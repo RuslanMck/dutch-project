@@ -1,0 +1,180 @@
+<title>Dutch матеріали</title>
+<style>
+/* layout: single 640px column, tabs on top */
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#777;--line:#e2e2e2;--acc:#c2410c;--soft:#fbf3ee;--bad:#b91c1c;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161616;--fg:#eee;--mut:#999;--line:#333;--acc:#fb923c;--soft:#221a15;--bad:#f87171;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161616;--fg:#eee;--mut:#999;--line:#333;--acc:#fb923c;--soft:#221a15;--bad:#f87171;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding-block:16px;padding-inline:16px}
+nav{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+button,input,select{font:inherit;color:inherit;background:none;border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.on{border-color:var(--acc);color:var(--acc)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:normal;font-size:13px}
+.s{border:0;padding:2px 6px;color:var(--acc)}
+.x{border:0;color:var(--mut);padding:2px 6px}
+.x.arm{color:var(--acc)}
+.card{border:1px solid var(--line);border-radius:10px;padding:40px 16px;text-align:center;font-size:24px;min-height:80px;cursor:pointer}
+.card small{display:block;color:var(--mut);font-size:15px;margin-top:10px}
+.row{display:flex;gap:8px;margin-top:12px}.row>*{flex:1}
+.add{display:grid;gap:8px;margin-top:24px}
+.m{color:var(--mut);font-size:14px;margin-top:8px}
+#rf{width:100%;box-sizing:border-box;margin-bottom:12px}
+.rule{border-bottom:1px solid var(--line)}
+.rule summary{cursor:pointer;padding:12px 0;font-weight:600;list-style:none;display:flex;gap:8px;align-items:baseline}
+.rule summary::-webkit-details-marker{display:none}
+.rule summary::before{content:'›';color:var(--acc);display:inline-block;transition:transform .15s}
+.rule[open] summary::before{transform:rotate(90deg)}
+.rule summary .tag{margin-left:auto;font-weight:normal;font-size:12px;color:var(--mut);letter-spacing:.03em}
+.rb{padding:0 0 16px 14px;min-width:0}
+.rb p{margin:0 0 10px}
+.rb ul{margin:0 0 10px;padding-left:20px}
+.rb table{margin:0 0 10px;font-size:15px}
+.rb td,.rb th{padding:6px}
+.rb .ex{background:var(--soft);border-radius:6px;padding:8px 10px;margin:0 0 10px}
+.rb .ex div+div{margin-top:4px}
+.rb b{color:var(--acc);font-weight:600}
+.badge{font-size:12px;color:var(--bad);border:1px solid var(--bad);border-radius:10px;padding:0 7px;font-weight:normal;font-variant-numeric:tabular-nums}
+.ml{border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:12px}
+.ml h4{margin:0;font-size:12px;color:var(--mut);font-weight:normal;letter-spacing:.06em;text-transform:uppercase}
+.mt{display:flex;gap:8px;align-items:baseline;font-weight:600}
+.mt .n{margin-left:auto;color:var(--bad);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fx{color:var(--mut);font-size:14px}
+.cs{font-size:14px;margin-top:2px}
+.cs s{color:var(--bad)}
+.ec{color:var(--bad);font-variant-numeric:tabular-nums;text-align:center;font-weight:600}
+.hs{border:0;padding:0;color:inherit;font-size:13px}.hs.on{color:var(--acc)}
+.empty{color:var(--mut);padding:24px 0}
+@media (prefers-reduced-motion:reduce){.rule summary::before{transition:none}}
+</style>
+<main>
+<nav><button id="t1" class="on">Таблиця</button><button id="t2">Картки</button><button id="t3">Практика</button><button id="t4">Правила</button></nav>
+<div id="v1"><input id="wf" placeholder="Пошук слова" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:12px"><div class="tw"><table><thead><tr><th>Слово</th><th>Переклад</th><th><button id="se" class="hs" title="Сортувати за кількістю помилок">Помилки ↓</button></th><th>Статус</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+<div class="add"><input id="nl" placeholder="Слово (nl)"><input id="uk" placeholder="Переклад">
+<select id="art"><option value="">—</option><option>de</option><option>het</option></select>
+<input id="ex" placeholder="Приклад (необов'язково)"><button id="ad">Додати</button></div></div>
+<div id="v2" hidden><div id="cd" class="card"></div>
+<div class="row"><button id="again">Ще раз</button><button id="know">Знаю</button></div></div>
+<div id="v3" hidden><div id="pq" class="card"></div>
+<div class="add"><input id="pa" placeholder="Напиши нідерландською (можна з de/het)" autocapitalize="off" autocomplete="off" spellcheck="false"><button id="pc">Перевірити</button></div>
+<div id="pr" class="m"></div><div id="ps" class="m"></div></div>
+<div id="v4" hidden><input id="rf" placeholder="Пошук у правилах" autocomplete="off"><div id="rl"><div class="empty">Тут з'являться граматичні правила.</div></div></div>
+<div id="msg" class="m"></div>
+</main>
+<script>
+const NEXT={new:'learning',learning:'learned',learned:'new'},LBL={new:'нове',learning:'вчу',learned:'знаю'};
+const EMPTY='Словник порожній. Додай слова нижче або попроси Claude імпортувати стартовий набір (див. README).';
+let sortErr=false,words=[],rules=[],mistakes=[],db=null,i=0,flip=false,armed=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pool=()=>words.filter(w=>w.status!=='learned');
+function render(){
+  const q=$('#wf').value.trim().toLowerCase();
+  let list=sortErr?[...words].sort((a,b)=>(b.err||0)-(a.err||0)):words;
+  if(q)list=list.filter(w=>(w.nl+' '+w.uk+' '+(w.topic||'')).toLowerCase().includes(q));
+  $('#tb').innerHTML=list.map(w=>`<tr><td>${esc(w.art)} ${esc(w.nl)}</td><td>${esc(w.uk)}</td><td class="ec">${w.err||''}</td><td><button class="s" data-s="${esc(w.id)}">${LBL[w.status]||'нове'}</button></td><td><button class="x${armed===w.id?' arm':''}" data-d="${esc(w.id)}">${armed===w.id?'видалити?':'×'}</button></td></tr>`).join('')||`<tr><td colspan="5">${words.length?'Нічого не знайдено':EMPTY}</td></tr>`;
+  const p=pool();
+  if(!p.length){$('#cd').innerHTML=words.length?'Усе вивчено':'Немає слів';return}
+  const w=p[i%p.length];
+  $('#cd').innerHTML=flip?`${esc(w.uk)}<small>${esc(w.ex)}</small>`:`${esc(w.art)} ${esc(w.nl)}`;
+}
+$('#wf').oninput=render;
+/* rule body: blank-line paragraphs, "- " lists, "|" tables, "> " example lines, **bold** */
+const inl=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+function md(t){
+  return String(t||'').split(/\n\s*\n/).map(b=>{
+    const L=b.split('\n').map(x=>x.trim()).filter(Boolean);
+    if(!L.length)return'';
+    if(L.every(x=>x.startsWith('|'))){
+      const rows=L.filter(x=>!/^\|[\s|:-]+\|?$/.test(x)).map(x=>x.replace(/^\||\|$/g,'').split('|').map(c=>c.trim()));
+      const [h,...r]=rows;
+      return `<div class="tw"><table><thead><tr>${h.map(c=>`<th>${inl(c)}</th>`).join('')}</tr></thead><tbody>${r.map(x=>`<tr>${x.map(c=>`<td>${inl(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    }
+    if(L.every(x=>x.startsWith('- ')))return`<ul>${L.map(x=>`<li>${inl(x.slice(2))}</li>`).join('')}</ul>`;
+    if(L.every(x=>x.startsWith('>')))return`<div class="ex">${L.map(x=>`<div>${inl(x.replace(/^>\s?/,''))}</div>`).join('')}</div>`;
+    return`<p>${L.map(inl).join('<br>')}</p>`;
+  }).join('');
+}
+const errN=id=>mistakes.filter(m=>m.rule===id).reduce((s,m)=>s+(m.count||0),0);
+function mlog(id){
+  const ms=mistakes.filter(m=>m.rule===id).sort((a,b)=>(b.count||0)-(a.count||0)||(b.last||0)-(a.last||0));
+  if(!ms.length)return'';
+  return`<div class="ml"><h4>Мої помилки</h4>${ms.map(m=>`<div><div class="mt"><span>${esc(m.title)}</span><span class="n">×${m.count||0}</span></div>${m.fix?`<div class="fx">${esc(m.fix)}</div>`:''}<div class="cs">${(m.cases||[]).slice(-3).reverse().map(c=>`<s>${esc(c.w)}</s> → ${esc(c.r)}`).join('<br>')}</div></div>`).join('')}</div>`;
+}
+function renderRules(){
+  const q=$('#rf').value.trim().toLowerCase();
+  const all=rules.concat(mistakes.some(m=>m.rule==='other')?[{id:'other',title:'Інші помилки',topic:'поза правилами',body:'',order:1e9}]:[]);
+  const txt=r=>(r.title+' '+r.topic+' '+r.body+' '+mistakes.filter(m=>m.rule===r.id).map(m=>m.title+' '+(m.cases||[]).map(c=>c.w+' '+c.r).join(' ')).join(' ')).toLowerCase();
+  const list=all.filter(r=>!q||txt(r).includes(q));
+  if(!all.length){$('#rl').innerHTML='<div class="empty">Тут з\'являться граматичні правила. Попроси Claude імпортувати стартові правила або додати нове.</div>';return}
+  if(!list.length){$('#rl').innerHTML='<div class="empty">Нічого не знайдено.</div>';return}
+  const open=new Set([...document.querySelectorAll('.rule[open]')].map(d=>d.dataset.id));
+  $('#rl').innerHTML=list.map(r=>`<details class="rule" data-id="${esc(r.id)}"${open.has(r.id)||q?' open':''}><summary>${esc(r.title)}${errN(r.id)?`<span class="badge" title="мої помилки">${errN(r.id)}</span>`:''}${r.topic?`<span class="tag">${esc(r.topic)}</span>`:''}</summary><div class="rb">${md(r.body)}${mlog(r.id)}</div></details>`).join('');
+}
+$('#rf').oninput=renderRules;
+let pid=null,done=false,ok=0,tot=0;
+const lev=(a,b)=>{const m=[];for(let i=0;i<=a.length;i++)m[i]=[i];for(let j=1;j<=b.length;j++)m[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return m[a.length][b.length]};
+function nextQ(){const p=pool().length?pool():words;if(!p.length){pid=null;$('#pq').textContent='Немає слів';return}
+  let w;do{w=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&w.id===pid);
+  pid=w.id;done=false;$('#pq').textContent=w.uk;$('#pa').value='';$('#pr').textContent='';$('#pc').textContent='Перевірити';$('#pa').focus()}
+async function check(){
+  if(done){nextQ();return}
+  const w=words.find(x=>x.id===pid);let v=$('#pa').value.trim().toLowerCase().replace(/\s+/g,' ');
+  if(!w||!v)return;
+  let art='';const m=v.match(/^(de|het)\s+(.+)$/);if(m){art=m[1];v=m[2]}
+  const t=w.nl.toLowerCase(),full=(w.art?w.art+' ':'')+w.nl;let msg,good=false;
+  if(v===t){if(art&&w.art&&art!==w.art)msg='Слово вірно, але артикль: '+w.art+' → '+full;else{good=true;msg='✓ '+full}}
+  else if(lev(v,t)<=1)msg='Майже, перевір літери. Правильно: '+full;
+  else msg='✗ Правильно: '+full;
+  done=true;tot++;if(good)ok++;
+  $('#pr').textContent=msg;$('#ps').textContent='Вірно: '+ok+' з '+tot;$('#pc').textContent='Далі';
+  if(!db)return;
+  const upd={status:good?(w.status==='learning'?'learned':w.status):'learning'};if(!good)upd.err=(w.err||0)+1;
+  try{await db.doc('words/'+w.id).update(upd)}catch(e){$('#msg').textContent=e.message}
+}
+$('#pc').onclick=check;
+$('#pa').onkeydown=e=>{if(e.key==='Enter')check()};
+function tab(n){[1,2,3,4].forEach(k=>{$('#v'+k).hidden=k!==n;$('#t'+k).className=k===n?'on':''});flip=false;armed=null;render();if(n===3&&!pid)nextQ();if(n===4)renderRules();try{localStorage.setItem('tab',n)}catch(e){}}
+[1,2,3,4].forEach(k=>$('#t'+k).onclick=()=>tab(k));
+$('#se').onclick=()=>{sortErr=!sortErr;$('#se').className='hs'+(sortErr?' on':'');render()};
+$('#cd').onclick=()=>{flip=!flip;render()};
+const mark=async st=>{const p=pool();if(!p.length||!db)return;const w=p[i%p.length];flip=false;try{await db.doc('words/'+w.id).update({status:st})}catch(e){$('#msg').textContent=e.message}};
+$('#know').onclick=()=>mark('learned');
+$('#again').onclick=()=>{i++;mark('learning')};
+$('#tb').onclick=async e=>{
+  const s=e.target.dataset.s,d=e.target.dataset.d;
+  if(!db||(!s&&!d))return;
+  try{
+    if(s){const w=words.find(x=>x.id===s);await db.doc('words/'+s).update({status:NEXT[w.status]||'learning'})}
+    if(d){if(armed===d){armed=null;await db.doc('words/'+d).delete()}else{armed=d;render()}}
+  }catch(err){$('#msg').textContent=err.message}
+};
+$('#ad').onclick=async()=>{
+  const nl=$('#nl').value.trim(),uk=$('#uk').value.trim();
+  if(!nl||!uk||!db)return;
+  try{await db.collection('words').add({nl,uk,art:$('#art').value,ex:$('#ex').value.trim(),status:'new',added:Date.now()});
+    ['#nl','#uk','#ex'].forEach(s=>$(s).value='')}catch(e){$('#msg').textContent=e.message}
+};
+render();
+try{const t=+localStorage.getItem('tab');if(t>=1&&t<=4)tab(t)}catch(e){}
+(async()=>{
+  try{db=await window.claude.use('db')}catch(e){db=null}
+  if(!db){$('#msg').textContent='База недоступна: відкрий сторінку в claude.ai під своїм акаунтом.';return}
+  db.collection('words').onSnapshot(s=>{
+    words=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.added||0)-(b.added||0));
+    render();
+  },e=>{$('#msg').textContent=e.message});
+  db.collection('rules').onSnapshot(s=>{
+    rules=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.order||0)-(b.order||0));
+    renderRules();
+  },e=>{$('#msg').textContent=e.message});
+  db.collection('mistakes').onSnapshot(s=>{
+    mistakes=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+    renderRules();
+  },e=>{$('#msg').textContent=e.message});
+})();
+</script>

@@ -1,0 +1,51 @@
+[
+ {
+  "body": "| Займенник | Значення | luisteren | hebben | zijn |\n|---|---|---|---|---|\n| ik | я | luister | heb | ben |\n| jij / je | ти | luister**t** | heb**t** | ben**t** |\n| u | Ви (ввічливо) | luister**t** | heb**t** / heeft | ben**t** |\n| hij, zij / ze, het | він, вона, воно | luister**t** | **heeft** | **is** |\n| wij / we | ми | luister**en** | hebb**en** | zijn |\n| jullie | ви | luister**en** | hebb**en** | zijn |\n| zij / ze | вони | luister**en** | hebb**en** | zijn |\n\nСхема для правильних дієслів:\n- **ik** → основа (інфінітив без -en): luisteren → ik luister\n- **jij, u, hij, zij, het** → основа + **t**: hij luistert\n- **wij, jullie, zij** (мн.) → інфінітив: we luisteren\n\nПитання з інверсією: якщо **jij / je** стоїть після дієслова, -t зникає. З u і hij -t лишається.\n\n> Jij woont in Utrecht. → Woon **je** in Utrecht?\n> Luister jij? Heb je tijd? Ben je moe?\n> Woon**t** u ook in Utrecht?\n\nПравопис основи (щоб звук не змінився):\n- довга голосна пишеться двома буквами: wonen → ik woon, maken → ik maak\n- подвоєна приголосна скорочується: zitten → ik zit, bellen → ik bel\n- v → f, z → s у кінці: leven → ik leef, lezen → ik lees\n- основа вже на -t: друге -t не додається: hij zit, jij eet\n- основа на -d: -t все одно додається: hij vindt, jij wordt\n\nКороткі форми je, ze, we звичайні в розмові. Повні jij, zij, wij ставлять для наголосу або протиставлення: **Jij** gaat, niet ik.",
+  "order": 10,
+  "title": "Особові займенники + дієслово (теперішній час)",
+  "topic": "1.4 · дієслово",
+  "id": "pronomen-werkwoord"
+ },
+ {
+  "body": "Головне: модальне дієслово змінюється і стоїть на своєму звичному місці. Друге дієслово йде в **інфінітиві** в **кінець** речення.\n\n> Ik **wil** graag koffie **drinken**.\n> Je **moet** morgen vroeg **werken**.\n> **Mag** ik twee flessen water **hebben**?\n> **Kunt** u dat even **herhalen**?\n\n| | kunnen (могти, вміти) | mogen (мати дозвіл) | moeten (мусити) | willen (хотіти) | zullen (буду / давай) |\n|---|---|---|---|---|---|\n| ik | kan | mag | moet | wil | zal |\n| jij / je | kunt (kan) | mag | moet | wilt (wil) | zult (zal) |\n| u | kunt | mag | moet | wilt | zult |\n| hij, zij, het | kan | mag | moet | wil | zal |\n| wij, jullie, zij | kunnen | mogen | moeten | willen | zullen |\n\nУвага: у hij/zij/het немає -t (hij kan, hij wil), на відміну від звичайних дієслів (правило 1.4). Виняток: hij moet.\n\nПорядок слів:\n\n| Тип | 1 | 2 | середина | кінець |\n|---|---|---|---|---|\n| ствердження | Ik | wil | graag koffie | drinken |\n| питання | Mag | ik | twee flessen water | hebben? |\n| питання зі словом | Wat | wil | je | eten? |\n\nТипова помилка: ставити друге дієслово одразу після модального та ще й зміненим.\n\n> ✗ Mag ik heb twee flessen water?\n> ✓ Mag ik twee flessen water hebben?\n\nУ проханнях друге дієслово часто пропускають, якщо зміст зрозумілий:\n\n> Mag ik twee flessen water?\n> Ik wil graag een koffie.",
+  "order": 15,
+  "title": "Модальні дієслова + інфінітив",
+  "topic": "Д1 · дієслово",
+  "id": "modaal"
+ },
+ {
+  "body": "| Особа | Присвійний | Значення | Приклад |\n|---|---|---|---|\n| ik | mijn | мій | mijn broer |\n| jij / je | jouw / je | твій | jouw / je ouders |\n| u | uw | Ваш | uw adres |\n| hij | zijn | його | zijn werk |\n| zij / ze | haar | її | haar foto |\n| wij / we | **onze** / **ons** | наш | onze les, ons adres |\n| jullie | jullie | ваш | jullie docent |\n| zij / ze (мн.) | hun | їхній | hun familie |\n\nЄдиний займенник, що змінюється, це **наш**:\n- **ons** перед het-словом в однині: ons adres, ons huis\n- **onze** перед de-словом і будь-якою множиною: onze les, onze kinderen, onze huizen\n\n**jouw** з наголосом, **je** без нього. Звичайно кажуть je: Komen je ouders ook? Jouw ставлять для контрасту: Is dit jouw tas of mijn tas?\n\nУвага для україномовних: слова «свій» у нідерландській немає. Завжди бери займенник особи:\n\n> Hij belt **zijn** moeder. (він дзвонить своїй мамі)\n> We bezoeken **onze** ouders. (ми відвідуємо своїх батьків)\n> Ze komen met **hun** kinderen. (вони приходять зі своїми дітьми)\n\nzijn має два значення: «його» і дієслово «бути». Розрізняй за місцем: zijn werk (його робота) і Ze zijn moe (вони втомлені).",
+  "order": 20,
+  "title": "Присвійні займенники (possessief pronomen)",
+  "topic": "2.8 · займенник",
+  "id": "possessief"
+ },
+ {
+  "body": "| | Означений | Неозначений |\n|---|---|---|\n| de-слово | **de** cursus | **een** cursus |\n| het-слово | **het** café | **een** café |\n| зменшувальне (-je) | **het** rondje | **een** rondje |\n| множина | **de** cursussen | cursussen (без артикля) |\n\n- **de / het** означений: конкретна, відома річ (the)\n- **een** неозначений: одна якась річ (a / an); у множині неозначеного артикля немає\n- зменшувальні на -je завжди **het**: het zusje, het kopje, het biertje\n- у множині завжди **de**, навіть для het-слів\n\nБез артикля кажуть про речовини та незлічуване, коли не йдеться про конкретну порцію:\n\n> Ik wil graag cola.\n> Ik neem rode wijn.\n> Але: Doe mij maar **een** biertje. (одна порція)\n\nde чи het: приблизно дві третини слів мають de, тож артикль треба вчити разом зі словом. Кілька підказок:\n- люди й професії переважно de: de man, de ober, de docent\n- слова на -ing переважно de: de oefening, de woning\n- інфінітив як іменник het: het eten, het leven\n- слова на -isme, -ment переважно het: het toerisme, het moment\n\neen (неозначений артикль) вимовляється коротко, як «ен». **één** з наголосами означає число «один»: drie komkommers voor één euro.",
+  "order": 30,
+  "title": "Артикль: de, het, een",
+  "topic": "3.6 · артикль",
+  "id": "artikel"
+ },
+ {
+  "body": "Правило: до 19 додаємо **-de**, від 20 додаємо **-ste**. Скорочення пишеться цифрою з **e**: 1e, 2e, 21e.\n\n| | | | |\n|---|---|---|---|\n| 1e | **eerste** | 11e | elfde |\n| 2e | tweede | 12e | twaalfde |\n| 3e | **derde** | 13e | dertiende |\n| 4e | vierde | 14e | veertiende |\n| 5e | vijfde | 15e | vijftiende |\n| 6e | zesde | 16e | zestiende |\n| 7e | zevende | 17e | zeventiende |\n| 8e | **achtste** | 18e | achttiende |\n| 9e | negende | 19e | negentiende |\n| 10e | tiende | 20e | twintig**ste** |\n\nВинятки, які треба запам'ятати: **eerste** (не «eende»), **derde** (не «driede»), **achtste** (-ste замість -de).\n\nДалі все за правилом -ste:\n> 21e eenentwintigste\n> 30e dertigste\n> 100e honderdste\n> 1000e duizendste\n\nДля складених чисел форму визначає остання частина: 101e honderdeerste, 103e honderdderde.\n\nПорядковий числівник уже закінчується на -e, тому перед іменником не змінюється: het eerste rondje, de derde dag, mijn tweede les.\n\nУ датах нідерландці зазвичай кажуть звичайне число: 11 oktober читається elf oktober.",
+  "order": 40,
+  "title": "Порядкові числівники (rangtelwoorden)",
+  "topic": "3.8 · числівник",
+  "id": "rangtelwoorden"
+ },
+ {
+  "body": "Головне: у множині всі іменники отримують артикль **de**, навіть het-слова.\n\n> het boontje → **de** boontjes\n> het spekje → **de** spekjes\n\n| Закінчення | Коли | Однина → множина |\n|---|---|---|\n| **-en** | більшість слів | de tomaat → de tomat**en** |\n| **-s** | на ненаголошені -el, -er, -em, -en, -e, зменшувальні на -je, багато запозичень | de komkommer → de komkommer**s** |\n| **-'s** | на довгу голосну -a, -o, -u, -i, -y | de foto → de foto**'s** |\n\nПравопис при **-en** (щоб звук голосної не змінився):\n- довга голосна з двох букв у закритому складі втрачає одну: tomaat → toma-ten, persoon → perso-nen\n- коротка голосна: приголосна подвоюється: boodschap → boodschap-pen\n- f → v, s → z (часто): de brief → de brieven, het huis → de huizen\n\nПриклади з -s: buitenlanders, aardappels, champignons, kantines.\nПриклади з -'s: paprika's, foto's.\n\nНерегулярні треба вчити окремо, напр. de buur → de buren.",
+  "order": 50,
+  "title": "Множина іменників (pluralis)",
+  "topic": "5.4 · іменник",
+  "id": "pluralis"
+ },
+ {
+  "body": "Головне: прикметник перед іменником отримує **-e**. Без -e лише у двох випадках:\n- het-слово в однині з **een**, **geen** або без артикля\n- прикметник стоїть після дієслова (is, zijn, vinden…)\n\n| | de-слово | het-слово |\n|---|---|---|\n| de / het | de klein**e** courgette | het klein**e** bosje |\n| een / geen | een klein**e** courgette | een **klein** bosje |\n| без артикля | vers**e** knoflook | **goed** idee |\n| множина | (de) klein**e** courgettes | (de) klein**e** bosjes |\n| після дієслова | De courgette is **klein**. | Het bosje is **klein**. |\n\nЯк швидко перевірити: це het-слово в однині без de/het/dit/dat? Тоді без -e. Інакше з -e (якщо прикметник перед іменником).\n\n> een groot gezin (het gezin)\n> een grote stad (de stad)\n> Prettig weekend! (het weekend, без артикля)\n> De tomaten zijn altijd mooi. (після дієслова)\n\nПравопис при додаванні -e (ті самі правила, що й для множини):\n- groot → grote, geel → gele\n- wit → witte, dik → dikke\n- lief → lieve, vies → vieze\n\nНазви країн-прикметники теж змінюються: Nederlands → een Nederlandse moeder, але een Nederlands gerecht (het).",
+  "order": 60,
+  "title": "Прикметник перед іменником (adjectief)",
+  "topic": "5.5 · прикметник",
+  "id": "adjectief"
+ }
+]
