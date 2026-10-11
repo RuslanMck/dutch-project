@@ -1,14 +1,12 @@
 # Dutch learning kit for Claude
 
-Набір для вивчення нідерландської з Claude (для україномовних, рівень A1/A2): власний словник, граматичні правила, картки, практика і журнал помилок, який Claude веде сам.
+A kit for learning Dutch with Claude, built for Ukrainian speakers at A1/A2 level: your own dictionary, grammar rules, flashcards, practice, and a mistake log that Claude keeps for you. Claude's explanations and the page interface are in Ukrainian.
 
-*English summary below.*
+## Quick start: set up with one prompt
 
-## Швидкий старт: налаштування одним промптом
-
-1. У [claude.ai](https://claude.ai) створи **Project** (наприклад, «Dutch») і відкрий у ньому новий чат.
-2. Скопіюй промпт нижче, встав у чат і відправ. Claude сам забере файли з репозиторію, створить твою сторінку, заповнить її і підготує решту.
-3. Підтверджуй запити Claude на запис, їх буде кілька. Наприкінці виконай два ручні кроки, про які він скаже: встав інструкції проєкту і збережи скіл.
+1. In [claude.ai](https://claude.ai), create a **Project** (e.g. "Dutch") and open a new chat in it.
+2. Copy the prompt below, paste it into the chat and send it. Claude fetches the files from this repo, creates your page, fills it and prepares the rest.
+3. Approve Claude's write requests when asked (there will be several). At the end, do the two manual steps Claude points out: paste the project instructions and save the skill.
 
 ```text
 Set up my Dutch learning kit from this public GitHub repo:
@@ -25,52 +23,46 @@ Explain everything to me in Ukrainian. Do not change the repo.
 4. In `project-instructions.md` and `skills/dutch-exercise-check/SKILL.md`, replace `<ARTIFACT_URL>` with my new artifact's link.
 5. Give me the finished project instructions (the text below the line in `project-instructions.md`) in one copyable code block, and tell me to paste it into this Project's instructions field.
 6. Give me the skill: if you can show a skill-proposal card, propose `dutch-exercise-check` with the updated SKILL.md; otherwise send me a ZIP of the `dutch-exercise-check` folder to upload as a skill.
-7. Finish with one short line on how to start, e.g. "напиши: дай вправу на правило 5.5".
+7. Finish with one short line on how to start, e.g. "ask me for an exercise on rule 5.5".
 ```
 
-Якщо щось пішло не так, нижче є ручне налаштування.
+If something goes wrong, use the manual setup below.
 
-## Що всередині
+## What's inside
 
-| Файл | Що це |
+| File | What it is |
 |---|---|
-| `artifact/dutch-materials.html` | Сторінка «Dutch матеріали»: словник, картки, практика, правила з журналом помилок |
-| `starter/words.json` | Стартовий словник: ~530 слів і фраз за темами |
-| `starter/rules.json` | 7 граматичних правил українською (артиклі, займенники, модальні дієслова, множина, прикметники…) |
-| `project-instructions.md` | Інструкції для Claude Project: як пояснювати, як давати вправи, як перевіряти |
-| `skills/dutch-exercise-check/SKILL.md` | Скіл: перевірка вправ з номерами правил і запис помилок у сторінку |
+| `artifact/dutch-materials.html` | The "Dutch матеріали" page: dictionary, flashcards, practice, grammar rules with a mistake log |
+| `starter/words.json` | Starter dictionary: ~530 Dutch words and phrases with Ukrainian translations, grouped by topic |
+| `starter/rules.json` | 7 grammar rules explained in Ukrainian (articles, pronouns, modal verbs, plurals, adjectives…) |
+| `project-instructions.md` | Instructions for the Claude Project: how to explain, give exercises and check answers |
+| `skills/dutch-exercise-check/SKILL.md` | Skill: checks exercises with rule numbers and logs mistakes in the page |
 
-Номери правил (1.4, 5.5…) відповідають розділам підручника *Basic Dutch: A Grammar and Workbook* (Routledge). Сам підручник у набір не входить.
+Rule numbers (1.4, 5.5…) match the sections of the textbook *Basic Dutch: A Grammar and Workbook* (Routledge). The textbook itself is not included.
 
-## Ручне налаштування (≈10 хвилин)
+## Manual setup (≈10 minutes)
 
-Потрібен акаунт на [claude.ai](https://claude.ai).
+You need a [claude.ai](https://claude.ai) account.
 
-1. **Завантаж набір.** Зелена кнопка **Code → Download ZIP**, розпакуй.
-2. **Створи Project** у claude.ai (наприклад, «Dutch»).
-3. **Створи свою сторінку.** У чаті цього проєкту прикріпи `artifact/dutch-materials.html`, `starter/words.json` і `starter/rules.json` та напиши:
+1. **Download the kit.** Green **Code → Download ZIP** button, then unzip it.
+2. **Create a Project** in claude.ai (e.g. "Dutch").
+3. **Create your page.** In a chat inside that Project, attach `artifact/dutch-materials.html`, `starter/words.json` and `starter/rules.json`, and send:
 
-   > Опублікуй dutch-materials.html як артефакт із можливістю `db`. Потім імпортуй у його базу: rules.json → колекція `rules`, words.json → колекція `words` (doc_id = поле `id`, саме поле `id` у документ не записуй). Пиши пакетами по 50.
+   > Publish dutch-materials.html as an artifact with the `db` capability. Then import into its database: rules.json → collection `rules`, words.json → collection `words` (doc_id = the `id` field; leave `id` out of the document). Write in batches of 50.
 
-   Claude кілька разів попросить підтвердити запис: це нормально, близько 12 пакетів. У результаті з'явиться твоя власна сторінка з власним посиланням.
-4. **Встав інструкції.** Відкрий `project-instructions.md`, скопіюй текст під лінією в поле instructions проєкту і заміни `<ARTIFACT_URL>` посиланням на свою сторінку.
-5. **Додай скіл (необов'язково, але бажано).** У `skills/dutch-exercise-check/SKILL.md` теж заміни `<ARTIFACT_URL>`, заархівуй папку `dutch-exercise-check` у ZIP і завантаж у claude.ai як скіл (у налаштуваннях скілів).
+   Claude will ask you to approve the writes several times (about 12 batches). That's expected. You end up with your own page with its own link.
+4. **Paste the instructions.** Open `project-instructions.md`, copy the text below the line into the Project's instructions field, and replace `<ARTIFACT_URL>` with your page's link.
+5. **Add the skill (optional, recommended).** Replace `<ARTIFACT_URL>` in `skills/dutch-exercise-check/SKILL.md` too, zip the `dutch-exercise-check` folder and upload it to claude.ai as a skill (in the skills settings).
 
-Готово. Напиши в проєкті «дай вправу на правило 5.5» і перевір, як усе працює.
+Done. Ask in the Project for an exercise on rule 5.5 to check that everything works.
 
-## Як налаштувати під себе
+## Making it your own
 
-- **Слова.** Додавай на вкладці «Таблиця» або просто пиши Claude «додай слово …». Непотрібні слова видаляй хрестиком.
-- **Правила.** Попроси Claude: «додай правило з розділу 6.2 своїми словами». Свої правила нумеруй Д1, Д2…
-- **Мова пояснень.** Усе налаштовано на українську. Для іншої мови зміни інструкції проєкту, скіл і переклади в `words.json`.
-- **Прогрес.** Статуси слів (нове / вчу / знаю) і журнал помилок — тільки твої: сторінка належить тобі, ніхто інший їх не бачить, поки ти сам не поділишся посиланням.
+- **Words.** Add them on the "Таблиця" (Table) tab, or just tell Claude "add the word …". Remove words you don't need with the × button.
+- **Rules.** Ask Claude to add a rule from a textbook section in its own words. Number your own rules Д1, Д2…
+- **Explanation language.** Everything is set up for Ukrainian. For another language, change the project instructions, the skill and the translations in `words.json`.
+- **Progress.** Word statuses (new / learning / learned) and the mistake log are yours alone: the page belongs to you and nobody else sees it unless you share the link.
 
-## Оновлення
+## Updates
 
-Твоя копія не оновлюється сама. Якщо тут з'являться нові слова чи правила, можеш попросити Claude імпортувати лише нові записи з `starter/`.
-
----
-
-## English summary
-
-Quickest setup: create a Claude Project and paste the prompt from "Швидкий старт" above into a chat. A starter kit for learning Dutch with Claude (Ukrainian explanations, A1/A2): a self-hosted artifact page with a dictionary, flashcards, practice and grammar rules with a mistake log; ~530 starter words and 7 rules; Project instructions; and a skill that checks exercises and logs mistakes. Download the ZIP, create a Claude Project, upload the HTML and the two JSON files and ask Claude to publish the page with the `db` capability and import the data (step 3 above), then paste the instructions and add the skill. Your copy, your progress — nothing is shared with the original.
+Your copy does not update itself. If new words or rules are added here, you can ask Claude to import only the new entries from `starter/`.
