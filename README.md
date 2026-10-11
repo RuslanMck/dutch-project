@@ -4,6 +4,32 @@
 
 *English summary below.*
 
+## Швидкий старт: налаштування одним промптом
+
+1. У [claude.ai](https://claude.ai) створи **Project** (наприклад, «Dutch») і відкрий у ньому новий чат.
+2. Скопіюй промпт нижче, встав у чат і відправ. Claude сам забере файли з репозиторію, створить твою сторінку, заповнить її і підготує решту.
+3. Підтверджуй запити Claude на запис, їх буде кілька. Наприкінці виконай два ручні кроки, про які він скаже: встав інструкції проєкту і збережи скіл.
+
+```text
+Set up my Dutch learning kit from this public GitHub repo:
+https://github.com/RuslanMck/dutch-project
+
+Explain everything to me in Ukrainian. Do not change the repo.
+
+1. Get the files: run `git clone --depth 1 https://github.com/RuslanMck/dutch-project` in your workspace. If cloning fails, ask me to download the ZIP (Code → Download ZIP) and attach it, then unpack it.
+2. Publish `artifact/dutch-materials.html` as a new artifact with the `db` capability, exactly as it is (do not redesign it).
+3. Import the starter data into that artifact's database with the ArtifactData tool:
+   - `starter/rules.json` → collection `rules`
+   - `starter/words.json` → collection `words`
+   For every item use its `id` field as doc_id and write all other fields as the document (leave `id` out). Use `set` in batches of up to 50. Afterwards list both collections and tell me the counts (expected: 7 rules, 532 words).
+4. In `project-instructions.md` and `skills/dutch-exercise-check/SKILL.md`, replace `<ARTIFACT_URL>` with my new artifact's link.
+5. Give me the finished project instructions (the text below the line in `project-instructions.md`) in one copyable code block, and tell me to paste it into this Project's instructions field.
+6. Give me the skill: if you can show a skill-proposal card, propose `dutch-exercise-check` with the updated SKILL.md; otherwise send me a ZIP of the `dutch-exercise-check` folder to upload as a skill.
+7. Finish with one short line on how to start, e.g. "напиши: дай вправу на правило 5.5".
+```
+
+Якщо щось пішло не так, нижче є ручне налаштування.
+
 ## Що всередині
 
 | Файл | Що це |
@@ -16,7 +42,7 @@
 
 Номери правил (1.4, 5.5…) відповідають розділам підручника *Basic Dutch: A Grammar and Workbook* (Routledge). Сам підручник у набір не входить.
 
-## Налаштування (≈10 хвилин)
+## Ручне налаштування (≈10 хвилин)
 
 Потрібен акаунт на [claude.ai](https://claude.ai).
 
@@ -47,4 +73,4 @@
 
 ## English summary
 
-A starter kit for learning Dutch with Claude (Ukrainian explanations, A1/A2): a self-hosted artifact page with a dictionary, flashcards, practice and grammar rules with a mistake log; ~530 starter words and 7 rules; Project instructions; and a skill that checks exercises and logs mistakes. Download the ZIP, create a Claude Project, upload the HTML and the two JSON files and ask Claude to publish the page with the `db` capability and import the data (step 3 above), then paste the instructions and add the skill. Your copy, your progress — nothing is shared with the original.
+Quickest setup: create a Claude Project and paste the prompt from "Швидкий старт" above into a chat. A starter kit for learning Dutch with Claude (Ukrainian explanations, A1/A2): a self-hosted artifact page with a dictionary, flashcards, practice and grammar rules with a mistake log; ~530 starter words and 7 rules; Project instructions; and a skill that checks exercises and logs mistakes. Download the ZIP, create a Claude Project, upload the HTML and the two JSON files and ask Claude to publish the page with the `db` capability and import the data (step 3 above), then paste the instructions and add the skill. Your copy, your progress — nothing is shared with the original.
