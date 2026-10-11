@@ -1,0 +1,5322 @@
+[
+ {
+  "nl": "gefeliciteerd",
+  "uk": "вітаю",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-gefeliciteerd",
+  "status": "new",
+  "added": 1700000000000
+ },
+ {
+  "nl": "gefeliciteerd met je verjaardag",
+  "uk": "вітаю з днем народження",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-gefeliciteerd-met-je-verjaardag",
+  "status": "new",
+  "added": 1700000000001
+ },
+ {
+  "nl": "prettig met je kennis te maken",
+  "uk": "приємно з тобою познайомитися",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-prettig-met-je-kennis-te-maken",
+  "status": "new",
+  "added": 1700000000002
+ },
+ {
+  "nl": "prettig",
+  "uk": "приємний",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-prettig",
+  "status": "new",
+  "added": 1700000000003
+ },
+ {
+  "nl": "kennen",
+  "uk": "знати (когось)",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-kennen",
+  "status": "new",
+  "added": 1700000000004
+ },
+ {
+  "nl": "elkaar",
+  "uk": "один одного",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-elkaar",
+  "status": "new",
+  "added": 1700000000005
+ },
+ {
+  "nl": "eigenlijk",
+  "uk": "насправді, власне кажучи",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-eigenlijk",
+  "status": "new",
+  "added": 1700000000006
+ },
+ {
+  "nl": "willen",
+  "uk": "хотіти",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-willen",
+  "status": "new",
+  "added": 1700000000007
+ },
+ {
+  "nl": "trakteren",
+  "uk": "пригощати",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-trakteren",
+  "status": "new",
+  "added": 1700000000008
+ },
+ {
+  "nl": "maar",
+  "uk": "але",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-maar",
+  "status": "new",
+  "added": 1700000000009
+ },
+ {
+  "nl": "mij",
+  "uk": "мене, мені",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-mij",
+  "status": "new",
+  "added": 1700000000010
+ },
+ {
+  "nl": "doe mij maar een biertje",
+  "uk": "мені пиво, будь ласка",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-doe-mij-maar-een-biertje",
+  "status": "new",
+  "added": 1700000000011
+ },
+ {
+  "nl": "ik neem rode wijn",
+  "uk": "я візьму червоне вино",
+  "art": "",
+  "ex": "",
+  "topic": "In het café",
+  "id": "s-ik-neem-rode-wijn",
+  "status": "new",
+  "added": 1700000000012
+ },
+ {
+  "nl": "kletsen",
+  "uk": "балакати",
+  "art": "",
+  "ex": "",
+  "topic": "Різне",
+  "id": "s-kletsen",
+  "status": "new",
+  "added": 1700000000013
+ },
+ {
+  "nl": "rustig",
+  "uk": "спокійний",
+  "art": "",
+  "ex": "",
+  "topic": "Різне",
+  "id": "s-rustig",
+  "status": "new",
+  "added": 1700000000014
+ },
+ {
+  "nl": "druk",
+  "uk": "зайнятий",
+  "art": "",
+  "ex": "",
+  "topic": "Різне",
+  "id": "s-druk",
+  "status": "new",
+  "added": 1700000000015
+ },
+ {
+  "nl": "waarom",
+  "uk": "чому",
+  "art": "",
+  "ex": "",
+  "topic": "Різне",
+  "id": "s-waarom",
+  "status": "new",
+  "added": 1700000000016
+ },
+ {
+  "nl": "ik ben jarig",
+  "uk": "у мене день народження",
+  "art": "",
+  "ex": "",
+  "topic": "Різне",
+  "id": "s-ik-ben-jarig",
+  "status": "new",
+  "added": 1700000000017
+ },
+ {
+  "nl": "mijn verjaardag is in",
+  "uk": "мій день народження в",
+  "art": "",
+  "ex": "",
+  "topic": "Різне",
+  "id": "s-mijn-verjaardag-is-in",
+  "status": "new",
+  "added": 1700000000018
+ },
+ {
+  "nl": "maandag",
+  "uk": "понеділок",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-maandag",
+  "status": "new",
+  "added": 1700000000019
+ },
+ {
+  "nl": "dinsdag",
+  "uk": "вівторок",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-dinsdag",
+  "status": "new",
+  "added": 1700000000020
+ },
+ {
+  "nl": "woensdag",
+  "uk": "середа",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-woensdag",
+  "status": "new",
+  "added": 1700000000021
+ },
+ {
+  "nl": "donderdag",
+  "uk": "четвер",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-donderdag",
+  "status": "new",
+  "added": 1700000000022
+ },
+ {
+  "nl": "vrijdag",
+  "uk": "п'ятниця",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-vrijdag",
+  "status": "new",
+  "added": 1700000000023
+ },
+ {
+  "nl": "zaterdag",
+  "uk": "субота",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-zaterdag",
+  "status": "new",
+  "added": 1700000000024
+ },
+ {
+  "nl": "zondag",
+  "uk": "неділя",
+  "art": "",
+  "ex": "",
+  "topic": "Дні тижня",
+  "id": "s-zondag",
+  "status": "new",
+  "added": 1700000000025
+ },
+ {
+  "nl": "kantine",
+  "uk": "їдальня",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-kantine",
+  "status": "new",
+  "added": 1700000000026
+ },
+ {
+  "nl": "zo",
+  "uk": "отак! ну от!",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-zo",
+  "status": "new",
+  "added": 1700000000027
+ },
+ {
+  "nl": "al",
+  "uk": "вже",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-al",
+  "status": "new",
+  "added": 1700000000028
+ },
+ {
+  "nl": "pas",
+  "uk": "тільки",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-pas",
+  "status": "new",
+  "added": 1700000000029
+ },
+ {
+  "nl": "jarig",
+  "uk": "іменинник",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-jarig",
+  "status": "new",
+  "added": 1700000000030
+ },
+ {
+  "nl": "wat leuk",
+  "uk": "як гарно",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-wat-leuk",
+  "status": "new",
+  "added": 1700000000031
+ },
+ {
+  "nl": "dus in de winter",
+  "uk": "тож взимку",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-dus-in-de-winter",
+  "status": "new",
+  "added": 1700000000032
+ },
+ {
+  "nl": "krijgen",
+  "uk": "отримувати",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-krijgen",
+  "status": "new",
+  "added": 1700000000033
+ },
+ {
+  "nl": "nog",
+  "uk": "ще",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-nog",
+  "status": "new",
+  "added": 1700000000034
+ },
+ {
+  "nl": "bezoek",
+  "uk": "гості, відвідування",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-bezoek",
+  "status": "new",
+  "added": 1700000000035
+ },
+ {
+  "nl": "jonger",
+  "uk": "молодший",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-jonger",
+  "status": "new",
+  "added": 1700000000036
+ },
+ {
+  "nl": "hij of jij",
+  "uk": "він чи ти",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-hij-of-jij",
+  "status": "new",
+  "added": 1700000000037
+ },
+ {
+  "nl": "meer",
+  "uk": "більше",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-meer",
+  "status": "new",
+  "added": 1700000000038
+ },
+ {
+  "nl": "kijken",
+  "uk": "дивитися",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-kijken",
+  "status": "new",
+  "added": 1700000000039
+ },
+ {
+  "nl": "kijk",
+  "uk": "дивись",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-kijk",
+  "status": "new",
+  "added": 1700000000040
+ },
+ {
+  "nl": "een heel ander type",
+  "uk": "зовсім інший тип",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-een-heel-ander-type",
+  "status": "new",
+  "added": 1700000000041
+ },
+ {
+  "nl": "haar",
+  "uk": "волосся",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-haar",
+  "status": "new",
+  "added": 1700000000042
+ },
+ {
+  "nl": "donker",
+  "uk": "темний",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-donker",
+  "status": "new",
+  "added": 1700000000043
+ },
+ {
+  "nl": "daar",
+  "uk": "там",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-daar",
+  "status": "new",
+  "added": 1700000000044
+ },
+ {
+  "nl": "seizoen",
+  "uk": "сезон, пора року",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-seizoen",
+  "status": "new",
+  "added": 1700000000045
+ },
+ {
+  "nl": "weten",
+  "uk": "знати (факт)",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-weten",
+  "status": "new",
+  "added": 1700000000046
+ },
+ {
+  "nl": "vertellen",
+  "uk": "розповідати",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-vertellen",
+  "status": "new",
+  "added": 1700000000047
+ },
+ {
+  "nl": "vertel eens",
+  "uk": "розкажи-но",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-vertel-eens",
+  "status": "new",
+  "added": 1700000000048
+ },
+ {
+  "nl": "kom eens hier",
+  "uk": "іди-но сюди",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-kom-eens-hier",
+  "status": "new",
+  "added": 1700000000049
+ },
+ {
+  "nl": "zeg eens",
+  "uk": "скажи-но",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-zeg-eens",
+  "status": "new",
+  "added": 1700000000050
+ },
+ {
+  "nl": "dat wil ik wel",
+  "uk": "оце я залюбки",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-dat-wil-ik-wel",
+  "status": "new",
+  "added": 1700000000051
+ },
+ {
+  "nl": "op bezoek komen",
+  "uk": "приходити в гості",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 2.1",
+  "id": "s-op-bezoek-komen",
+  "status": "new",
+  "added": 1700000000052
+ },
+ {
+  "nl": "allemaal",
+  "uk": "усі",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-allemaal",
+  "status": "new",
+  "added": 1700000000053
+ },
+ {
+  "nl": "iedereen",
+  "uk": "усі, кожен",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-iedereen",
+  "status": "new",
+  "added": 1700000000054
+ },
+ {
+  "nl": "cursus",
+  "uk": "курс",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-cursus",
+  "status": "new",
+  "added": 1700000000055
+ },
+ {
+  "nl": "ander",
+  "uk": "інший",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-ander",
+  "status": "new",
+  "added": 1700000000056
+ },
+ {
+  "nl": "lesgeven",
+  "uk": "навчати, викладати",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-lesgeven",
+  "status": "new",
+  "added": 1700000000057
+ },
+ {
+  "nl": "dag",
+  "uk": "день",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-dag",
+  "status": "new",
+  "added": 1700000000058
+ },
+ {
+  "nl": "beginnen",
+  "uk": "починати",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-beginnen",
+  "status": "new",
+  "added": 1700000000059
+ },
+ {
+  "nl": "kennismaken",
+  "uk": "знайомитися",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-kennismaken",
+  "status": "new",
+  "added": 1700000000060
+ },
+ {
+  "nl": "wat",
+  "uk": "що",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-wat",
+  "status": "new",
+  "added": 1700000000061
+ },
+ {
+  "nl": "jouw",
+  "uk": "твій",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-jouw",
+  "status": "new",
+  "added": 1700000000062
+ },
+ {
+  "nl": "jullie",
+  "uk": "ви; ваш",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-jullie",
+  "status": "new",
+  "added": 1700000000063
+ },
+ {
+  "nl": "voornaam",
+  "uk": "ім'я",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-voornaam",
+  "status": "new",
+  "added": 1700000000064
+ },
+ {
+  "nl": "achternaam",
+  "uk": "прізвище",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-achternaam",
+  "status": "new",
+  "added": 1700000000065
+ },
+ {
+  "nl": "uit",
+  "uk": "з",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-uit",
+  "status": "new",
+  "added": 1700000000066
+ },
+ {
+  "nl": "welke",
+  "uk": "який",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-welke",
+  "status": "new",
+  "added": 1700000000067
+ },
+ {
+  "nl": "buurman",
+  "uk": "сусід",
+  "art": "de",
+  "ex": "Mijn nieuwe buurman heeft een grote hond.",
+  "topic": "Урок 1.2",
+  "id": "s-buurman",
+  "status": "new",
+  "added": 1700000000068
+ },
+ {
+  "nl": "van",
+  "uk": "з, від",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-van",
+  "status": "new",
+  "added": 1700000000069
+ },
+ {
+  "nl": "hoe",
+  "uk": "як",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-hoe",
+  "status": "new",
+  "added": 1700000000070
+ },
+ {
+  "nl": "heten",
+  "uk": "зватися",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-heten",
+  "status": "new",
+  "added": 1700000000071
+ },
+ {
+  "nl": "waar",
+  "uk": "де",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-waar",
+  "status": "new",
+  "added": 1700000000072
+ },
+ {
+  "nl": "wonen",
+  "uk": "жити, проживати",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-wonen",
+  "status": "new",
+  "added": 1700000000073
+ },
+ {
+  "nl": "leven",
+  "uk": "жити",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-leven",
+  "status": "new",
+  "added": 1700000000074
+ },
+ {
+  "nl": "adres",
+  "uk": "адреса",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-adres",
+  "status": "new",
+  "added": 1700000000075
+ },
+ {
+  "nl": "op",
+  "uk": "на",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-op",
+  "status": "new",
+  "added": 1700000000076
+ },
+ {
+  "nl": "nummer",
+  "uk": "номер",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-nummer",
+  "status": "new",
+  "added": 1700000000077
+ },
+ {
+  "nl": "antwoord",
+  "uk": "відповідь",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-antwoord",
+  "status": "new",
+  "added": 1700000000078
+ },
+ {
+  "nl": "nee",
+  "uk": "ні",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-nee",
+  "status": "new",
+  "added": 1700000000079
+ },
+ {
+  "nl": "ook",
+  "uk": "також",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-ook",
+  "status": "new",
+  "added": 1700000000080
+ },
+ {
+  "nl": "zeggen",
+  "uk": "сказати (конкретні слова)",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-zeggen",
+  "status": "new",
+  "added": 1700000000081
+ },
+ {
+  "nl": "hier",
+  "uk": "тут",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-hier",
+  "status": "new",
+  "added": 1700000000082
+ },
+ {
+  "nl": "jaar",
+  "uk": "рік",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-jaar",
+  "status": "new",
+  "added": 1700000000083
+ },
+ {
+  "nl": "les",
+  "uk": "урок",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-les",
+  "status": "new",
+  "added": 1700000000084
+ },
+ {
+  "nl": "hebben",
+  "uk": "мати",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-hebben",
+  "status": "new",
+  "added": 1700000000085
+ },
+ {
+  "nl": "boek",
+  "uk": "книга",
+  "art": "het",
+  "ex": "Ik lees een goed boek.",
+  "topic": "Урок 1.2",
+  "id": "s-boek",
+  "status": "new",
+  "added": 1700000000086
+ },
+ {
+  "nl": "bladzijde",
+  "uk": "сторінка",
+  "art": "de",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-bladzijde",
+  "status": "new",
+  "added": 1700000000087
+ },
+ {
+  "nl": "naar",
+  "uk": "до, у напрямку",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-naar",
+  "status": "new",
+  "added": 1700000000088
+ },
+ {
+  "nl": "stoppen",
+  "uk": "зупинятися",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-stoppen",
+  "status": "new",
+  "added": 1700000000089
+ },
+ {
+  "nl": "is",
+  "uk": "це є",
+  "art": "het",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-is",
+  "status": "new",
+  "added": 1700000000090
+ },
+ {
+  "nl": "tot straks",
+  "uk": "побачимось скоро",
+  "art": "",
+  "ex": "",
+  "topic": "Урок 1.2",
+  "id": "s-tot-straks",
+  "status": "new",
+  "added": 1700000000091
+ },
+ {
+  "nl": "mogen",
+  "uk": "мати дозвіл, можна",
+  "art": "",
+  "ex": "",
+  "topic": "Модальні дієслова",
+  "id": "s-mogen",
+  "status": "new",
+  "added": 1700000000092
+ },
+ {
+  "nl": "moeten",
+  "uk": "мусити",
+  "art": "",
+  "ex": "",
+  "topic": "Модальні дієслова",
+  "id": "s-moeten",
+  "status": "new",
+  "added": 1700000000093
+ },
+ {
+  "nl": "kunnen",
+  "uk": "могти, вміти",
+  "art": "",
+  "ex": "",
+  "topic": "Модальні дієслова",
+  "id": "s-kunnen",
+  "status": "new",
+  "added": 1700000000094
+ },
+ {
+  "nl": "zullen",
+  "uk": "буду / давай (допоміжне)",
+  "art": "",
+  "ex": "",
+  "topic": "Модальні дієслова",
+  "id": "s-zullen",
+  "status": "new",
+  "added": 1700000000095
+ },
+ {
+  "nl": "gaan",
+  "uk": "йти; збиратися (майбутня дія)",
+  "art": "",
+  "ex": "",
+  "topic": "Модальні дієслова",
+  "id": "s-gaan",
+  "status": "new",
+  "added": 1700000000096
+ },
+ {
+  "nl": "zijn",
+  "uk": "бути",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-zijn",
+  "status": "new",
+  "added": 1700000000097
+ },
+ {
+  "nl": "komen",
+  "uk": "приходити",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-komen",
+  "status": "new",
+  "added": 1700000000098
+ },
+ {
+  "nl": "luisteren (naar)",
+  "uk": "слухати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-luisteren-naar",
+  "status": "new",
+  "added": 1700000000099
+ },
+ {
+  "nl": "denken",
+  "uk": "думати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-denken",
+  "status": "new",
+  "added": 1700000000100
+ },
+ {
+  "nl": "rijden",
+  "uk": "їхати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-rijden",
+  "status": "new",
+  "added": 1700000000101
+ },
+ {
+  "nl": "huilen",
+  "uk": "плакати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-huilen",
+  "status": "new",
+  "added": 1700000000102
+ },
+ {
+  "nl": "tekenen",
+  "uk": "малювати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-tekenen",
+  "status": "new",
+  "added": 1700000000103
+ },
+ {
+  "nl": "werken",
+  "uk": "працювати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-werken",
+  "status": "new",
+  "added": 1700000000104
+ },
+ {
+  "nl": "rekenen",
+  "uk": "рахувати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-rekenen",
+  "status": "new",
+  "added": 1700000000105
+ },
+ {
+  "nl": "branden",
+  "uk": "горіти",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-branden",
+  "status": "new",
+  "added": 1700000000106
+ },
+ {
+  "nl": "liggen",
+  "uk": "лежати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-liggen",
+  "status": "new",
+  "added": 1700000000107
+ },
+ {
+  "nl": "zitten",
+  "uk": "сидіти",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-zitten",
+  "status": "new",
+  "added": 1700000000108
+ },
+ {
+  "nl": "pakken",
+  "uk": "хапати, брати",
+  "art": "",
+  "ex": "",
+  "topic": "Дієслова",
+  "id": "s-pakken",
+  "status": "new",
+  "added": 1700000000109
+ },
+ {
+  "nl": "man",
+  "uk": "чоловік",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-man",
+  "status": "new",
+  "added": 1700000000110
+ },
+ {
+  "nl": "vrouw",
+  "uk": "жінка",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-vrouw",
+  "status": "new",
+  "added": 1700000000111
+ },
+ {
+  "nl": "kind",
+  "uk": "дитина",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-kind",
+  "status": "new",
+  "added": 1700000000112
+ },
+ {
+  "nl": "hond",
+  "uk": "собака",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-hond",
+  "status": "new",
+  "added": 1700000000113
+ },
+ {
+  "nl": "kat",
+  "uk": "кіт",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-kat",
+  "status": "new",
+  "added": 1700000000114
+ },
+ {
+  "nl": "konijn",
+  "uk": "кролик",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-konijn",
+  "status": "new",
+  "added": 1700000000115
+ },
+ {
+  "nl": "jongen",
+  "uk": "хлопчик",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-jongen",
+  "status": "new",
+  "added": 1700000000116
+ },
+ {
+  "nl": "meisje",
+  "uk": "дівчинка",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-meisje",
+  "status": "new",
+  "added": 1700000000117
+ },
+ {
+  "nl": "baby",
+  "uk": "немовля",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-baby",
+  "status": "new",
+  "added": 1700000000118
+ },
+ {
+  "nl": "krant",
+  "uk": "газета",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-krant",
+  "status": "new",
+  "added": 1700000000119
+ },
+ {
+  "nl": "pen",
+  "uk": "ручка",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-pen",
+  "status": "new",
+  "added": 1700000000120
+ },
+ {
+  "nl": "acteur",
+  "uk": "актор",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-acteur",
+  "status": "new",
+  "added": 1700000000121
+ },
+ {
+  "nl": "mens",
+  "uk": "людина (як істота)",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-mens",
+  "status": "new",
+  "added": 1700000000122
+ },
+ {
+  "nl": "appel",
+  "uk": "яблуко",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-appel",
+  "status": "new",
+  "added": 1700000000123
+ },
+ {
+  "nl": "tomaat",
+  "uk": "помідор",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-tomaat",
+  "status": "new",
+  "added": 1700000000124
+ },
+ {
+  "nl": "apotheek",
+  "uk": "аптека",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-apotheek",
+  "status": "new",
+  "added": 1700000000125
+ },
+ {
+  "nl": "nationaliteit",
+  "uk": "національність",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-nationaliteit",
+  "status": "new",
+  "added": 1700000000126
+ },
+ {
+  "nl": "tafeltje",
+  "uk": "столик",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-tafeltje",
+  "status": "new",
+  "added": 1700000000127
+ },
+ {
+  "nl": "hondje",
+  "uk": "песик",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-hondje",
+  "status": "new",
+  "added": 1700000000128
+ },
+ {
+  "nl": "voetbal",
+  "uk": "футбол",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-voetbal",
+  "status": "new",
+  "added": 1700000000129
+ },
+ {
+  "nl": "basketbal",
+  "uk": "баскетбол",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-basketbal",
+  "status": "new",
+  "added": 1700000000130
+ },
+ {
+  "nl": "goud",
+  "uk": "золото",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-goud",
+  "status": "new",
+  "added": 1700000000131
+ },
+ {
+  "nl": "zilver",
+  "uk": "срібло",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-zilver",
+  "status": "new",
+  "added": 1700000000132
+ },
+ {
+  "nl": "bedrijf",
+  "uk": "компанія, підприємство",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-bedrijf",
+  "status": "new",
+  "added": 1700000000133
+ },
+ {
+  "nl": "potlood",
+  "uk": "олівець",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-potlood",
+  "status": "new",
+  "added": 1700000000134
+ },
+ {
+  "nl": "feest",
+  "uk": "свято, вечірка",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-feest",
+  "status": "new",
+  "added": 1700000000135
+ },
+ {
+  "nl": "fruit",
+  "uk": "фрукти",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-fruit",
+  "status": "new",
+  "added": 1700000000136
+ },
+ {
+  "nl": "geld",
+  "uk": "гроші",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-geld",
+  "status": "new",
+  "added": 1700000000137
+ },
+ {
+  "nl": "gezicht",
+  "uk": "обличчя",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-gezicht",
+  "status": "new",
+  "added": 1700000000138
+ },
+ {
+  "nl": "hart",
+  "uk": "серце",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-hart",
+  "status": "new",
+  "added": 1700000000139
+ },
+ {
+  "nl": "hoofd",
+  "uk": "голова",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-hoofd",
+  "status": "new",
+  "added": 1700000000140
+ },
+ {
+  "nl": "huis",
+  "uk": "будинок",
+  "art": "het",
+  "ex": "Ik woon in een groot huis.",
+  "topic": "De / Het",
+  "id": "s-huis",
+  "status": "new",
+  "added": 1700000000141
+ },
+ {
+  "nl": "weekend",
+  "uk": "вихідні",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-weekend",
+  "status": "new",
+  "added": 1700000000142
+ },
+ {
+  "nl": "uur",
+  "uk": "година",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-uur",
+  "status": "new",
+  "added": 1700000000143
+ },
+ {
+  "nl": "land",
+  "uk": "країна",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-land",
+  "status": "new",
+  "added": 1700000000144
+ },
+ {
+  "nl": "lichaam",
+  "uk": "тіло",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-lichaam",
+  "status": "new",
+  "added": 1700000000145
+ },
+ {
+  "nl": "licht",
+  "uk": "світло",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-licht",
+  "status": "new",
+  "added": 1700000000146
+ },
+ {
+  "nl": "lokaal",
+  "uk": "аудиторія, клас",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-lokaal",
+  "status": "new",
+  "added": 1700000000147
+ },
+ {
+  "nl": "mes",
+  "uk": "ніж",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-mes",
+  "status": "new",
+  "added": 1700000000148
+ },
+ {
+  "nl": "oog",
+  "uk": "око",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-oog",
+  "status": "new",
+  "added": 1700000000149
+ },
+ {
+  "nl": "oor",
+  "uk": "вухо",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-oor",
+  "status": "new",
+  "added": 1700000000150
+ },
+ {
+  "nl": "papier",
+  "uk": "папір",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-papier",
+  "status": "new",
+  "added": 1700000000151
+ },
+ {
+  "nl": "raam",
+  "uk": "вікно",
+  "art": "het",
+  "ex": "Doe het raam open, alsjeblieft.",
+  "topic": "De / Het",
+  "id": "s-raam",
+  "status": "new",
+  "added": 1700000000152
+ },
+ {
+  "nl": "station",
+  "uk": "вокзал, станція",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-station",
+  "status": "new",
+  "added": 1700000000153
+ },
+ {
+  "nl": "weer",
+  "uk": "погода",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-weer",
+  "status": "new",
+  "added": 1700000000154
+ },
+ {
+  "nl": "werk",
+  "uk": "робота",
+  "art": "het",
+  "ex": "Ik ga naar mijn werk.",
+  "topic": "De / Het",
+  "id": "s-werk",
+  "status": "new",
+  "added": 1700000000155
+ },
+ {
+  "nl": "zout",
+  "uk": "сіль",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-zout",
+  "status": "new",
+  "added": 1700000000156
+ },
+ {
+  "nl": "kopje",
+  "uk": "чашка",
+  "art": "het",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-kopje",
+  "status": "new",
+  "added": 1700000000157
+ },
+ {
+  "nl": "datum",
+  "uk": "дата",
+  "art": "de",
+  "ex": "",
+  "topic": "De / Het",
+  "id": "s-datum",
+  "status": "new",
+  "added": 1700000000158
+ },
+ {
+  "nl": "hoe heet je?",
+  "uk": "як тебе звати?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-heet-je",
+  "status": "new",
+  "added": 1700000000159
+ },
+ {
+  "nl": "hoe heet u?",
+  "uk": "як Вас звати?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-heet-u",
+  "status": "new",
+  "added": 1700000000160
+ },
+ {
+  "nl": "tot later",
+  "uk": "до зустрічі пізніше",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-tot-later",
+  "status": "new",
+  "added": 1700000000161
+ },
+ {
+  "nl": "tot ziens",
+  "uk": "до побачення",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-tot-ziens",
+  "status": "new",
+  "added": 1700000000162
+ },
+ {
+  "nl": "fijne dag",
+  "uk": "гарного дня",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-fijne-dag",
+  "status": "new",
+  "added": 1700000000163
+ },
+ {
+  "nl": "fijne avond",
+  "uk": "гарного вечора",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-fijne-avond",
+  "status": "new",
+  "added": 1700000000164
+ },
+ {
+  "nl": "waar kom je vandaan?",
+  "uk": "звідки ти?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-waar-kom-je-vandaan",
+  "status": "new",
+  "added": 1700000000165
+ },
+ {
+  "nl": "ik kom uit Oekraïne",
+  "uk": "я з України",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-ik-kom-uit-oekraine",
+  "status": "new",
+  "added": 1700000000166
+ },
+ {
+  "nl": "waar woon je?",
+  "uk": "де ти живеш?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-waar-woon-je",
+  "status": "new",
+  "added": 1700000000167
+ },
+ {
+  "nl": "waar woont u?",
+  "uk": "де Ви живете?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-waar-woont-u",
+  "status": "new",
+  "added": 1700000000168
+ },
+ {
+  "nl": "hoe oud ben je?",
+  "uk": "скільки тобі років?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-oud-ben-je",
+  "status": "new",
+  "added": 1700000000169
+ },
+ {
+  "nl": "hoe oud bent u?",
+  "uk": "скільки Вам років?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-oud-bent-u",
+  "status": "new",
+  "added": 1700000000170
+ },
+ {
+  "nl": "wat doe je?",
+  "uk": "чим ти займаєшся?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-wat-doe-je",
+  "status": "new",
+  "added": 1700000000171
+ },
+ {
+  "nl": "wat doet u?",
+  "uk": "чим Ви займаєтесь?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-wat-doet-u",
+  "status": "new",
+  "added": 1700000000172
+ },
+ {
+  "nl": "hoi",
+  "uk": "хай",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoi",
+  "status": "new",
+  "added": 1700000000173
+ },
+ {
+  "nl": "hallo",
+  "uk": "привіт",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hallo",
+  "status": "new",
+  "added": 1700000000174
+ },
+ {
+  "nl": "goedemorgen",
+  "uk": "доброго ранку",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-goedemorgen",
+  "status": "new",
+  "added": 1700000000175
+ },
+ {
+  "nl": "goedemiddag",
+  "uk": "доброго дня",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-goedemiddag",
+  "status": "new",
+  "added": 1700000000176
+ },
+ {
+  "nl": "goedenavond",
+  "uk": "доброго вечора",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-goedenavond",
+  "status": "new",
+  "added": 1700000000177
+ },
+ {
+  "nl": "doei",
+  "uk": "па-па",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-doei",
+  "status": "new",
+  "added": 1700000000178
+ },
+ {
+  "nl": "vandaan",
+  "uk": "звідки",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-vandaan",
+  "status": "new",
+  "added": 1700000000179
+ },
+ {
+  "nl": "oud",
+  "uk": "старий; років",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-oud",
+  "status": "new",
+  "added": 1700000000180
+ },
+ {
+  "nl": "goed",
+  "uk": "добре",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-goed",
+  "status": "new",
+  "added": 1700000000181
+ },
+ {
+  "nl": "prima",
+  "uk": "чудово",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-prima",
+  "status": "new",
+  "added": 1700000000182
+ },
+ {
+  "nl": "oké",
+  "uk": "окей",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-oke",
+  "status": "new",
+  "added": 1700000000183
+ },
+ {
+  "nl": "wat zei u?",
+  "uk": "що Ви сказали?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-wat-zei-u",
+  "status": "new",
+  "added": 1700000000184
+ },
+ {
+  "nl": "ik begrijp het niet",
+  "uk": "я не розумію",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-ik-begrijp-het-niet",
+  "status": "new",
+  "added": 1700000000185
+ },
+ {
+  "nl": "ik begrijp dat woord niet",
+  "uk": "я не розумію це слово",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-ik-begrijp-dat-woord-niet",
+  "status": "new",
+  "added": 1700000000186
+ },
+ {
+  "nl": "iets langzamer, alstublieft",
+  "uk": "трохи повільніше, будь ласка",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-iets-langzamer-alstublieft",
+  "status": "new",
+  "added": 1700000000187
+ },
+ {
+  "nl": "kunt u langzamer spreken, alstublieft?",
+  "uk": "можете говорити повільніше, будь ласка?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-kunt-u-langzamer-spreken-alstublieft",
+  "status": "new",
+  "added": 1700000000188
+ },
+ {
+  "nl": "hoe zeg je dat in het Nederlands?",
+  "uk": "як це сказати нідерландською?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-zeg-je-dat-in-het-nederlands",
+  "status": "new",
+  "added": 1700000000189
+ },
+ {
+  "nl": "hoe spel je dat?",
+  "uk": "як це пишеться по буквах?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-spel-je-dat",
+  "status": "new",
+  "added": 1700000000190
+ },
+ {
+  "nl": "kunt u dat opschrijven?",
+  "uk": "можете це записати?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-kunt-u-dat-opschrijven",
+  "status": "new",
+  "added": 1700000000191
+ },
+ {
+  "nl": "wat betekent dat?",
+  "uk": "що це означає?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-wat-betekent-dat",
+  "status": "new",
+  "added": 1700000000192
+ },
+ {
+  "nl": "mag ik je zeggen?",
+  "uk": "можна до тебе на «ти»?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-mag-ik-je-zeggen",
+  "status": "new",
+  "added": 1700000000193
+ },
+ {
+  "nl": "zeg maar je",
+  "uk": "звертайся на «ти»",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-zeg-maar-je",
+  "status": "new",
+  "added": 1700000000194
+ },
+ {
+  "nl": "kunt u dat herhalen, alstublieft?",
+  "uk": "можете повторити, будь ласка?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-kunt-u-dat-herhalen-alstublieft",
+  "status": "new",
+  "added": 1700000000195
+ },
+ {
+  "nl": "kunt u dat nog een keer zeggen?",
+  "uk": "можете сказати ще раз?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-kunt-u-dat-nog-een-keer-zeggen",
+  "status": "new",
+  "added": 1700000000196
+ },
+ {
+  "nl": "kunt u het uitleggen?",
+  "uk": "можете пояснити?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-kunt-u-het-uitleggen",
+  "status": "new",
+  "added": 1700000000197
+ },
+ {
+  "nl": "sorry, kunt u dat nog een keer zeggen?",
+  "uk": "перепрошую, можете сказати ще раз?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-sorry-kunt-u-dat-nog-een-keer-zeggen",
+  "status": "new",
+  "added": 1700000000198
+ },
+ {
+  "nl": "begrijpen",
+  "uk": "розуміти",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-begrijpen",
+  "status": "new",
+  "added": 1700000000199
+ },
+ {
+  "nl": "betekenen",
+  "uk": "означати",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-betekenen",
+  "status": "new",
+  "added": 1700000000200
+ },
+ {
+  "nl": "spreken",
+  "uk": "говорити (мовою, взагалі)",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-spreken",
+  "status": "new",
+  "added": 1700000000201
+ },
+ {
+  "nl": "langzamer",
+  "uk": "повільніше",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-langzamer",
+  "status": "new",
+  "added": 1700000000202
+ },
+ {
+  "nl": "langzaam",
+  "uk": "повільно",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-langzaam",
+  "status": "new",
+  "added": 1700000000203
+ },
+ {
+  "nl": "Nederlands",
+  "uk": "нідерландська мова",
+  "art": "het",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-nederlands",
+  "status": "new",
+  "added": 1700000000204
+ },
+ {
+  "nl": "niet",
+  "uk": "не",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-niet",
+  "status": "new",
+  "added": 1700000000205
+ },
+ {
+  "nl": "zei",
+  "uk": "сказав (минулий час від zeggen)",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-zei",
+  "status": "new",
+  "added": 1700000000206
+ },
+ {
+  "nl": "een",
+  "uk": "артикль «a»; один",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-een",
+  "status": "new",
+  "added": 1700000000207
+ },
+ {
+  "nl": "tijd",
+  "uk": "час",
+  "art": "de",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-tijd",
+  "status": "new",
+  "added": 1700000000208
+ },
+ {
+  "nl": "herhalen",
+  "uk": "повторювати",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-herhalen",
+  "status": "new",
+  "added": 1700000000209
+ },
+ {
+  "nl": "woord",
+  "uk": "слово",
+  "art": "het",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-woord",
+  "status": "new",
+  "added": 1700000000210
+ },
+ {
+  "nl": "uitleggen",
+  "uk": "пояснювати",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-uitleggen",
+  "status": "new",
+  "added": 1700000000211
+ },
+ {
+  "nl": "spellen",
+  "uk": "писати по буквах",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-spellen",
+  "status": "new",
+  "added": 1700000000212
+ },
+ {
+  "nl": "opschrijven",
+  "uk": "записувати",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-opschrijven",
+  "status": "new",
+  "added": 1700000000213
+ },
+ {
+  "nl": "sorry",
+  "uk": "вибачте, перепрошую",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-sorry",
+  "status": "new",
+  "added": 1700000000214
+ },
+ {
+  "nl": "alstublieft",
+  "uk": "будь ласка (офіційно)",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-alstublieft",
+  "status": "new",
+  "added": 1700000000215
+ },
+ {
+  "nl": "alsjeblieft",
+  "uk": "будь ласка (неформально)",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-alsjeblieft",
+  "status": "new",
+  "added": 1700000000216
+ },
+ {
+  "nl": "dat",
+  "uk": "те, це",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-dat",
+  "status": "new",
+  "added": 1700000000217
+ },
+ {
+  "nl": "een keer",
+  "uk": "один раз",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-een-keer",
+  "status": "new",
+  "added": 1700000000218
+ },
+ {
+  "nl": "iets",
+  "uk": "трохи; щось",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-iets",
+  "status": "new",
+  "added": 1700000000219
+ },
+ {
+  "nl": "hoe gaat het?",
+  "uk": "як справи?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoe-gaat-het",
+  "status": "new",
+  "added": 1700000000220
+ },
+ {
+  "nl": "goed, dank je wel. En met jou?",
+  "uk": "добре, дякую. А в тебе?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-goed-dank-je-wel-en-met-jou",
+  "status": "new",
+  "added": 1700000000221
+ },
+ {
+  "nl": "sorry, mijn Nederlands is nog niet zo goed",
+  "uk": "вибачте, моя нідерландська ще не дуже добра",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-sorry-mijn-nederlands-is-nog-niet-zo-goed",
+  "status": "new",
+  "added": 1700000000222
+ },
+ {
+  "nl": "kun je dat herhalen?",
+  "uk": "можеш повторити?",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-kun-je-dat-herhalen",
+  "status": "new",
+  "added": 1700000000223
+ },
+ {
+  "nl": "naam",
+  "uk": "ім'я",
+  "art": "de",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-naam",
+  "status": "new",
+  "added": 1700000000224
+ },
+ {
+  "nl": "mijn",
+  "uk": "мій",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-mijn",
+  "status": "new",
+  "added": 1700000000225
+ },
+ {
+  "nl": "hoeveel",
+  "uk": "скільки",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-hoeveel",
+  "status": "new",
+  "added": 1700000000226
+ },
+ {
+  "nl": "dank je",
+  "uk": "дякую",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-dank-je",
+  "status": "new",
+  "added": 1700000000227
+ },
+ {
+  "nl": "dank je wel",
+  "uk": "дуже дякую",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-dank-je-wel",
+  "status": "new",
+  "added": 1700000000228
+ },
+ {
+  "nl": "geen probleem",
+  "uk": "без проблем",
+  "art": "",
+  "ex": "",
+  "topic": "Знайомство і фрази на уроці",
+  "id": "s-geen-probleem",
+  "status": "new",
+  "added": 1700000000229
+ },
+ {
+  "nl": "rennen",
+  "uk": "бігти",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-rennen",
+  "status": "new",
+  "added": 1700000000230
+ },
+ {
+  "nl": "waarom ben je verdrietig?",
+  "uk": "чому ти сумний?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-waarom-ben-je-verdrietig",
+  "status": "new",
+  "added": 1700000000231
+ },
+ {
+  "nl": "hoe vaak",
+  "uk": "як часто",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-hoe-vaak",
+  "status": "new",
+  "added": 1700000000232
+ },
+ {
+  "nl": "omdat",
+  "uk": "тому що",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-omdat",
+  "status": "new",
+  "added": 1700000000233
+ },
+ {
+  "nl": "verdrietig",
+  "uk": "сумний",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-verdrietig",
+  "status": "new",
+  "added": 1700000000234
+ },
+ {
+  "nl": "hardlopen",
+  "uk": "бігати (спорт)",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-hardlopen",
+  "status": "new",
+  "added": 1700000000235
+ },
+ {
+  "nl": "gezond",
+  "uk": "здоровий",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-gezond",
+  "status": "new",
+  "added": 1700000000236
+ },
+ {
+  "nl": "ze helpen elkaar",
+  "uk": "вони допомагають одне одному",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ze-helpen-elkaar",
+  "status": "new",
+  "added": 1700000000237
+ },
+ {
+  "nl": "ik loop hard in het park",
+  "uk": "я бігаю в парку",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-loop-hard-in-het-park",
+  "status": "new",
+  "added": 1700000000238
+ },
+ {
+  "nl": "ik wil gezond leven",
+  "uk": "я хочу жити здорово",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-wil-gezond-leven",
+  "status": "new",
+  "added": 1700000000239
+ },
+ {
+  "nl": "welk boek lees je?",
+  "uk": "яку книгу ти читаєш?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-welk-boek-lees-je",
+  "status": "new",
+  "added": 1700000000240
+ },
+ {
+  "nl": "hoe vaak leer jij Nederlands?",
+  "uk": "як часто ти вчиш нідерландську?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-hoe-vaak-leer-jij-nederlands",
+  "status": "new",
+  "added": 1700000000241
+ },
+ {
+  "nl": "ik ren omdat het regent",
+  "uk": "я біжу, тому що йде дощ",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-ren-omdat-het-regent",
+  "status": "new",
+  "added": 1700000000242
+ },
+ {
+  "nl": "leuk je te ontmoeten",
+  "uk": "приємно познайомитися",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-leuk-je-te-ontmoeten",
+  "status": "new",
+  "added": 1700000000243
+ },
+ {
+  "nl": "vragen",
+  "uk": "запитувати",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-vragen",
+  "status": "new",
+  "added": 1700000000244
+ },
+ {
+  "nl": "met wie",
+  "uk": "з ким",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-met-wie",
+  "status": "new",
+  "added": 1700000000245
+ },
+ {
+  "nl": "lezen",
+  "uk": "читати",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-lezen",
+  "status": "new",
+  "added": 1700000000246
+ },
+ {
+  "nl": "ik lees 's ochtends de krant",
+  "uk": "вранці я читаю газету",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-lees-s-ochtends-de-krant",
+  "status": "new",
+  "added": 1700000000247
+ },
+ {
+  "nl": "wie",
+  "uk": "хто",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-wie",
+  "status": "new",
+  "added": 1700000000248
+ },
+ {
+  "nl": "mijn vader leest elke dag de krant",
+  "uk": "мій тато читає газету щодня",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-mijn-vader-leest-elke-dag-de-krant",
+  "status": "new",
+  "added": 1700000000249
+ },
+ {
+  "nl": "mag ik iets vragen?",
+  "uk": "можна дещо запитати?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-mag-ik-iets-vragen",
+  "status": "new",
+  "added": 1700000000250
+ },
+ {
+  "nl": "weet jij wanneer hij komt?",
+  "uk": "ти знаєш, коли він прийде?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-weet-jij-wanneer-hij-komt",
+  "status": "new",
+  "added": 1700000000251
+ },
+ {
+  "nl": "ik weet zijn naam niet",
+  "uk": "я не знаю його імені",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-weet-zijn-naam-niet",
+  "status": "new",
+  "added": 1700000000252
+ },
+ {
+  "nl": "wie belt aan?",
+  "uk": "хто дзвонить у двері?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-wie-belt-aan",
+  "status": "new",
+  "added": 1700000000253
+ },
+ {
+  "nl": "met wie ga je wandelen?",
+  "uk": "з ким ти підеш гуляти?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-met-wie-ga-je-wandelen",
+  "status": "new",
+  "added": 1700000000254
+ },
+ {
+  "nl": "ik ga met mijn broer naar het park",
+  "uk": "я йду з братом у парк",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-ga-met-mijn-broer-naar-het-park",
+  "status": "new",
+  "added": 1700000000255
+ },
+ {
+  "nl": "welke film is jouw favoriet?",
+  "uk": "який твій улюблений фільм?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-welke-film-is-jouw-favoriet",
+  "status": "new",
+  "added": 1700000000256
+ },
+ {
+  "nl": "welke dag is het vandaag?",
+  "uk": "який сьогодні день?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-welke-dag-is-het-vandaag",
+  "status": "new",
+  "added": 1700000000257
+ },
+ {
+  "nl": "heb je vrije tijd?",
+  "uk": "в тебе є вільний час?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-heb-je-vrije-tijd",
+  "status": "new",
+  "added": 1700000000258
+ },
+ {
+  "nl": "ik heb vandaag geen tijd",
+  "uk": "у мене сьогодні немає часу",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-heb-vandaag-geen-tijd",
+  "status": "new",
+  "added": 1700000000259
+ },
+ {
+  "nl": "hoofdstad",
+  "uk": "столиця",
+  "art": "de",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-hoofdstad",
+  "status": "new",
+  "added": 1700000000260
+ },
+ {
+  "nl": "elke",
+  "uk": "кожен",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-elke",
+  "status": "new",
+  "added": 1700000000261
+ },
+ {
+  "nl": "ik vind mijn huis mooi",
+  "uk": "мені подобається мій будинок",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-vind-mijn-huis-mooi",
+  "status": "new",
+  "added": 1700000000262
+ },
+ {
+  "nl": "ons huis is niet groot en niet klein",
+  "uk": "наш будинок не великий і не маленький",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ons-huis-is-niet-groot-en-niet-klein",
+  "status": "new",
+  "added": 1700000000263
+ },
+ {
+  "nl": "praten",
+  "uk": "розмовляти",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-praten",
+  "status": "new",
+  "added": 1700000000264
+ },
+ {
+  "nl": "niemand",
+  "uk": "ніхто",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-niemand",
+  "status": "new",
+  "added": 1700000000265
+ },
+ {
+  "nl": "iemand",
+  "uk": "хтось",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-iemand",
+  "status": "new",
+  "added": 1700000000266
+ },
+ {
+  "nl": "vinden",
+  "uk": "вважати",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-vinden",
+  "status": "new",
+  "added": 1700000000267
+ },
+ {
+  "nl": "vind je",
+  "uk": "ти вважаєш",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-vind-je",
+  "status": "new",
+  "added": 1700000000268
+ },
+ {
+  "nl": "aanbellen",
+  "uk": "дзвонити у двері",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-aanbellen",
+  "status": "new",
+  "added": 1700000000269
+ },
+ {
+  "nl": "in een dorp",
+  "uk": "у селі",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-in-een-dorp",
+  "status": "new",
+  "added": 1700000000270
+ },
+ {
+  "nl": "in een stad",
+  "uk": "в місті",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-in-een-stad",
+  "status": "new",
+  "added": 1700000000271
+ },
+ {
+  "nl": "ik heb het druk",
+  "uk": "я зайнятий",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-heb-het-druk",
+  "status": "new",
+  "added": 1700000000272
+ },
+ {
+  "nl": "ik wil met je praten",
+  "uk": "я хочу поговорити з тобою",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-wil-met-je-praten",
+  "status": "new",
+  "added": 1700000000273
+ },
+ {
+  "nl": "niemand kent hem",
+  "uk": "ніхто не знає його",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-niemand-kent-hem",
+  "status": "new",
+  "added": 1700000000274
+ },
+ {
+  "nl": "iemand belt aan",
+  "uk": "хтось дзвонить у двері",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-iemand-belt-aan",
+  "status": "new",
+  "added": 1700000000275
+ },
+ {
+  "nl": "zij wil in deze stad wonen",
+  "uk": "вона хоче жити в цьому місті",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-zij-wil-in-deze-stad-wonen",
+  "status": "new",
+  "added": 1700000000276
+ },
+ {
+  "nl": "niemand komt",
+  "uk": "ніхто не приходить",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-niemand-komt",
+  "status": "new",
+  "added": 1700000000277
+ },
+ {
+  "nl": "dingen",
+  "uk": "речі",
+  "art": "de",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-dingen",
+  "status": "new",
+  "added": 1700000000278
+ },
+ {
+  "nl": "aardappel",
+  "uk": "картопля",
+  "art": "de",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-aardappel",
+  "status": "new",
+  "added": 1700000000279
+ },
+ {
+  "nl": "vieren",
+  "uk": "святкувати",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-vieren",
+  "status": "new",
+  "added": 1700000000280
+ },
+ {
+  "nl": "houden van",
+  "uk": "любити (когось / щось)",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-houden-van",
+  "status": "new",
+  "added": 1700000000281
+ },
+ {
+  "nl": "ik eet graag",
+  "uk": "я люблю їсти",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-eet-graag",
+  "status": "new",
+  "added": 1700000000282
+ },
+ {
+  "nl": "ik wil graag",
+  "uk": "я би хотів",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-wil-graag",
+  "status": "new",
+  "added": 1700000000283
+ },
+ {
+  "nl": "na",
+  "uk": "після",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-na",
+  "status": "new",
+  "added": 1700000000284
+ },
+ {
+  "nl": "eigen",
+  "uk": "власний",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-eigen",
+  "status": "new",
+  "added": 1700000000285
+ },
+ {
+  "nl": "mijn eigen huis",
+  "uk": "мій власний будинок",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-mijn-eigen-huis",
+  "status": "new",
+  "added": 1700000000286
+ },
+ {
+  "nl": "dat zijn niet mijn dingen",
+  "uk": "це не мої речі",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-dat-zijn-niet-mijn-dingen",
+  "status": "new",
+  "added": 1700000000287
+ },
+ {
+  "nl": "hij houdt van aardappelen",
+  "uk": "він любить картоплю",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-hij-houdt-van-aardappelen",
+  "status": "new",
+  "added": 1700000000288
+ },
+ {
+  "nl": "zij houdt van koffie",
+  "uk": "вона любить каву",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-zij-houdt-van-koffie",
+  "status": "new",
+  "added": 1700000000289
+ },
+ {
+  "nl": "ik ga naar huis na het werk",
+  "uk": "я йду додому після роботи",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-ga-naar-huis-na-het-werk",
+  "status": "new",
+  "added": 1700000000290
+ },
+ {
+  "nl": "het regent weer",
+  "uk": "знову йде дощ",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-het-regent-weer",
+  "status": "new",
+  "added": 1700000000291
+ },
+ {
+  "nl": "gaat het soms niet goed",
+  "uk": "іноді справи йдуть не добре",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-gaat-het-soms-niet-goed",
+  "status": "new",
+  "added": 1700000000292
+ },
+ {
+  "nl": "of",
+  "uk": "або",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-of",
+  "status": "new",
+  "added": 1700000000293
+ },
+ {
+  "nl": "tekort aan",
+  "uk": "нестача",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-tekort-aan",
+  "status": "new",
+  "added": 1700000000294
+ },
+ {
+  "nl": "tekort aan geld",
+  "uk": "нестача грошей",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-tekort-aan-geld",
+  "status": "new",
+  "added": 1700000000295
+ },
+ {
+  "nl": "gevaarlijk",
+  "uk": "небезпечний",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-gevaarlijk",
+  "status": "new",
+  "added": 1700000000296
+ },
+ {
+  "nl": "kan gevaarlijk zijn",
+  "uk": "може бути небезпечним",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-kan-gevaarlijk-zijn",
+  "status": "new",
+  "added": 1700000000297
+ },
+ {
+  "nl": "dan",
+  "uk": "тоді",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-dan",
+  "status": "new",
+  "added": 1700000000298
+ },
+ {
+  "nl": "wil je thee of koffie?",
+  "uk": "ти хочеш чай чи каву?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-wil-je-thee-of-koffie",
+  "status": "new",
+  "added": 1700000000299
+ },
+ {
+  "nl": "als het niet regent, dan ga ik lopen",
+  "uk": "якщо не буде дощу, я піду пішки",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-als-het-niet-regent-dan-ga-ik-lopen",
+  "status": "new",
+  "added": 1700000000300
+ },
+ {
+  "nl": "moe",
+  "uk": "втомлений",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-moe",
+  "status": "new",
+  "added": 1700000000301
+ },
+ {
+  "nl": "als",
+  "uk": "коли; якщо",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-als",
+  "status": "new",
+  "added": 1700000000302
+ },
+ {
+  "nl": "opstaan",
+  "uk": "вставати",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-opstaan",
+  "status": "new",
+  "added": 1700000000303
+ },
+ {
+  "nl": "en",
+  "uk": "і",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-en",
+  "status": "new",
+  "added": 1700000000304
+ },
+ {
+  "nl": "de rest van de dag",
+  "uk": "решту дня",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-de-rest-van-de-dag",
+  "status": "new",
+  "added": 1700000000305
+ },
+ {
+  "nl": "rest",
+  "uk": "решта",
+  "art": "de",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-rest",
+  "status": "new",
+  "added": 1700000000306
+ },
+ {
+  "nl": "daardoor",
+  "uk": "через це",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-daardoor",
+  "status": "new",
+  "added": 1700000000307
+ },
+ {
+  "nl": "daarom",
+  "uk": "тому",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-daarom",
+  "status": "new",
+  "added": 1700000000308
+ },
+ {
+  "nl": "volgens",
+  "uk": "згідно з",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-volgens",
+  "status": "new",
+  "added": 1700000000309
+ },
+ {
+  "nl": "onderzoeker",
+  "uk": "дослідник",
+  "art": "de",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-onderzoeker",
+  "status": "new",
+  "added": 1700000000310
+ },
+ {
+  "nl": "te weinig",
+  "uk": "занадто мало",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-te-weinig",
+  "status": "new",
+  "added": 1700000000311
+ },
+ {
+  "nl": "ongeveer",
+  "uk": "приблизно",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ongeveer",
+  "status": "new",
+  "added": 1700000000312
+ },
+ {
+  "nl": "nodig hebben",
+  "uk": "потребувати",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-nodig-hebben",
+  "status": "new",
+  "added": 1700000000313
+ },
+ {
+  "nl": "soms",
+  "uk": "іноді",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-soms",
+  "status": "new",
+  "added": 1700000000314
+ },
+ {
+  "nl": "wat is de hoofdstad van jouw land?",
+  "uk": "яка столиця твоєї країни?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-wat-is-de-hoofdstad-van-jouw-land",
+  "status": "new",
+  "added": 1700000000315
+ },
+ {
+  "nl": "ga je wel eens op vakantie?",
+  "uk": "ти взагалі їздиш у відпустку?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ga-je-wel-eens-op-vakantie",
+  "status": "new",
+  "added": 1700000000316
+ },
+ {
+  "nl": "ik ga elke zomer op vakantie",
+  "uk": "я їжджу у відпустку кожного літа",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-ga-elke-zomer-op-vakantie",
+  "status": "new",
+  "added": 1700000000317
+ },
+ {
+  "nl": "waar ga je graag naartoe?",
+  "uk": "куди тобі подобається їздити?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-waar-ga-je-graag-naartoe",
+  "status": "new",
+  "added": 1700000000318
+ },
+ {
+  "nl": "vind je je huis mooi?",
+  "uk": "тобі подобається твій будинок?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-vind-je-je-huis-mooi",
+  "status": "new",
+  "added": 1700000000319
+ },
+ {
+  "nl": "woon je in een dorp of in een stad?",
+  "uk": "ти живеш у селі чи в місті?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-woon-je-in-een-dorp-of-in-een-stad",
+  "status": "new",
+  "added": 1700000000320
+ },
+ {
+  "nl": "ik woon in een stad",
+  "uk": "я живу в місті",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-ik-woon-in-een-stad",
+  "status": "new",
+  "added": 1700000000321
+ },
+ {
+  "nl": "welke plaats vind jij mooi?",
+  "uk": "яке місце тобі подобається?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-welke-plaats-vind-jij-mooi",
+  "status": "new",
+  "added": 1700000000322
+ },
+ {
+  "nl": "is je huis groot of klein?",
+  "uk": "твій будинок великий чи маленький?",
+  "art": "",
+  "ex": "",
+  "topic": "Розмова: щоденне",
+  "id": "s-is-je-huis-groot-of-klein",
+  "status": "new",
+  "added": 1700000000323
+ },
+ {
+  "nl": "kan ik iets voor je doen?",
+  "uk": "чи можу я щось для тебе зробити?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-kan-ik-iets-voor-je-doen",
+  "status": "new",
+  "added": 1700000000324
+ },
+ {
+  "nl": "iets doen",
+  "uk": "щось зробити",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-iets-doen",
+  "status": "new",
+  "added": 1700000000325
+ },
+ {
+  "nl": "mag ik de kaart, alsjeblieft?",
+  "uk": "можна меню, будь ласка?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-mag-ik-de-kaart-alsjeblieft",
+  "status": "new",
+  "added": 1700000000326
+ },
+ {
+  "nl": "kaart",
+  "uk": "меню",
+  "art": "de",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-kaart",
+  "status": "new",
+  "added": 1700000000327
+ },
+ {
+  "nl": "jazeker, komt eraan",
+  "uk": "так, звичайно, зараз принесу",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-jazeker-komt-eraan",
+  "status": "new",
+  "added": 1700000000328
+ },
+ {
+  "nl": "zeker",
+  "uk": "звичайно (формально)",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-zeker",
+  "status": "new",
+  "added": 1700000000329
+ },
+ {
+  "nl": "komt eraan",
+  "uk": "зараз принесу",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-komt-eraan",
+  "status": "new",
+  "added": 1700000000330
+ },
+ {
+  "nl": "heb je een keuze kunnen maken?",
+  "uk": "ти вже обрав?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-heb-je-een-keuze-kunnen-maken",
+  "status": "new",
+  "added": 1700000000331
+ },
+ {
+  "nl": "keuze",
+  "uk": "вибір",
+  "art": "de",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-keuze",
+  "status": "new",
+  "added": 1700000000332
+ },
+ {
+  "nl": "ik neem graag een koffie",
+  "uk": "я із задоволенням візьму каву",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-ik-neem-graag-een-koffie",
+  "status": "new",
+  "added": 1700000000333
+ },
+ {
+  "nl": "nemen",
+  "uk": "брати",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-nemen",
+  "status": "new",
+  "added": 1700000000334
+ },
+ {
+  "nl": "hebben jullie verse jus?",
+  "uk": "у вас є свіжий сік?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-hebben-jullie-verse-jus",
+  "status": "new",
+  "added": 1700000000335
+ },
+ {
+  "nl": "graag",
+  "uk": "із задоволенням; будь ласка",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-graag",
+  "status": "new",
+  "added": 1700000000336
+ },
+ {
+  "nl": "kan ik betalen, alsjeblieft?",
+  "uk": "можна заплатити, будь ласка?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-kan-ik-betalen-alsjeblieft",
+  "status": "new",
+  "added": 1700000000337
+ },
+ {
+  "nl": "betalen",
+  "uk": "платити",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-betalen",
+  "status": "new",
+  "added": 1700000000338
+ },
+ {
+  "nl": "zeker, wil je contant of pinnen?",
+  "uk": "звичайно, готівкою чи карткою?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-zeker-wil-je-contant-of-pinnen",
+  "status": "new",
+  "added": 1700000000339
+ },
+ {
+  "nl": "contant",
+  "uk": "готівкою",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-contant",
+  "status": "new",
+  "added": 1700000000340
+ },
+ {
+  "nl": "pinnen",
+  "uk": "платити карткою",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-pinnen",
+  "status": "new",
+  "added": 1700000000341
+ },
+ {
+  "nl": "dan is het 5 euro, alsjeblieft",
+  "uk": "тоді це 5 євро, будь ласка",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-dan-is-het-5-euro-alsjeblieft",
+  "status": "new",
+  "added": 1700000000342
+ },
+ {
+  "nl": "heb je voor mij een thee om mee te nemen?",
+  "uk": "є для мене чай на виніс?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-heb-je-voor-mij-een-thee-om-mee-te-nemen",
+  "status": "new",
+  "added": 1700000000343
+ },
+ {
+  "nl": "om mee te nemen",
+  "uk": "на виніс",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-om-mee-te-nemen",
+  "status": "new",
+  "added": 1700000000344
+ },
+ {
+  "nl": "ik heb eigenlijk alleen thee om hier op te drinken",
+  "uk": "власне, у мене є лише чай, щоб випити тут",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-ik-heb-eigenlijk-alleen-thee-om-hier-op-te-drinken",
+  "status": "new",
+  "added": 1700000000345
+ },
+ {
+  "nl": "alleen",
+  "uk": "тільки",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-alleen",
+  "status": "new",
+  "added": 1700000000346
+ },
+ {
+  "nl": "dus we serveren aan tafel",
+  "uk": "тож ми подаємо за столом",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-dus-we-serveren-aan-tafel",
+  "status": "new",
+  "added": 1700000000347
+ },
+ {
+  "nl": "dus",
+  "uk": "тому, отже",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-dus",
+  "status": "new",
+  "added": 1700000000348
+ },
+ {
+  "nl": "serveren",
+  "uk": "подавати",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-serveren",
+  "status": "new",
+  "added": 1700000000349
+ },
+ {
+  "nl": "dan zou ik graag een thee willen",
+  "uk": "тоді я хотів би чай",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-dan-zou-ik-graag-een-thee-willen",
+  "status": "new",
+  "added": 1700000000350
+ },
+ {
+  "nl": "zou ik kunnen betalen?",
+  "uk": "чи міг би я заплатити?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-zou-ik-kunnen-betalen",
+  "status": "new",
+  "added": 1700000000351
+ },
+ {
+  "nl": "pinnen graag",
+  "uk": "карткою, будь ласка",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-pinnen-graag",
+  "status": "new",
+  "added": 1700000000352
+ },
+ {
+  "nl": "ja, ga je gang",
+  "uk": "так, будь ласка (прошу)",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-ja-ga-je-gang",
+  "status": "new",
+  "added": 1700000000353
+ },
+ {
+  "nl": "helemaal gelukt, dankjewel",
+  "uk": "усе вдалося, дякую",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-helemaal-gelukt-dankjewel",
+  "status": "new",
+  "added": 1700000000354
+ },
+ {
+  "nl": "bedankt",
+  "uk": "дякую",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-bedankt",
+  "status": "new",
+  "added": 1700000000355
+ },
+ {
+  "nl": "hoe kan ik je helpen?",
+  "uk": "як я можу тобі допомогти?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-hoe-kan-ik-je-helpen",
+  "status": "new",
+  "added": 1700000000356
+ },
+ {
+  "nl": "mag ik een thee, alsjeblieft?",
+  "uk": "можна мені чай, будь ласка?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-mag-ik-een-thee-alsjeblieft",
+  "status": "new",
+  "added": 1700000000357
+ },
+ {
+  "nl": "wil je contant betalen of pinnen?",
+  "uk": "хочеш заплатити готівкою чи карткою?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-wil-je-contant-betalen-of-pinnen",
+  "status": "new",
+  "added": 1700000000358
+ },
+ {
+  "nl": "ik wil graag contant betalen",
+  "uk": "я хочу заплатити готівкою",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-ik-wil-graag-contant-betalen",
+  "status": "new",
+  "added": 1700000000359
+ },
+ {
+  "nl": "helemaal goed, het wordt dan 4 euro",
+  "uk": "чудово, тоді це буде 4 євро",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-helemaal-goed-het-wordt-dan-4-euro",
+  "status": "new",
+  "added": 1700000000360
+ },
+ {
+  "nl": "helemaal goed",
+  "uk": "чудово, домовились",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-helemaal-goed",
+  "status": "new",
+  "added": 1700000000361
+ },
+ {
+  "nl": "wordt",
+  "uk": "це буде (коштувати)",
+  "art": "het",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-wordt",
+  "status": "new",
+  "added": 1700000000362
+ },
+ {
+  "nl": "heb je een tafel voor 2?",
+  "uk": "є у вас стіл на двох?",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-heb-je-een-tafel-voor-2",
+  "status": "new",
+  "added": 1700000000363
+ },
+ {
+  "nl": "tuurlijk",
+  "uk": "звичайно (неформально)",
+  "art": "",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-tuurlijk",
+  "status": "new",
+  "added": 1700000000364
+ },
+ {
+  "nl": "tafel",
+  "uk": "стіл",
+  "art": "de",
+  "ex": "",
+  "topic": "У кафе",
+  "id": "s-tafel",
+  "status": "new",
+  "added": 1700000000365
+ },
+ {
+  "nl": "doen",
+  "uk": "робити",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-doen",
+  "status": "new",
+  "added": 1700000000366
+ },
+ {
+  "nl": "controleren",
+  "uk": "перевіряти",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-controleren",
+  "status": "new",
+  "added": 1700000000367
+ },
+ {
+  "nl": "repareren",
+  "uk": "ремонтувати",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-repareren",
+  "status": "new",
+  "added": 1700000000368
+ },
+ {
+  "nl": "poetsen",
+  "uk": "чистити",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-poetsen",
+  "status": "new",
+  "added": 1700000000369
+ },
+ {
+  "nl": "brengen",
+  "uk": "приносити",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-brengen",
+  "status": "new",
+  "added": 1700000000370
+ },
+ {
+  "nl": "wanneer",
+  "uk": "коли",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-wanneer",
+  "status": "new",
+  "added": 1700000000371
+ },
+ {
+  "nl": "altijd",
+  "uk": "завжди",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-altijd",
+  "status": "new",
+  "added": 1700000000372
+ },
+ {
+  "nl": "boodschappen",
+  "uk": "покупки, продукти",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-boodschappen",
+  "status": "new",
+  "added": 1700000000373
+ },
+ {
+  "nl": "boodschappen doen",
+  "uk": "робити покупки",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-boodschappen-doen",
+  "status": "new",
+  "added": 1700000000374
+ },
+ {
+  "nl": "bij de Aldi",
+  "uk": "в Алді",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-bij-de-aldi",
+  "status": "new",
+  "added": 1700000000375
+ },
+ {
+  "nl": "les krijgen",
+  "uk": "мати уроки, навчатися",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-les-krijgen",
+  "status": "new",
+  "added": 1700000000376
+ },
+ {
+  "nl": "deze week",
+  "uk": "цього тижня",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-deze-week",
+  "status": "new",
+  "added": 1700000000377
+ },
+ {
+  "nl": "elke dag",
+  "uk": "кожен день",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-elke-dag",
+  "status": "new",
+  "added": 1700000000378
+ },
+ {
+  "nl": "elke maand",
+  "uk": "кожного місяця",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-elke-maand",
+  "status": "new",
+  "added": 1700000000379
+ },
+ {
+  "nl": "telefoonrekening",
+  "uk": "телефонний рахунок",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-telefoonrekening",
+  "status": "new",
+  "added": 1700000000380
+ },
+ {
+  "nl": "rekening",
+  "uk": "рахунок",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-rekening",
+  "status": "new",
+  "added": 1700000000381
+ },
+ {
+  "nl": "brievenbus",
+  "uk": "поштова скринька",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-brievenbus",
+  "status": "new",
+  "added": 1700000000382
+ },
+ {
+  "nl": "naar de tandarts",
+  "uk": "до стоматолога",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-naar-de-tandarts",
+  "status": "new",
+  "added": 1700000000383
+ },
+ {
+  "nl": "de lekke fietsband",
+  "uk": "спущена велосипедна шина",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-de-lekke-fietsband",
+  "status": "new",
+  "added": 1700000000384
+ },
+ {
+  "nl": "sommige",
+  "uk": "деякі",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-sommige",
+  "status": "new",
+  "added": 1700000000385
+ },
+ {
+  "nl": "ruiken",
+  "uk": "пахнути",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-ruiken",
+  "status": "new",
+  "added": 1700000000386
+ },
+ {
+  "nl": "vies",
+  "uk": "брудний",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-vies",
+  "status": "new",
+  "added": 1700000000387
+ },
+ {
+  "nl": "natuurlijk",
+  "uk": "звичайно",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-natuurlijk",
+  "status": "new",
+  "added": 1700000000388
+ },
+ {
+  "nl": "kleren",
+  "uk": "одяг",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-kleren",
+  "status": "new",
+  "added": 1700000000389
+ },
+ {
+  "nl": "wegen",
+  "uk": "важити",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-wegen",
+  "status": "new",
+  "added": 1700000000390
+ },
+ {
+  "nl": "staan",
+  "uk": "стояти",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-staan",
+  "status": "new",
+  "added": 1700000000391
+ },
+ {
+  "nl": "versturen",
+  "uk": "надсилати",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-versturen",
+  "status": "new",
+  "added": 1700000000392
+ },
+ {
+  "nl": "fietsen",
+  "uk": "їздити на велосипеді",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-fietsen",
+  "status": "new",
+  "added": 1700000000393
+ },
+ {
+  "nl": "zoeken",
+  "uk": "шукати",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-zoeken",
+  "status": "new",
+  "added": 1700000000394
+ },
+ {
+  "nl": "bezoeken",
+  "uk": "відвідувати",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-bezoeken",
+  "status": "new",
+  "added": 1700000000395
+ },
+ {
+  "nl": "zwemmen",
+  "uk": "плавати",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-zwemmen",
+  "status": "new",
+  "added": 1700000000396
+ },
+ {
+  "nl": "anderhalf",
+  "uk": "півтора",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-anderhalf",
+  "status": "new",
+  "added": 1700000000397
+ },
+ {
+  "nl": "twee en een half",
+  "uk": "два з половиною",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-twee-en-een-half",
+  "status": "new",
+  "added": 1700000000398
+ },
+ {
+  "nl": "wassen",
+  "uk": "мити",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-wassen",
+  "status": "new",
+  "added": 1700000000399
+ },
+ {
+  "nl": "afwassen",
+  "uk": "мити посуд",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-afwassen",
+  "status": "new",
+  "added": 1700000000400
+ },
+ {
+  "nl": "bad",
+  "uk": "ванна",
+  "art": "het",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-bad",
+  "status": "new",
+  "added": 1700000000401
+ },
+ {
+  "nl": "douche",
+  "uk": "душ",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-douche",
+  "status": "new",
+  "added": 1700000000402
+ },
+ {
+  "nl": "douchen",
+  "uk": "приймати душ",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-douchen",
+  "status": "new",
+  "added": 1700000000403
+ },
+ {
+  "nl": "wasmachine",
+  "uk": "пральна машина",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-wasmachine",
+  "status": "new",
+  "added": 1700000000404
+ },
+ {
+  "nl": "afwasmachine",
+  "uk": "посудомийна машина",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-afwasmachine",
+  "status": "new",
+  "added": 1700000000405
+ },
+ {
+  "nl": "vaatwasser",
+  "uk": "посудомийна машина",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-vaatwasser",
+  "status": "new",
+  "added": 1700000000406
+ },
+ {
+  "nl": "waarheid",
+  "uk": "правда",
+  "art": "de",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-waarheid",
+  "status": "new",
+  "added": 1700000000407
+ },
+ {
+  "nl": "gebruiken",
+  "uk": "використовувати",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-gebruiken",
+  "status": "new",
+  "added": 1700000000408
+ },
+ {
+  "nl": "weinig",
+  "uk": "небагато",
+  "art": "",
+  "ex": "",
+  "topic": "Побут і щоденні справи",
+  "id": "s-weinig",
+  "status": "new",
+  "added": 1700000000409
+ },
+ {
+  "nl": "een gram",
+  "uk": "1 грам",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-gram",
+  "status": "new",
+  "added": 1700000000410
+ },
+ {
+  "nl": "drie gram",
+  "uk": "3 грами",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-drie-gram",
+  "status": "new",
+  "added": 1700000000411
+ },
+ {
+  "nl": "dertien liter",
+  "uk": "13 літрів",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-dertien-liter",
+  "status": "new",
+  "added": 1700000000412
+ },
+ {
+  "nl": "twee liter melk",
+  "uk": "два літри молока",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-twee-liter-melk",
+  "status": "new",
+  "added": 1700000000413
+ },
+ {
+  "nl": "een kilo kalkoen",
+  "uk": "кілограм індички",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-kilo-kalkoen",
+  "status": "new",
+  "added": 1700000000414
+ },
+ {
+  "nl": "een millimeter",
+  "uk": "1 міліметр",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-millimeter",
+  "status": "new",
+  "added": 1700000000415
+ },
+ {
+  "nl": "vierentachtig centimeter",
+  "uk": "84 сантиметри",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-vierentachtig-centimeter",
+  "status": "new",
+  "added": 1700000000416
+ },
+ {
+  "nl": "negen meter",
+  "uk": "9 метрів",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-negen-meter",
+  "status": "new",
+  "added": 1700000000417
+ },
+ {
+  "nl": "vier vierkante meter",
+  "uk": "4 м²",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-vier-vierkante-meter",
+  "status": "new",
+  "added": 1700000000418
+ },
+ {
+  "nl": "drieënveertig kilometer",
+  "uk": "43 кілометри",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-drieenveertig-kilometer",
+  "status": "new",
+  "added": 1700000000419
+ },
+ {
+  "nl": "een minuut",
+  "uk": "1 хвилина",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-minuut",
+  "status": "new",
+  "added": 1700000000420
+ },
+ {
+  "nl": "vijftien minuten",
+  "uk": "15 хвилин",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-vijftien-minuten",
+  "status": "new",
+  "added": 1700000000421
+ },
+ {
+  "nl": "een week",
+  "uk": "1 тиждень",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-week",
+  "status": "new",
+  "added": 1700000000422
+ },
+ {
+  "nl": "zeven weken",
+  "uk": "7 тижнів",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-zeven-weken",
+  "status": "new",
+  "added": 1700000000423
+ },
+ {
+  "nl": "een kwartier",
+  "uk": "чверть години",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-kwartier",
+  "status": "new",
+  "added": 1700000000424
+ },
+ {
+  "nl": "drie kwartier",
+  "uk": "три чверті години",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-drie-kwartier",
+  "status": "new",
+  "added": 1700000000425
+ },
+ {
+  "nl": "een maand",
+  "uk": "1 місяць",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-maand",
+  "status": "new",
+  "added": 1700000000426
+ },
+ {
+  "nl": "vier maanden",
+  "uk": "4 місяці",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-vier-maanden",
+  "status": "new",
+  "added": 1700000000427
+ },
+ {
+  "nl": "een uur",
+  "uk": "1 година",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-uur",
+  "status": "new",
+  "added": 1700000000428
+ },
+ {
+  "nl": "vijf uur",
+  "uk": "5 годин",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-vijf-uur",
+  "status": "new",
+  "added": 1700000000429
+ },
+ {
+  "nl": "een jaar",
+  "uk": "1 рік",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-jaar",
+  "status": "new",
+  "added": 1700000000430
+ },
+ {
+  "nl": "veertien jaar",
+  "uk": "14 років",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-veertien-jaar",
+  "status": "new",
+  "added": 1700000000431
+ },
+ {
+  "nl": "een half uur",
+  "uk": "півгодини",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-half-uur",
+  "status": "new",
+  "added": 1700000000432
+ },
+ {
+  "nl": "een maand of twee",
+  "uk": "місяць чи два",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-maand-of-twee",
+  "status": "new",
+  "added": 1700000000433
+ },
+ {
+  "nl": "een minuut of vijf",
+  "uk": "хвилин п'ять",
+  "art": "",
+  "ex": "",
+  "topic": "Міри й час",
+  "id": "s-een-minuut-of-vijf",
+  "status": "new",
+  "added": 1700000000434
+ },
+ {
+  "nl": "nul",
+  "uk": "0",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-nul",
+  "status": "new",
+  "added": 1700000000435
+ },
+ {
+  "nl": "twee",
+  "uk": "2",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-twee",
+  "status": "new",
+  "added": 1700000000436
+ },
+ {
+  "nl": "drie",
+  "uk": "3",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-drie",
+  "status": "new",
+  "added": 1700000000437
+ },
+ {
+  "nl": "vier",
+  "uk": "4",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-vier",
+  "status": "new",
+  "added": 1700000000438
+ },
+ {
+  "nl": "vijf",
+  "uk": "5",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-vijf",
+  "status": "new",
+  "added": 1700000000439
+ },
+ {
+  "nl": "zes",
+  "uk": "6",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-zes",
+  "status": "new",
+  "added": 1700000000440
+ },
+ {
+  "nl": "zeven",
+  "uk": "7",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-zeven",
+  "status": "new",
+  "added": 1700000000441
+ },
+ {
+  "nl": "acht",
+  "uk": "8",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-acht",
+  "status": "new",
+  "added": 1700000000442
+ },
+ {
+  "nl": "negen",
+  "uk": "9",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-negen",
+  "status": "new",
+  "added": 1700000000443
+ },
+ {
+  "nl": "tien",
+  "uk": "10",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-tien",
+  "status": "new",
+  "added": 1700000000444
+ },
+ {
+  "nl": "elf",
+  "uk": "11",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-elf",
+  "status": "new",
+  "added": 1700000000445
+ },
+ {
+  "nl": "twaalf",
+  "uk": "12",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-twaalf",
+  "status": "new",
+  "added": 1700000000446
+ },
+ {
+  "nl": "dertien",
+  "uk": "13",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-dertien",
+  "status": "new",
+  "added": 1700000000447
+ },
+ {
+  "nl": "veertien",
+  "uk": "14",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-veertien",
+  "status": "new",
+  "added": 1700000000448
+ },
+ {
+  "nl": "vijftien",
+  "uk": "15",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-vijftien",
+  "status": "new",
+  "added": 1700000000449
+ },
+ {
+  "nl": "zestien",
+  "uk": "16",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-zestien",
+  "status": "new",
+  "added": 1700000000450
+ },
+ {
+  "nl": "zeventien",
+  "uk": "17",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-zeventien",
+  "status": "new",
+  "added": 1700000000451
+ },
+ {
+  "nl": "achttien",
+  "uk": "18",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-achttien",
+  "status": "new",
+  "added": 1700000000452
+ },
+ {
+  "nl": "negentien",
+  "uk": "19",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-negentien",
+  "status": "new",
+  "added": 1700000000453
+ },
+ {
+  "nl": "twintig",
+  "uk": "20",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-twintig",
+  "status": "new",
+  "added": 1700000000454
+ },
+ {
+  "nl": "eenentwintig",
+  "uk": "21",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-eenentwintig",
+  "status": "new",
+  "added": 1700000000455
+ },
+ {
+  "nl": "tweeëntwintig",
+  "uk": "22",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-tweeentwintig",
+  "status": "new",
+  "added": 1700000000456
+ },
+ {
+  "nl": "drieëntwintig",
+  "uk": "23",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-drieentwintig",
+  "status": "new",
+  "added": 1700000000457
+ },
+ {
+  "nl": "eenendertig",
+  "uk": "31",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-eenendertig",
+  "status": "new",
+  "added": 1700000000458
+ },
+ {
+  "nl": "drieëndertig",
+  "uk": "33",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-drieendertig",
+  "status": "new",
+  "added": 1700000000459
+ },
+ {
+  "nl": "vijfenveertig",
+  "uk": "45",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-vijfenveertig",
+  "status": "new",
+  "added": 1700000000460
+ },
+ {
+  "nl": "vierenvijftig",
+  "uk": "54",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-vierenvijftig",
+  "status": "new",
+  "added": 1700000000461
+ },
+ {
+  "nl": "zevenenzestig",
+  "uk": "67",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-zevenenzestig",
+  "status": "new",
+  "added": 1700000000462
+ },
+ {
+  "nl": "vijfenzeventig",
+  "uk": "75",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-vijfenzeventig",
+  "status": "new",
+  "added": 1700000000463
+ },
+ {
+  "nl": "eenentachtig",
+  "uk": "81",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-eenentachtig",
+  "status": "new",
+  "added": 1700000000464
+ },
+ {
+  "nl": "drieëntachtig",
+  "uk": "83",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-drieentachtig",
+  "status": "new",
+  "added": 1700000000465
+ },
+ {
+  "nl": "achtentachtig",
+  "uk": "88",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-achtentachtig",
+  "status": "new",
+  "added": 1700000000466
+ },
+ {
+  "nl": "achtennegentig",
+  "uk": "98",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-achtennegentig",
+  "status": "new",
+  "added": 1700000000467
+ },
+ {
+  "nl": "tweehonderd",
+  "uk": "200",
+  "art": "",
+  "ex": "",
+  "topic": "Числа",
+  "id": "s-tweehonderd",
+  "status": "new",
+  "added": 1700000000468
+ },
+ {
+  "nl": "verjaardag",
+  "uk": "день народження",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-verjaardag",
+  "status": "new",
+  "added": 1700000000469
+ },
+ {
+  "nl": "ochtend",
+  "uk": "ранок",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-ochtend",
+  "status": "new",
+  "added": 1700000000470
+ },
+ {
+  "nl": "eten",
+  "uk": "їсти",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-eten",
+  "status": "new",
+  "added": 1700000000471
+ },
+ {
+  "nl": "drankje",
+  "uk": "напій",
+  "art": "het",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-drankje",
+  "status": "new",
+  "added": 1700000000472
+ },
+ {
+  "nl": "tanden",
+  "uk": "зуби",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-tanden",
+  "status": "new",
+  "added": 1700000000473
+ },
+ {
+  "nl": "badkamer",
+  "uk": "ванна кімната",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-badkamer",
+  "status": "new",
+  "added": 1700000000474
+ },
+ {
+  "nl": "halen",
+  "uk": "приносити, забирати",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-halen",
+  "status": "new",
+  "added": 1700000000475
+ },
+ {
+  "nl": "vaak",
+  "uk": "часто",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-vaak",
+  "status": "new",
+  "added": 1700000000476
+ },
+ {
+  "nl": "melk",
+  "uk": "молоко",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-melk",
+  "status": "new",
+  "added": 1700000000477
+ },
+ {
+  "nl": "nooit",
+  "uk": "ніколи",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-nooit",
+  "status": "new",
+  "added": 1700000000478
+ },
+ {
+  "nl": "af en toe",
+  "uk": "час від часу",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-af-en-toe",
+  "status": "new",
+  "added": 1700000000479
+ },
+ {
+  "nl": "patat",
+  "uk": "картопля фрі",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-patat",
+  "status": "new",
+  "added": 1700000000480
+ },
+ {
+  "nl": "keuken",
+  "uk": "кухня",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-keuken",
+  "status": "new",
+  "added": 1700000000481
+ },
+ {
+  "nl": "spelen",
+  "uk": "грати",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-spelen",
+  "status": "new",
+  "added": 1700000000482
+ },
+ {
+  "nl": "bank",
+  "uk": "диван; банк",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-bank",
+  "status": "new",
+  "added": 1700000000483
+ },
+ {
+  "nl": "groente",
+  "uk": "овочі",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-groente",
+  "status": "new",
+  "added": 1700000000484
+ },
+ {
+  "nl": "morgen",
+  "uk": "завтра",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-morgen",
+  "status": "new",
+  "added": 1700000000485
+ },
+ {
+  "nl": "voor",
+  "uk": "перед, до",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-voor",
+  "status": "new",
+  "added": 1700000000486
+ },
+ {
+  "nl": "kopen",
+  "uk": "купувати",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-kopen",
+  "status": "new",
+  "added": 1700000000487
+ },
+ {
+  "nl": "vers",
+  "uk": "свіжий",
+  "art": "",
+  "ex": "Vers brood is erg lekker.",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-vers",
+  "status": "new",
+  "added": 1700000000488
+ },
+ {
+  "nl": "maken",
+  "uk": "робити",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-maken",
+  "status": "new",
+  "added": 1700000000489
+ },
+ {
+  "nl": "bijna",
+  "uk": "майже",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-bijna",
+  "status": "new",
+  "added": 1700000000490
+ },
+ {
+  "nl": "thuis",
+  "uk": "вдома",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-thuis",
+  "status": "new",
+  "added": 1700000000491
+ },
+ {
+  "nl": "heel",
+  "uk": "дуже",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-heel",
+  "status": "new",
+  "added": 1700000000492
+ },
+ {
+  "nl": "vriendelijk",
+  "uk": "дружній",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-vriendelijk",
+  "status": "new",
+  "added": 1700000000493
+ },
+ {
+  "nl": "mensen",
+  "uk": "люди",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-mensen",
+  "status": "new",
+  "added": 1700000000494
+ },
+ {
+  "nl": "vandaag",
+  "uk": "сьогодні",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-vandaag",
+  "status": "new",
+  "added": 1700000000495
+ },
+ {
+  "nl": "buiten",
+  "uk": "надворі",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-buiten",
+  "status": "new",
+  "added": 1700000000496
+ },
+ {
+  "nl": "straks",
+  "uk": "незабаром",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-straks",
+  "status": "new",
+  "added": 1700000000497
+ },
+ {
+  "nl": "vorige",
+  "uk": "попередній",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-vorige",
+  "status": "new",
+  "added": 1700000000498
+ },
+ {
+  "nl": "maand",
+  "uk": "місяць",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-maand",
+  "status": "new",
+  "added": 1700000000499
+ },
+ {
+  "nl": "duur",
+  "uk": "дорогий",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-duur",
+  "status": "new",
+  "added": 1700000000500
+ },
+ {
+  "nl": "kamer",
+  "uk": "кімната",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-kamer",
+  "status": "new",
+  "added": 1700000000501
+ },
+ {
+  "nl": "geen",
+  "uk": "жоден, немає",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-geen",
+  "status": "new",
+  "added": 1700000000502
+ },
+ {
+  "nl": "ik vind",
+  "uk": "я вважаю",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-ik-vind",
+  "status": "new",
+  "added": 1700000000503
+ },
+ {
+  "nl": "erg",
+  "uk": "дуже",
+  "art": "",
+  "ex": "erg lekker",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-erg",
+  "status": "new",
+  "added": 1700000000504
+ },
+ {
+  "nl": "ondanks",
+  "uk": "незважаючи на",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-ondanks",
+  "status": "new",
+  "added": 1700000000505
+ },
+ {
+  "nl": "gezellig",
+  "uk": "затишний, приємний",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-gezellig",
+  "status": "new",
+  "added": 1700000000506
+ },
+ {
+  "nl": "buurt",
+  "uk": "район",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-buurt",
+  "status": "new",
+  "added": 1700000000507
+ },
+ {
+  "nl": "buren",
+  "uk": "сусіди",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-buren",
+  "status": "new",
+  "added": 1700000000508
+ },
+ {
+  "nl": "enige",
+  "uk": "єдиний",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-enige",
+  "status": "new",
+  "added": 1700000000509
+ },
+ {
+  "nl": "nadeel",
+  "uk": "недолік",
+  "art": "het",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-nadeel",
+  "status": "new",
+  "added": 1700000000510
+ },
+ {
+  "nl": "mug",
+  "uk": "комар",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-mug",
+  "status": "new",
+  "added": 1700000000511
+ },
+ {
+  "nl": "muggen",
+  "uk": "комарі",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-muggen",
+  "status": "new",
+  "added": 1700000000512
+ },
+ {
+  "nl": "favoriete",
+  "uk": "улюблений",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-favoriete",
+  "status": "new",
+  "added": 1700000000513
+ },
+ {
+  "nl": "plek",
+  "uk": "місце",
+  "art": "de",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-plek",
+  "status": "new",
+  "added": 1700000000514
+ },
+ {
+  "nl": "koken",
+  "uk": "готувати",
+  "art": "",
+  "ex": "",
+  "topic": "Дім і щоденна рутина",
+  "id": "s-koken",
+  "status": "new",
+  "added": 1700000000515
+ },
+ {
+  "nl": "brief",
+  "uk": "лист (мн. brieven)",
+  "art": "de",
+  "ex": "Ik schrijf een brief.",
+  "topic": "Прикметники та інше",
+  "id": "s-brief",
+  "status": "new",
+  "added": 1700000000516
+ },
+ {
+  "nl": "fles",
+  "uk": "пляшка (мн. flessen)",
+  "art": "de",
+  "ex": "twee flessen water",
+  "topic": "Прикметники та інше",
+  "id": "s-fles",
+  "status": "new",
+  "added": 1700000000517
+ },
+ {
+  "nl": "groen",
+  "uk": "зелений",
+  "art": "",
+  "ex": "drie groene appels",
+  "topic": "Прикметники та інше",
+  "id": "s-groen",
+  "status": "new",
+  "added": 1700000000518
+ },
+ {
+  "nl": "groot",
+  "uk": "великий",
+  "art": "",
+  "ex": "een grote hond",
+  "topic": "Прикметники та інше",
+  "id": "s-groot",
+  "status": "new",
+  "added": 1700000000519
+ },
+ {
+  "nl": "heet",
+  "uk": "гарячий",
+  "art": "",
+  "ex": "De koffie is heet.",
+  "topic": "Прикметники та інше",
+  "id": "s-heet",
+  "status": "new",
+  "added": 1700000000520
+ },
+ {
+  "nl": "klein",
+  "uk": "маленький",
+  "art": "",
+  "ex": "twee kleine flessen water",
+  "topic": "Прикметники та інше",
+  "id": "s-klein",
+  "status": "new",
+  "added": 1700000000521
+ },
+ {
+  "nl": "koud",
+  "uk": "холодний",
+  "art": "",
+  "ex": "Koud water, alstublieft.",
+  "topic": "Прикметники та інше",
+  "id": "s-koud",
+  "status": "new",
+  "added": 1700000000522
+ },
+ {
+  "nl": "mooi",
+  "uk": "гарний",
+  "art": "",
+  "ex": "Dat is een mooi huis.",
+  "topic": "Прикметники та інше",
+  "id": "s-mooi",
+  "status": "new",
+  "added": 1700000000523
+ },
+ {
+  "nl": "nieuw",
+  "uk": "новий",
+  "art": "",
+  "ex": "mijn nieuwe buurman",
+  "topic": "Прикметники та інше",
+  "id": "s-nieuw",
+  "status": "new",
+  "added": 1700000000524
+ },
+ {
+  "nl": "fiets",
+  "uk": "велосипед",
+  "art": "de",
+  "ex": "Ik ga met de fiets naar mijn werk.",
+  "topic": "Прикметники та інше",
+  "id": "s-fiets",
+  "status": "new",
+  "added": 1700000000525
+ },
+ {
+  "nl": "kaas",
+  "uk": "сир",
+  "art": "de",
+  "ex": "Ik hou van Nederlandse kaas.",
+  "topic": "Прикметники та інше",
+  "id": "s-kaas",
+  "status": "new",
+  "added": 1700000000526
+ },
+ {
+  "nl": "brood",
+  "uk": "хліб",
+  "art": "het",
+  "ex": "Ik eet brood met kaas.",
+  "topic": "Прикметники та інше",
+  "id": "s-brood",
+  "status": "new",
+  "added": 1700000000527
+ },
+ {
+  "nl": "vriend",
+  "uk": "друг",
+  "art": "de",
+  "ex": "Hij is mijn beste vriend.",
+  "topic": "Прикметники та інше",
+  "id": "s-vriend",
+  "status": "new",
+  "added": 1700000000528
+ },
+ {
+  "nl": "week",
+  "uk": "тиждень",
+  "art": "de",
+  "ex": "Volgende week heb ik vakantie.",
+  "topic": "Прикметники та інше",
+  "id": "s-week",
+  "status": "new",
+  "added": 1700000000529
+ },
+ {
+  "nl": "stad",
+  "uk": "місто",
+  "art": "de",
+  "ex": "Amsterdam is een mooie stad.",
+  "topic": "Прикметники та інше",
+  "id": "s-stad",
+  "status": "new",
+  "added": 1700000000530
+ },
+ {
+  "nl": "straat",
+  "uk": "вулиця",
+  "art": "de",
+  "ex": "Er loopt een kat op straat.",
+  "topic": "Прикметники та інше",
+  "id": "s-straat",
+  "status": "new",
+  "added": 1700000000531
+ }
+]
