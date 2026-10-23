@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dutch матеріали</title>
+  <meta name="theme-color" content="#c2410c" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Dutch">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<main class="app login">
+  <h1>Dutch матеріали</h1>
+  <p id="err" class="err" hidden>Невірний пароль</p>
+  <form method="post" action="/auth/login">
+    <label class="field">
+      <span>Пароль</span>
+      <input type="password" name="password" required autofocus autocomplete="current-password">
+    </label>
+    <button class="primary" type="submit">Увійти</button>
+  </form>
+</main>
+<script>
+  // Login failures redirect back here with ?e=1.
+  if (new URLSearchParams(location.search).get('e') === '1') {
+    document.getElementById('err').hidden = false;
+  }
+</script>
+</body>
+</html>

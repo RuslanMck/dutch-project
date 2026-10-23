@@ -1,0 +1,13 @@
+{
+  "name": "Dutch матеріали",
+  "short_name": "Dutch",
+  "lang": "uk",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#c2410c",
+  "background_color": "#fafaf9",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

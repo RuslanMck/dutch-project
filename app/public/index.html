@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dutch матеріали</title>
+  <meta name="theme-color" content="#c2410c" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Dutch">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <h1>Dutch матеріали</h1>
+    <form method="post" action="/auth/logout">
+      <button class="ghost" type="submit">Вийти</button>
+    </form>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Розділи">
+    <button type="button" role="tab" data-tab="table" aria-selected="false">Таблиця</button>
+    <button type="button" role="tab" data-tab="cards" aria-selected="false">Картки</button>
+    <button type="button" role="tab" data-tab="practice" aria-selected="false">Практика</button>
+    <button type="button" role="tab" data-tab="rules" aria-selected="false">Правила</button>
+    <button type="button" role="tab" data-tab="phrases" aria-selected="false">Фрази</button>
+    <button type="button" role="tab" data-tab="texts" aria-selected="false">Тексти</button>
+  </nav>
+
+  <div id="notice" class="notice" role="alert" hidden></div>
+
+  <main>
+    <!-- 1 · Таблиця -->
+    <section id="tab-table" class="tab" role="tabpanel" data-tab="table">
+      <form id="word-form" class="form" autocomplete="off">
+        <label class="field">
+          <span>Слово</span>
+          <input name="nl" required autocapitalize="none" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Переклад</span>
+          <input name="uk" required>
+        </label>
+        <label class="field">
+          <span>Артикль</span>
+          <select name="article">
+            <option value="">—</option>
+            <option value="de">de</option>
+            <option value="het">het</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Глава</span>
+          <input name="section" inputmode="decimal" placeholder="6.1">
+        </label>
+        <label class="field wide">
+          <span>Приклад</span>
+          <input name="example" placeholder="NL — UK">
+        </label>
+        <button class="primary wide" type="submit">Додати</button>
+      </form>
+
+      <div class="toolbar">
+        <input id="table-q" type="search" placeholder="Пошук" aria-label="Пошук у словах">
+        <select id="table-topic" aria-label="Тема"><option value="">усі теми</option></select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="words">
+          <thead>
+            <tr>
+              <th>Слово</th>
+              <th>Глава</th>
+              <th>Переклад</th>
+              <th><button id="sort-errors" class="th-btn" type="button" aria-pressed="false">Помилки ↓</button></th>
+              <th>Статус</th>
+              <th><span class="sr-only">Видалити</span></th>
+            </tr>
+          </thead>
+          <tbody id="words-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2 · Картки -->
+    <section id="tab-cards" class="tab" role="tabpanel" data-tab="cards" hidden>
+      <button id="card" class="card" type="button" aria-label="Перевернути картку">
+        <span id="card-body"></span>
+      </button>
+      <div id="card-actions" class="card-actions">
+        <button id="card-again" type="button">Ще раз</button>
+        <button id="card-know" class="primary" type="button">Знаю</button>
+      </div>
+      <p id="card-count" class="muted center"></p>
+    </section>
+
+    <!-- 3 · Практика -->
+    <section id="tab-practice" class="tab" role="tabpanel" data-tab="practice" hidden>
+      <label class="field">
+        <span>Режим</span>
+        <select id="practice-mode">
+          <option value="all">Слова: переклад → nl (з артиклем або без)</option>
+          <option value="art">Артикль: de чи het</option>
+        </select>
+      </label>
+      <div id="practice-q" class="practice-q" aria-live="polite"></div>
+      <form id="practice-form" class="row-form" autocomplete="off">
+        <input id="practice-input" type="text" autocapitalize="none" spellcheck="false" aria-label="Відповідь">
+        <button id="practice-btn" class="primary" type="submit">Перевірити</button>
+      </form>
+      <p id="practice-msg" class="msg" aria-live="polite"></p>
+      <p id="practice-score" class="muted"></p>
+    </section>
+
+    <!-- 4 · Правила -->
+    <section id="tab-rules" class="tab" role="tabpanel" data-tab="rules" hidden>
+      <input id="rules-q" type="search" placeholder="Пошук у правилах і помилках" aria-label="Пошук у правилах">
+      <div id="rules-list" class="rules-list"></div>
+    </section>
+
+    <!-- 5 · Фрази -->
+    <section id="tab-phrases" class="tab" role="tabpanel" data-tab="phrases" hidden>
+      <form id="phrase-form" class="form" autocomplete="off">
+        <label class="field">
+          <span>Фраза</span>
+          <input name="nl" required autocapitalize="none" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Переклад</span>
+          <input name="uk" required>
+        </label>
+        <label class="field wide">
+          <span>Контекст (необов'язково)</span>
+          <input name="context">
+        </label>
+        <button class="primary wide" type="submit">Додати</button>
+      </form>
+      <ul id="phrases-list" class="list"></ul>
+    </section>
+
+    <!-- 6 · Тексти -->
+    <section id="tab-texts" class="tab" role="tabpanel" data-tab="texts" hidden>
+      <div id="texts-list"></div>
+    </section>
+  </main>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

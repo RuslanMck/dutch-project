@@ -1,0 +1,11 @@
+# No access log on purpose: the MCP URL carries its secret in the path.
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy dutch-app:3000
+}

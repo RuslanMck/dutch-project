@@ -37,6 +37,7 @@ If something goes wrong, use the manual setup below.
 | `starter/rules.json` | 7 grammar rules explained in Ukrainian (articles, pronouns, modal verbs, plurals, adjectives…) |
 | `project-instructions.md` | Instructions for the Claude Project: how to explain, give exercises and check answers |
 | `skills/dutch-exercise-check/SKILL.md` | Skill: checks exercises with rule numbers and logs mistakes in the page |
+| `app/` | Optional: the same page as a self-hosted web app (Docker, SQLite) with an MCP server, so Claude can update your data from any device. See `app/README.md` |
 
 Rule numbers (1.4, 5.5…) match the sections of the textbook *Basic Dutch: A Grammar and Workbook* (Routledge). The textbook itself is not included.
 
