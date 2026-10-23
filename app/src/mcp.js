@@ -2,14 +2,28 @@
 // so this router does its own authentication:
 //   POST /mcp/<MCP_SECRET>            claude.ai connector (secret in the path)
 //   POST /mcp  Authorization: Bearer  Claude Code / scripts (API_TOKEN)
-// Every tool is a thin wrapper around src/repo.js; this file contains no SQL.
+// Every tool is a thin wrapper around src/repo.js; this file contains no SQL. Tool arguments are described by the
+// shared contracts in src/contracts/, so MCP and REST validate the same shapes.
 import express from 'express';
 import crypto from 'node:crypto';
-import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { listMistakePatternsQuerySchema, logMistakeToolInputSchema } from './contracts/mistake-contracts.js';
+import { addPhrasesInputSchema, listPhrasesInputSchema } from './contracts/phrase-contracts.js';
+import { createRuleToolInputSchema, ruleReferenceSchema, updateRuleInputSchema } from './contracts/rule-contracts.js';
+import { identifierSchema } from './contracts/shared-contracts.js';
+import { createTextInputSchema } from './contracts/text-contracts.js';
+import {
+  addWordsInputSchema,
+  listWordsToolInputSchema,
+  logWordErrorByLookupInputSchema,
+  searchWordsInputSchema,
+  setWordStatusInputSchema,
+  updateWordInputSchema,
+} from './contracts/word-contracts.js';
 import * as repo from './repo.js';
 import { getDb } from './db.js';
+import { mapToDomainError } from './errors/domain-errors.js';
 
 const INSTRUCTIONS = `This is the learner's Dutch (NL) → Ukrainian (UK) learning database. The web app is in Ukrainian; the data is stored as given.
 Words and expressions share the words table; kind ('word' | 'expression') is detected automatically.
@@ -94,7 +108,7 @@ const compactRule = r => ({
 const compactText = t => ({ id: t.id, title: t.title, section: t.section, added_at: t.added_at });
 
 const ok = result => ({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
-const fail = err => ({ isError: true, content: [{ type: 'text', text: err.message }] });
+const fail = err => ({ isError: true, content: [{ type: 'text', text: mapToDomainError(err).message }] });
 
 // Registers one tool. The handler's return value is JSON-encoded; thrown errors become isError results.
 function defineTool(server, name, config, handler) {
@@ -110,26 +124,6 @@ function defineTool(server, name, config, handler) {
 const READ_ONLY = { readOnlyHint: true };
 const DESTRUCTIVE = { destructiveHint: true };
 
-// Zod shapes shared by several tools. They mirror the validation in repo.js.
-const STATUS = z.enum(['new', 'learning', 'learned']);
-const ARTICLE = z.enum(['', 'de', 'het']);
-const KIND = z.enum(['word', 'expression']);
-const SOURCE = z.enum(['exercise', 'lesson', 'practice']);
-const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD');
-const ID = z.number().int().positive().describe('numeric id');
-
-const WORD_FIELDS = {
-  nl: z.string().min(1).describe('Dutch text, e.g. "bestellen" or "hoe heet je?"'),
-  uk: z.string().min(1).describe('Ukrainian translation'),
-  article: ARTICLE.nullish().describe("'de', 'het' or '' for none"),
-  example_nl: z.string().nullish().describe('Dutch example sentence'),
-  example_uk: z.string().nullish().describe('Ukrainian translation of the example'),
-  section: z.string().nullish().describe("textbook chapter code, e.g. '6.1'"),
-  topic: z.string().nullish().describe('free-text dictionary topic, e.g. "У кафе"'),
-  status: STATUS.nullish(),
-  kind: KIND.nullish().describe('auto-detected when omitted'),
-};
-
 function registerTools(server) {
   defineTool(server, 'stats', {
     title: 'Database statistics',
@@ -140,23 +134,14 @@ function registerTools(server) {
   defineTool(server, 'search_words', {
     title: 'Search words',
     description: 'Case-insensitive search on Dutch and Ukrainian text. Exact Dutch matches come first. Use before add_words to avoid duplicates.',
-    inputSchema: {
-      query: z.string().min(1).describe('text to find in nl or uk'),
-      limit: z.number().int().min(1).max(1000).optional().describe('default 20'),
-    },
+    inputSchema: searchWordsInputSchema.shape,
     annotations: READ_ONLY,
   }, ({ query, limit }) => repo.findWords(query, { limit: limit ?? 20 }).map(compactWord));
 
   defineTool(server, 'list_words', {
     title: 'List words',
     description: 'List dictionary words, oldest first (or by error count). Filters: status, topic, section (textbook chapter). Returns compact rows.',
-    inputSchema: {
-      status: STATUS.optional(),
-      topic: z.string().min(1).optional(),
-      section: z.string().min(1).optional().describe("textbook chapter code, e.g. '6.1'"),
-      sort: z.enum(['added', 'errors']).optional().describe("'added' (default) or 'errors' (most errors first)"),
-      limit: z.number().int().min(1).max(5000).optional().describe('default 100'),
-    },
+    inputSchema: listWordsToolInputSchema.shape,
     annotations: READ_ONLY,
   }, ({ status, topic, section, sort, limit }) => {
     // repo.listWords has no section filter, so filter here and apply the limit after it.
@@ -170,10 +155,7 @@ function registerTools(server) {
     description: 'Add several dictionary words in one call. Words are created with status "new" unless given. '
       + 'An entry whose nl and article match an existing word is skipped (reported in "skipped") unless skip_existing is false. '
       + 'Returns {added, skipped}.',
-    inputSchema: {
-      words: z.array(z.object(WORD_FIELDS)).min(1).max(1000),
-      skip_existing: z.boolean().optional().describe('default true'),
-    },
+    inputSchema: addWordsInputSchema.shape,
   }, ({ words, skip_existing }) => {
     const { added, skipped } = repo.addWords(words, { skipExisting: skip_existing ?? true });
     return { added: added.map(compactWord), skipped };
@@ -182,31 +164,20 @@ function registerTools(server) {
   defineTool(server, 'update_word', {
     title: 'Update word',
     description: 'Change fields of one word by id. Only the given fields change. Empty string or null clears example_nl, example_uk, section, topic. Changing nl re-detects kind unless kind is given.',
-    inputSchema: {
-      id: ID,
-      nl: z.string().min(1).optional(),
-      uk: z.string().min(1).optional(),
-      article: ARTICLE.nullish(),
-      example_nl: z.string().nullish(),
-      example_uk: z.string().nullish(),
-      section: z.string().nullish(),
-      topic: z.string().nullish(),
-      status: STATUS.optional(),
-      kind: KIND.optional(),
-    },
+    inputSchema: { id: identifierSchema, ...updateWordInputSchema.shape },
   }, ({ id, ...patch }) => compactWord(repo.updateWord(id, patch)));
 
   defineTool(server, 'delete_word', {
     title: 'Delete word',
     description: 'Permanently delete one word by id, with its error history.',
-    inputSchema: { id: ID },
+    inputSchema: { id: identifierSchema },
     annotations: DESTRUCTIVE,
   }, ({ id }) => repo.deleteWord(id));
 
   defineTool(server, 'set_word_status', {
     title: 'Set word status',
     description: 'Set a word to new, learning or learned.',
-    inputSchema: { id: ID, status: STATUS },
+    inputSchema: { id: identifierSchema, ...setWordStatusInputSchema.shape },
   }, ({ id, status }) => compactWord(repo.setWordStatus(id, status)));
 
   defineTool(server, 'log_word_error', {
@@ -215,15 +186,7 @@ function registerTools(server) {
       + 'Give id, or nl (exact, case-insensitive; article helps choose between homographs). '
       + 'If no word matches, one is created from nl, uk (required then), article, section and status "learning", and the error is logged on it. '
       + 'Returns {word, created}.',
-    inputSchema: {
-      id: ID.optional(),
-      nl: z.string().min(1).optional(),
-      uk: z.string().min(1).optional().describe('Ukrainian translation; needed only when the word must be created'),
-      article: ARTICLE.nullish(),
-      source: SOURCE.optional().describe("'exercise', 'lesson' (default) or 'practice'"),
-      wrong_answer: z.string().nullish().describe('what the learner wrote'),
-      section: z.string().nullish().describe('section for a newly created word'),
-    },
+    inputSchema: logWordErrorByLookupInputSchema.shape,
   }, ({ id, nl, uk, article, source, wrong_answer, section }) => {
     const src = source ?? 'lesson';
     let word;
@@ -254,9 +217,7 @@ function registerTools(server) {
   defineTool(server, 'get_rule', {
     title: 'Get grammar rule',
     description: 'One grammar rule with its full body and the mistake patterns filed under it. Look it up by numeric id or by code such as "5.5".',
-    inputSchema: {
-      id_or_code: z.union([z.number().int().positive(), z.string().min(1)]),
-    },
+    inputSchema: { id_or_code: ruleReferenceSchema },
     annotations: READ_ONLY,
   }, ({ id_or_code }) => {
     const rule = repo.getRule(id_or_code);
@@ -269,34 +230,19 @@ function registerTools(server) {
       + 'A block is a table if every line starts with "|" (a line of |---| separators is dropped; the first row is the header); '
       + 'a list if every line starts with "- "; an example box if every line starts with ">"; otherwise a paragraph (lines are joined). '
       + 'Inline formatting: **bold** only. Do not use other markdown or HTML.',
-    inputSchema: {
-      code: z.string().min(1).describe('rule number shown to the learner, e.g. "5.5" or "Д1"'),
-      title: z.string().min(1),
-      body: z.string(),
-      category: z.string().nullish().describe('word class, e.g. "прикметник"'),
-      sort_order: z.number().int().nullish().describe('ascending display order; default after the last rule'),
-    },
+    inputSchema: createRuleToolInputSchema.shape,
   }, args => repo.addRule(args));
 
   defineTool(server, 'update_rule', {
     title: 'Update grammar rule',
     description: 'Change fields of one rule by id. Only the given fields change. The body uses the same mini-markdown as add_rule.',
-    inputSchema: {
-      id: ID,
-      code: z.string().min(1).optional(),
-      title: z.string().min(1).optional(),
-      body: z.string().optional(),
-      category: z.string().nullish(),
-      sort_order: z.number().int().optional(),
-    },
+    inputSchema: { id: identifierSchema, ...updateRuleInputSchema.omit({ section: true }).shape },
   }, ({ id, ...patch }) => repo.updateRule(id, patch));
 
   defineTool(server, 'list_mistake_patterns', {
     title: 'List mistake patterns',
     description: 'Recurring mistake patterns with their cases, most frequent first. Filter by rule_code; "other" lists patterns that fit no rule. Check here before log_mistake to reuse a pattern_id.',
-    inputSchema: {
-      rule_code: z.string().min(1).optional().describe('e.g. "5.5", or "other"'),
-    },
+    inputSchema: listMistakePatternsQuerySchema.pick({ rule_code: true }).shape,
     annotations: READ_ONLY,
   }, ({ rule_code }) => repo.listPatterns({ rule_code }));
 
@@ -305,29 +251,13 @@ function registerTools(server) {
     description: 'Record one grammar mistake. Pass pattern_id to add a case to an existing pattern. '
       + 'Otherwise the case goes to the pattern with the same rule_code and the same title (case-insensitive), or a new pattern is created, '
       + 'which needs title (short) and fix (one line). rule_code null means no rule fits ("other"). Returns the pattern.',
-    inputSchema: {
-      rule_code: z.string().min(1).nullable().describe('rule code such as "5.5", or null when no rule fits'),
-      pattern_id: ID.nullish().describe('existing pattern to add this case to'),
-      title: z.string().min(1).nullish().describe('what went wrong, for a new pattern'),
-      fix: z.string().nullish().describe('one-line correct rule, for a new pattern'),
-      wrong: z.string().min(1).describe('what the learner wrote'),
-      right: z.string().min(1).describe('the correct form'),
-      date: DATE.nullish().describe('YYYY-MM-DD; default today'),
-      source: SOURCE.nullish().describe("default 'exercise'"),
-    },
+    inputSchema: logMistakeToolInputSchema.shape,
   }, args => repo.logMistake({ ...args, source: args.source ?? 'exercise' }));
 
   defineTool(server, 'add_phrases', {
     title: 'Add phrases',
     description: 'Add stable Dutch phrases (dialogue lines, shop talk) in one call. context is the source, e.g. the dialogue name. All phrases are added or none are.',
-    inputSchema: {
-      phrases: z.array(z.object({
-        nl: z.string().min(1),
-        uk: z.string().min(1),
-        context: z.string().nullish(),
-        section: z.string().nullish(),
-      })).min(1).max(1000),
-    },
+    inputSchema: addPhrasesInputSchema.shape,
   }, ({ phrases }) => {
     // One transaction, so a bad item leaves nothing half-added. Each repo call still validates its own input.
     const added = getDb().transaction(() => phrases.map(p => repo.addPhrase(p)))();
@@ -337,16 +267,14 @@ function registerTools(server) {
   defineTool(server, 'list_phrases', {
     title: 'List phrases',
     description: 'Phrases, newest first.',
-    inputSchema: {
-      limit: z.number().int().min(1).max(5000).optional().describe('default 100'),
-    },
+    inputSchema: listPhrasesInputSchema.shape,
     annotations: READ_ONLY,
   }, ({ limit }) => repo.listPhrases().slice(0, limit ?? 100));
 
   defineTool(server, 'delete_phrase', {
     title: 'Delete phrase',
     description: 'Permanently delete one phrase by id.',
-    inputSchema: { id: ID },
+    inputSchema: { id: identifierSchema },
     annotations: DESTRUCTIVE,
   }, ({ id }) => repo.deletePhrase(id));
 
@@ -354,11 +282,7 @@ function registerTools(server) {
     title: 'Add text',
     description: 'Add a bilingual text, e.g. a textbook dialogue. body format: one Dutch line, then its Ukrainian line; '
       + 'pairs are separated by a blank line. A speaker prefix such as "Jasper:" / "Яспер:" may start a line. Returns the text.',
-    inputSchema: {
-      title: z.string().min(1).describe('e.g. "Dialoog 6.1: In een restaurant"'),
-      body: z.string().min(1),
-      section: z.string().nullish().describe("textbook chapter code, e.g. '6.1'"),
-    },
+    inputSchema: createTextInputSchema.shape,
   }, args => repo.addText(args));
 
   defineTool(server, 'list_texts', {
@@ -370,7 +294,7 @@ function registerTools(server) {
   defineTool(server, 'get_text', {
     title: 'Get text',
     description: 'One text by id, including its body.',
-    inputSchema: { id: ID },
+    inputSchema: { id: identifierSchema },
     annotations: READ_ONLY,
   }, ({ id }) => repo.getText(id));
 }

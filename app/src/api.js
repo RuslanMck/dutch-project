@@ -2,6 +2,7 @@
 import express from 'express';
 import * as repo from './repo.js';
 import { bus } from './events.js';
+import { ConflictError, mapToDomainError, NotFoundError, ValidationError } from './errors/domain-errors.js';
 
 export const apiRouter = express.Router();
 apiRouter.use(express.json({ limit: '2mb' }));   // no-op when server.js already parsed the body
@@ -76,10 +77,25 @@ apiRouter.get('/events', (req, res) => {
 
 apiRouter.use((req, res) => res.status(404).json({ error: 'not found' }));
 
+const STATUS_CODE_BY_ERROR_TYPE = new Map([
+  [ValidationError, 400],
+  [NotFoundError, 404],
+  [ConflictError, 409],
+]);
+
+// Domain errors map to 400/404/409. Errors from Express middleware (bad JSON, body too large) keep their status.
+function findStatusCode(error) {
+  for (const [ErrorType, statusCode] of STATUS_CODE_BY_ERROR_TYPE) {
+    if (error instanceof ErrorType) return statusCode;
+  }
+  return Number.isInteger(error.status) ? error.status : 500;
+}
+
 // eslint-disable-next-line no-unused-vars
 apiRouter.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
-  const status = err.status || 500;
-  if (status >= 500) console.error(err);
-  res.status(status).json({ error: err.message });
+  const error = mapToDomainError(err);
+  const status = findStatusCode(error);
+  if (status >= 500) console.error(error);
+  res.status(status).json({ error: error.message });
 });

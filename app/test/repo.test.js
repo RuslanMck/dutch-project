@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, setDb, getDb } from '../src/db.js';
 import * as repo from '../src/repo.js';
+import { NotFoundError, ValidationError } from '../src/errors/domain-errors.js';
 import { importExport } from '../scripts/import.js';
 
 process.env.NODE_ENV = 'test';
@@ -78,9 +79,9 @@ test('logMistake with no rule creates a pattern with rule null, then reuses it',
   assert.equal(second.count, 2);
 });
 
-test('logMistake rejects an unknown rule code with 400', SKIP, () => {
+test('logMistake rejects an unknown rule code as a validation error', SKIP, () => {
   assert.throws(() => repo.logMistake({ rule_code: '99.9', title: 'x', wrong: 'a', right: 'b' }),
-    err => err.status === 400);
+    err => err instanceof ValidationError);
 });
 
 test('addWords skips existing entries (case-insensitive nl, same article)', SKIP, () => {
@@ -135,13 +136,13 @@ test('getRule accepts an id or a code', SKIP, () => {
   assert.equal(repo.getRule('Д1').category, 'дієслово');
 });
 
-test('bad input gives 400 and missing rows give 404', SKIP, () => {
-  assert.throws(() => repo.addWord({ nl: '', uk: 'x' }), err => err.status === 400);
-  assert.throws(() => repo.getWord(999999), err => err.status === 404);
-  assert.throws(() => repo.getWord('abc'), err => err.status === 400);
-  assert.throws(() => repo.addCase(999999, { wrong: 'a', right: 'b' }), err => err.status === 404);
+test('bad input gives a validation error and missing rows a not-found error', SKIP, () => {
+  assert.throws(() => repo.addWord({ nl: '', uk: 'x' }), err => err instanceof ValidationError);
+  assert.throws(() => repo.getWord(999999), err => err instanceof NotFoundError);
+  assert.throws(() => repo.getWord('abc'), err => err instanceof ValidationError);
+  assert.throws(() => repo.addCase(999999, { wrong: 'a', right: 'b' }), err => err instanceof NotFoundError);
   assert.throws(() => repo.addCase(repo.listPatterns()[0].id, { wrong: 'a', right: 'b', date: '2026-02-30' }),
-    err => err.status === 400);
+    err => err instanceof ValidationError);
 });
 
 test('stats and exportAll report the imported data', SKIP, () => {
