@@ -1,15 +1,19 @@
 // Contracts for phrases (stable Dutch lines with their context).
 import { z } from 'zod';
 
-import { identifierParameterSchema, nonEmptyTextSchema, optionalTextSchema } from './shared-contracts.js';
+import {
+  createNonEmptyTextSchema,
+  createOptionalTextSchema,
+  identifierParameterSchema,
+} from './shared-contracts.js';
 
 export const phrasePathParametersSchema = z.object({ id: identifierParameterSchema });
 
 export const createPhraseInputSchema = z.object({
-  nl: nonEmptyTextSchema,
-  uk: nonEmptyTextSchema,
-  context: optionalTextSchema,
-  section: optionalTextSchema,
+  nl: createNonEmptyTextSchema(),
+  uk: createNonEmptyTextSchema(),
+  context: createOptionalTextSchema(),
+  section: createOptionalTextSchema(),
 });
 
 export const addPhrasesInputSchema = z.object({

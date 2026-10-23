@@ -18,12 +18,14 @@ on top of it and the exact module/API contracts every part is built against.
 | Backups | In-app online backup daily to `data/backups/dutch-YYYY-MM-DD.db`, keep 30; plus `GET /api/export` (handoff JSON shape) | No host cron/sqlite3 needed |
 | Secrets | `.env` (git-ignored): `APP_PASSWORD`, `SESSION_SECRET`, `API_TOKEN`, `MCP_SECRET`, plus `DATA_DIR` | |
 | Personal data | `DATA_DIR` (default `./data`, git-ignored) holds the DB, backups and any seed export | |
-| Tests | `node --test` (built in), in-memory DB via `openDb(':memory:')` + `setDb()` | No extra dev deps |
+| Tests | `node --test` (built in); each suite builds an in-memory database and its own services (`test/database-test-helpers.js`) | No extra dev deps |
 
 Run anything with Node through Docker (there is no Node on the host):
 `docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim <cmd>`
 
 ## Layout
+
+This was the layout the app was first built with. The code has since been split by domain (see `src/README.md` and the project-quality-standards skill); the shapes and contracts below still describe what REST and MCP return.
 
 ```
 src/db.js        openDb(file), getDb(), setDb(db)          — done

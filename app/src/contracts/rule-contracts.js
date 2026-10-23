@@ -1,7 +1,11 @@
 // Contracts for grammar rules.
 import { z } from 'zod';
 
-import { identifierParameterSchema, nonEmptyTextSchema, optionalTextSchema } from './shared-contracts.js';
+import {
+  createNonEmptyTextSchema,
+  createOptionalTextSchema,
+  identifierParameterSchema,
+} from './shared-contracts.js';
 
 export const rulePathParametersSchema = z.object({ id: identifierParameterSchema });
 
@@ -11,13 +15,13 @@ export const ruleReferenceSchema = z.union([z.number().int().positive(), z.strin
 export const ruleReferencePathParametersSchema = z.object({ id: ruleReferenceSchema });
 
 export const createRuleInputSchema = z.object({
-  code: nonEmptyTextSchema.describe('rule number shown to the learner, e.g. "5.5" or "Д1"'),
-  title: nonEmptyTextSchema,
+  code: createNonEmptyTextSchema().describe('rule number shown to the learner, e.g. "5.5" or "Д1"'),
+  title: createNonEmptyTextSchema(),
   body: z.string().default(''),
-  category: optionalTextSchema.describe('word class, e.g. "прикметник"'),
+  category: createOptionalTextSchema().describe('word class, e.g. "прикметник"'),
   sort_order: z.number().int().nullish().describe('ascending display order; default after the last rule'),
-  section: optionalTextSchema.describe('textbook chapter code; defaults to the rule code'),
-  legacy_id: optionalTextSchema,
+  section: createOptionalTextSchema().describe('textbook chapter code; defaults to the rule code'),
+  legacy_id: createOptionalTextSchema(),
 });
 
 export const updateRuleInputSchema = createRuleInputSchema

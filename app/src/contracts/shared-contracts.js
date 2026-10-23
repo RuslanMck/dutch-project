@@ -26,10 +26,16 @@ export const calendarDateSchema = z.string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
   .refine(isRealCalendarDate, 'invalid date');
 
-export const nonEmptyTextSchema = z.string().trim().min(1, 'required');
+// The text building blocks are factories, not shared instances: when one schema object is used for two fields of
+// the same MCP tool, its JSON Schema repeats it as a "$ref", which not every MCP client resolves.
+export function createNonEmptyTextSchema() {
+  return z.string().trim().min(1, 'required');
+}
 
 // In a patch, an absent field is left alone, and null or '' clears it.
-export const optionalTextSchema = z.string().trim().nullish();
+export function createOptionalTextSchema() {
+  return z.string().trim().nullish();
+}
 
 function isRealCalendarDate(text) {
   const [year, month, day] = text.split('-').map(Number);

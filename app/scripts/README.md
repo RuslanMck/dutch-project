@@ -6,4 +6,4 @@ Command-line tools run by hand (`npm run import`, `docker compose run …`). The
 
 | File | What it does |
 |---|---|
-| `import.js` | Idempotent import of a claude.ai artifact export (`dutch-export.json`) into the database, matched by `legacy_id`; writes `import-report.txt` with duplicates and data issues. |
+| `import.js` | CLI for the idempotent import of a claude.ai artifact export (`dutch-export.json`) into the database at `DB_PATH`. The artifact import service does the work; the script writes `import-report.txt` and prints the counts. |

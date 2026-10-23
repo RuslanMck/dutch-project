@@ -1,9 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { once } from 'node:events';
-import { fileURLToPath } from 'node:url';
 
 // Env must be set before the modules are used (the secret is read per request, the token too).
 process.env.NODE_ENV = 'test';
@@ -13,16 +10,13 @@ process.env.API_TOKEN = 'test-api-token-for-mcp';
 const express = (await import('express')).default;
 const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
 const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-const { openDb, setDb } = await import('../src/db.js');
-const { mcpRouter } = await import('../src/mcp.js');
-const { importExport } = await import('../scripts/import.js');
-const repo = await import('../src/repo.js');
-
-const here = path.dirname(fileURLToPath(import.meta.url));
+const { createMcpRouter } = await import('../src/mcp.js');
+const { createTestContext } = await import('./database-test-helpers.js');
 const { seed, SKIP } = await import('./seed.js');
 
-setDb(openDb(':memory:'));
-if (seed) importExport(structuredClone(seed));   // rules (5.5 among them), mistakes, words
+const context = createTestContext();
+// rules (5.5 among them), mistakes, words
+if (seed) context.artifactImportService.importArtifactExport(structuredClone(seed));
 
 const SECRET = process.env.MCP_SECRET;
 const TOKEN = process.env.API_TOKEN;
@@ -35,7 +29,7 @@ const EXPECTED_TOOLS = [
 
 const app = express();
 app.disable('x-powered-by');
-app.use('/mcp', express.json(), mcpRouter);
+app.use('/mcp', express.json(), createMcpRouter(context));
 
 const server = app.listen(0, '127.0.0.1');
 let base;
@@ -145,7 +139,7 @@ test('log_word_error on an unknown nl creates the word as learning with one erro
 });
 
 test('log_word_error by id and by existing nl adds to the existing word', SKIP, async () => {
-  const groot = repo.findWords('groot', { limit: 1 })[0];   // seeded word
+  const groot = context.wordService.searchWords({ query: 'groot', limit: 1 })[0];   // seeded word
   const before = groot.error_count;
   const byId = await call(client, 'log_word_error', { id: groot.id });
   assert.equal(byId.created, false);

@@ -1,27 +1,23 @@
-import { test } from 'node:test';
+// Import of the seed export through the artifact import service, and the export round trip.
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { openDb, setDb, getDb } from '../src/db.js';
-import { exportAll } from '../src/repo.js';
-import { importExport } from '../scripts/import.js';
+import { test } from 'node:test';
 
-process.env.NODE_ENV = 'test';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
+import { createTestContext } from './database-test-helpers.js';
 import { seed, SKIP } from './seed.js';
 
 const TABLES = ['sections', 'topics', 'rules', 'texts', 'words', 'word_errors', 'phrases', 'mistake_patterns', 'mistake_cases'];
-const snapshot = db => Object.fromEntries(TABLES.map(t => [t, db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all()]));
+const snapshot = database => Object.fromEntries(TABLES
+  .map(tableName => [tableName, database.prepare(`SELECT * FROM ${tableName} ORDER BY rowid`).all()]));
 
-function freshDbWithSeed() {
-  setDb(openDb(':memory:'));
-  return importExport(structuredClone(seed));
+let context;
+
+function createContextWithSeed() {
+  context = createTestContext();
+  return context.artifactImportService.importArtifactExport(structuredClone(seed));
 }
 
 test('import of the real seed gives the expected counts', SKIP, () => {
-  const { counts, report } = freshDbWithSeed();
+  const { counts, report } = createContextWithSeed();
   assert.equal(counts.words, 586);
   assert.equal(counts.word_errors, 12);
   assert.equal(counts.rules, 7);
@@ -43,51 +39,50 @@ test('import of the real seed gives the expected counts', SKIP, () => {
 });
 
 test('import maps rule topics, the Д prefix and the other pseudo-rule', SKIP, () => {
-  freshDbWithSeed();
-  const db = getDb();
-  const adj = db.prepare("SELECT code, category, section_code, sort_order FROM rules WHERE legacy_id = 'adjectief'").get();
+  createContextWithSeed();
+  const database = context.database;
+  const adj = database.prepare("SELECT code, category, section_code, sort_order FROM rules WHERE legacy_id = 'adjectief'").get();
   assert.deepEqual({ ...adj }, { code: '5.5', category: 'прикметник', section_code: '5.5', sort_order: 60 });
-  const modal = db.prepare("SELECT code, category FROM rules WHERE legacy_id = 'modaal'").get();
+  const modal = database.prepare("SELECT code, category FROM rules WHERE legacy_id = 'modaal'").get();
   assert.deepEqual({ ...modal }, { code: 'Д1', category: 'дієслово' });
-  assert.equal(db.prepare("SELECT is_textbook FROM sections WHERE code = 'Д1'").pluck().get(), 0);
-  assert.equal(db.prepare("SELECT is_textbook FROM sections WHERE code = '5.5'").pluck().get(), 1);
-  const other = db.prepare("SELECT rule_id FROM mistake_patterns WHERE legacy_id = 'hoeveelheid'").get();
+  assert.equal(database.prepare("SELECT is_textbook FROM sections WHERE code = 'Д1'").pluck().get(), 0);
+  assert.equal(database.prepare("SELECT is_textbook FROM sections WHERE code = '5.5'").pluck().get(), 1);
+  const other = database.prepare("SELECT rule_id FROM mistake_patterns WHERE legacy_id = 'hoeveelheid'").get();
   assert.equal(other.rule_id, null);
 });
 
 test('import splits examples on the first " — " and keeps NL-only examples in example_nl', SKIP, () => {
-  freshDbWithSeed();
-  const db = getDb();
-  const split = db.prepare("SELECT example_nl, example_uk FROM words WHERE legacy_id = 'bestellen'").get();
+  createContextWithSeed();
+  const database = context.database;
+  const split = database.prepare("SELECT example_nl, example_uk FROM words WHERE legacy_id = 'bestellen'").get();
   assert.equal(split.example_nl, 'Kan ik een toetje bestellen?');
   assert.equal(split.example_uk, 'Можна замовити десерт?');
-  const nlOnly = db.prepare("SELECT example_nl, example_uk FROM words WHERE legacy_id = 'w-groot'").get();
+  const nlOnly = database.prepare("SELECT example_nl, example_uk FROM words WHERE legacy_id = 'w-groot'").get();
   assert.equal(nlOnly.example_uk, null);
 });
 
 test('second import changes nothing', SKIP, () => {
-  const first = freshDbWithSeed();
-  const db = getDb();
-  const before = snapshot(db);
-  const second = importExport(structuredClone(seed));
-  assert.deepEqual(snapshot(db), before);
+  const first = createContextWithSeed();
+  const database = context.database;
+  const before = snapshot(database);
+  const second = context.artifactImportService.importArtifactExport(structuredClone(seed));
+  assert.deepEqual(snapshot(database), before);
   assert.deepEqual(second.counts, first.counts);
 });
 
 test('groot has 4 legacy_import errors and error_count 4', SKIP, () => {
-  freshDbWithSeed();
-  const db = getDb();
-  const groot = db.prepare("SELECT id FROM words WHERE legacy_id = 'w-groot'").get();
-  const legacy = db.prepare(`SELECT COUNT(*) FROM word_errors
+  createContextWithSeed();
+  const database = context.database;
+  const groot = database.prepare("SELECT id FROM words WHERE legacy_id = 'w-groot'").get();
+  const legacy = database.prepare(`SELECT COUNT(*) FROM word_errors
       WHERE word_id = ? AND source = 'legacy_import' AND occurred_at IS NULL`).pluck().get(groot.id);
   assert.equal(legacy, 4);
-  assert.equal(db.prepare('SELECT error_count FROM v_words WHERE id = ?').pluck().get(groot.id), 4);
+  assert.equal(database.prepare('SELECT error_count FROM v_words WHERE id = ?').pluck().get(groot.id), 4);
 });
 
 test('exportAll output imports back to the same counts', SKIP, () => {
-  const first = freshDbWithSeed();
-  const exported = JSON.parse(JSON.stringify(exportAll()));
-  setDb(openDb(':memory:'));
-  const second = importExport(exported);
+  const first = createContextWithSeed();
+  const exported = JSON.parse(JSON.stringify(context.artifactExportService.exportCollections()));
+  const second = createTestContext().artifactImportService.importArtifactExport(exported);
   assert.deepEqual(second.counts, first.counts);
 });

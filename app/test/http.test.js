@@ -10,11 +10,11 @@ process.env.SESSION_SECRET = 'test-session-secret';
 process.env.API_TOKEN = 'test-api-token';
 
 const express = (await import('express')).default;
-const { openDb, setDb } = await import('../src/db.js');
 const { authRoutes, requireAuth } = await import('../src/auth.js');
-const { apiRouter } = await import('../src/api.js');
+const { createApiRouter } = await import('../src/api.js');
+const { createTestContext } = await import('./database-test-helpers.js');
 
-setDb(openDb(':memory:'));
+const context = createTestContext();
 
 const app = express();
 app.disable('x-powered-by');
@@ -22,7 +22,7 @@ app.use(express.urlencoded({ extended: false }), express.json());
 app.get('/api/health', (req, res) => res.json({ ok: true }));   // as in server.js, before auth
 app.use(authRoutes);
 app.use(requireAuth);
-app.use('/api', apiRouter);
+app.use('/api', createApiRouter(context));
 
 const server = app.listen(0, '127.0.0.1');
 let base;

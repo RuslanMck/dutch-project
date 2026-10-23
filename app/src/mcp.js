@@ -2,8 +2,8 @@
 // so this router does its own authentication:
 //   POST /mcp/<MCP_SECRET>            claude.ai connector (secret in the path)
 //   POST /mcp  Authorization: Bearer  Claude Code / scripts (API_TOKEN)
-// Every tool is a thin wrapper around src/repo.js; this file contains no SQL. Tool arguments are described by the
-// shared contracts in src/contracts/, so MCP and REST validate the same shapes.
+// Every tool is a thin wrapper around a domain service; this file contains no SQL. Tool arguments are described by
+// the shared contracts in src/contracts/, so MCP and REST validate the same shapes and call the same services.
 import express from 'express';
 import crypto from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,8 +21,6 @@ import {
   setWordStatusInputSchema,
   updateWordInputSchema,
 } from './contracts/word-contracts.js';
-import * as repo from './repo.js';
-import { getDb } from './db.js';
 import { mapToDomainError } from './errors/domain-errors.js';
 
 const INSTRUCTIONS = `This is the learner's Dutch (NL) → Ukrainian (UK) learning database. The web app is in Ukrainian; the data is stored as given.
@@ -122,21 +120,29 @@ function defineTool(server, name, config, handler) {
 }
 
 const READ_ONLY = { readOnlyHint: true };
+const DELETED_RESULT = Object.freeze({ ok: true });
 const DESTRUCTIVE = { destructiveHint: true };
 
-function registerTools(server) {
+function registerTools(server, {
+  wordService,
+  ruleService,
+  mistakeService,
+  phraseService,
+  textService,
+  statisticsService,
+}) {
   defineTool(server, 'stats', {
     title: 'Database statistics',
     description: 'Counts of words (by status, expressions), rules, mistake patterns, cases, phrases, texts, and the textbook sections in use.',
     annotations: READ_ONLY,
-  }, () => repo.stats());
+  }, () => statisticsService.calculateStatistics());
 
   defineTool(server, 'search_words', {
     title: 'Search words',
     description: 'Case-insensitive search on Dutch and Ukrainian text. Exact Dutch matches come first. Use before add_words to avoid duplicates.',
     inputSchema: searchWordsInputSchema.shape,
     annotations: READ_ONLY,
-  }, ({ query, limit }) => repo.findWords(query, { limit: limit ?? 20 }).map(compactWord));
+  }, ({ query, limit }) => wordService.searchWords({ query, limit }).map(compactWord));
 
   defineTool(server, 'list_words', {
     title: 'List words',
@@ -144,10 +150,7 @@ function registerTools(server) {
     inputSchema: listWordsToolInputSchema.shape,
     annotations: READ_ONLY,
   }, ({ status, topic, section, sort, limit }) => {
-    // repo.listWords has no section filter, so filter here and apply the limit after it.
-    const rows = repo.listWords({ status, topic, sort })
-      .filter(w => section === undefined || w.section === section);
-    return rows.slice(0, limit ?? 100).map(compactWord);
+    return wordService.listWords({ status, topic, section, sort, limit: limit ?? 100 }).map(compactWord);
   });
 
   defineTool(server, 'add_words', {
@@ -157,7 +160,7 @@ function registerTools(server) {
       + 'Returns {added, skipped}.',
     inputSchema: addWordsInputSchema.shape,
   }, ({ words, skip_existing }) => {
-    const { added, skipped } = repo.addWords(words, { skipExisting: skip_existing ?? true });
+    const { added, skipped } = wordService.createWords(words, { shouldSkipExisting: skip_existing ?? true });
     return { added: added.map(compactWord), skipped };
   });
 
@@ -165,20 +168,23 @@ function registerTools(server) {
     title: 'Update word',
     description: 'Change fields of one word by id. Only the given fields change. Empty string or null clears example_nl, example_uk, section, topic. Changing nl re-detects kind unless kind is given.',
     inputSchema: { id: identifierSchema, ...updateWordInputSchema.shape },
-  }, ({ id, ...patch }) => compactWord(repo.updateWord(id, patch)));
+  }, ({ id, ...patch }) => compactWord(wordService.updateWord(id, patch)));
 
   defineTool(server, 'delete_word', {
     title: 'Delete word',
     description: 'Permanently delete one word by id, with its error history.',
     inputSchema: { id: identifierSchema },
     annotations: DESTRUCTIVE,
-  }, ({ id }) => repo.deleteWord(id));
+  }, ({ id }) => {
+    wordService.deleteWord(id);
+    return DELETED_RESULT;
+  });
 
   defineTool(server, 'set_word_status', {
     title: 'Set word status',
     description: 'Set a word to new, learning or learned.',
     inputSchema: { id: identifierSchema, ...setWordStatusInputSchema.shape },
-  }, ({ id, status }) => compactWord(repo.setWordStatus(id, status)));
+  }, ({ id, status }) => compactWord(wordService.updateWordStatus(id, status)));
 
   defineTool(server, 'log_word_error', {
     title: 'Log word error',
@@ -187,32 +193,16 @@ function registerTools(server) {
       + 'If no word matches, one is created from nl, uk (required then), article, section and status "learning", and the error is logged on it. '
       + 'Returns {word, created}.',
     inputSchema: logWordErrorByLookupInputSchema.shape,
-  }, ({ id, nl, uk, article, source, wrong_answer, section }) => {
-    const src = source ?? 'lesson';
-    let word;
-    let created = false;
-    if (id !== undefined) {
-      word = repo.getWord(id);
-    } else {
-      if (!nl) throw new Error('give id, or nl to find the word');
-      const needle = nl.trim().toLowerCase();
-      const exact = repo.findWords(nl, { limit: 1000 }).filter(w => w.nl.toLowerCase() === needle);
-      word = exact.find(w => article !== undefined && article !== null && w.article === article) ?? exact[0];
-      if (!word) {
-        if (!uk) throw new Error(`word "${nl}" not found; give uk to create it`);
-        word = repo.addWord({ nl, uk, article: article ?? '', section, status: 'learning' });
-        created = true;
-      }
-    }
-    const updated = repo.logWordError(word.id, { source: src, wrong_answer });
-    return { word: compactWord(updated), created };
+  }, args => {
+    const { word, created } = wordService.logWordErrorByLookup(args);
+    return { word: compactWord(word), created };
   });
 
   defineTool(server, 'list_rules', {
     title: 'List grammar rules',
     description: 'All grammar rules in textbook order, without bodies. Use get_rule for the full text.',
     annotations: READ_ONLY,
-  }, () => repo.listRules().map(compactRule));
+  }, () => ruleService.listRules().map(compactRule));
 
   defineTool(server, 'get_rule', {
     title: 'Get grammar rule',
@@ -220,8 +210,8 @@ function registerTools(server) {
     inputSchema: { id_or_code: ruleReferenceSchema },
     annotations: READ_ONLY,
   }, ({ id_or_code }) => {
-    const rule = repo.getRule(id_or_code);
-    return { ...rule, patterns: repo.listPatterns({ rule_id: rule.id }) };
+    const rule = ruleService.getRule(id_or_code);
+    return { ...rule, patterns: mistakeService.listPatterns({ rule_id: rule.id }) };
   });
 
   defineTool(server, 'add_rule', {
@@ -231,20 +221,20 @@ function registerTools(server) {
       + 'a list if every line starts with "- "; an example box if every line starts with ">"; otherwise a paragraph (lines are joined). '
       + 'Inline formatting: **bold** only. Do not use other markdown or HTML.',
     inputSchema: createRuleToolInputSchema.shape,
-  }, args => repo.addRule(args));
+  }, args => ruleService.createRule(args));
 
   defineTool(server, 'update_rule', {
     title: 'Update grammar rule',
     description: 'Change fields of one rule by id. Only the given fields change. The body uses the same mini-markdown as add_rule.',
     inputSchema: { id: identifierSchema, ...updateRuleInputSchema.omit({ section: true }).shape },
-  }, ({ id, ...patch }) => repo.updateRule(id, patch));
+  }, ({ id, ...patch }) => ruleService.updateRule(id, patch));
 
   defineTool(server, 'list_mistake_patterns', {
     title: 'List mistake patterns',
     description: 'Recurring mistake patterns with their cases, most frequent first. Filter by rule_code; "other" lists patterns that fit no rule. Check here before log_mistake to reuse a pattern_id.',
     inputSchema: listMistakePatternsQuerySchema.pick({ rule_code: true }).shape,
     annotations: READ_ONLY,
-  }, ({ rule_code }) => repo.listPatterns({ rule_code }));
+  }, ({ rule_code }) => mistakeService.listPatterns({ rule_code }));
 
   defineTool(server, 'log_mistake', {
     title: 'Log mistake',
@@ -252,84 +242,88 @@ function registerTools(server) {
       + 'Otherwise the case goes to the pattern with the same rule_code and the same title (case-insensitive), or a new pattern is created, '
       + 'which needs title (short) and fix (one line). rule_code null means no rule fits ("other"). Returns the pattern.',
     inputSchema: logMistakeToolInputSchema.shape,
-  }, args => repo.logMistake({ ...args, source: args.source ?? 'exercise' }));
+  }, args => mistakeService.logMistake({ ...args, source: args.source ?? 'exercise' }));
 
   defineTool(server, 'add_phrases', {
     title: 'Add phrases',
     description: 'Add stable Dutch phrases (dialogue lines, shop talk) in one call. context is the source, e.g. the dialogue name. All phrases are added or none are.',
     inputSchema: addPhrasesInputSchema.shape,
-  }, ({ phrases }) => {
-    // One transaction, so a bad item leaves nothing half-added. Each repo call still validates its own input.
-    const added = getDb().transaction(() => phrases.map(p => repo.addPhrase(p)))();
-    return { added };
-  });
+  }, ({ phrases }) => ({ added: phraseService.createPhrases(phrases) }));
 
   defineTool(server, 'list_phrases', {
     title: 'List phrases',
     description: 'Phrases, newest first.',
     inputSchema: listPhrasesInputSchema.shape,
     annotations: READ_ONLY,
-  }, ({ limit }) => repo.listPhrases().slice(0, limit ?? 100));
+  }, ({ limit }) => phraseService.listPhrases({ limit: limit ?? 100 }));
 
   defineTool(server, 'delete_phrase', {
     title: 'Delete phrase',
     description: 'Permanently delete one phrase by id.',
     inputSchema: { id: identifierSchema },
     annotations: DESTRUCTIVE,
-  }, ({ id }) => repo.deletePhrase(id));
+  }, ({ id }) => {
+    phraseService.deletePhrase(id);
+    return DELETED_RESULT;
+  });
 
   defineTool(server, 'add_text', {
     title: 'Add text',
     description: 'Add a bilingual text, e.g. a textbook dialogue. body format: one Dutch line, then its Ukrainian line; '
       + 'pairs are separated by a blank line. A speaker prefix such as "Jasper:" / "Яспер:" may start a line. Returns the text.',
     inputSchema: createTextInputSchema.shape,
-  }, args => repo.addText(args));
+  }, args => textService.createText(args));
 
   defineTool(server, 'list_texts', {
     title: 'List texts',
     description: 'Texts without bodies, newest first. Use get_text for a body.',
     annotations: READ_ONLY,
-  }, () => repo.listTexts().map(compactText));
+  }, () => textService.listTexts().map(compactText));
 
   defineTool(server, 'get_text', {
     title: 'Get text',
     description: 'One text by id, including its body.',
     inputSchema: { id: identifierSchema },
     annotations: READ_ONLY,
-  }, ({ id }) => repo.getText(id));
+  }, ({ id }) => textService.getText(id));
 }
 
-function buildServer() {
-  const server = new McpServer({ name: 'dutch', version: '1.0.0' }, { instructions: INSTRUCTIONS });
-  registerTools(server);
-  return server;
-}
+// services: the domain services from server/create-domain-services.js.
+export function createMcpRouter(services) {
+  function buildServer() {
+    const server = new McpServer({ name: 'dutch', version: '1.0.0' }, { instructions: INSTRUCTIONS });
+    registerTools(server, services);
+    return server;
+  }
 
-// Stateless: a fresh server and transport per POST; nothing is kept between requests.
-async function handleMcp(req, res) {
-  const server = buildServer();
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  res.on('close', () => {
-    transport.close();
-    server.close();
-  });
-  try {
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
-  } catch (err) {
-    console.error('mcp: request failed:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
+  // Stateless: a fresh server and transport per POST; nothing is kept between requests.
+  async function handleMcp(req, res) {
+    const server = buildServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on('close', () => {
+      transport.close();
+      server.close();
+    });
+    try {
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    } catch (err) {
+      console.error('mcp: request failed:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
+      }
     }
   }
+
+  const mcpRouter = express.Router();
+
+  mcpRouter.post('/:secret', requireSecret, handleMcp);
+  mcpRouter.post('/', requireBearer, handleMcp);
+
+  mcpRouter.get('/:secret', requireSecret, methodNotAllowed);
+  mcpRouter.delete('/:secret', requireSecret, methodNotAllowed);
+  mcpRouter.get('/', requireBearer, methodNotAllowed);
+  mcpRouter.delete('/', requireBearer, methodNotAllowed);
+
+  return mcpRouter;
 }
-
-export const mcpRouter = express.Router();
-
-mcpRouter.post('/:secret', requireSecret, handleMcp);
-mcpRouter.post('/', requireBearer, handleMcp);
-
-mcpRouter.get('/:secret', requireSecret, methodNotAllowed);
-mcpRouter.delete('/:secret', requireSecret, methodNotAllowed);
-mcpRouter.get('/', requireBearer, methodNotAllowed);
-mcpRouter.delete('/', requireBearer, methodNotAllowed);
