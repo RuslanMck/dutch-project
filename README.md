@@ -67,3 +67,24 @@ Done. Ask in the Project for an exercise on rule 5.5 to check that everything wo
 ## Updates
 
 Your copy does not update itself. If new words or rules are added here, you can ask Claude to import only the new entries from `starter/`.
+
+## Repository map
+
+This repository holds two ways to use the kit: the claude.ai artifact kit (root files, `artifact/`, `starter/`, `skills/`) and the optional self-hosted app (`app/`). Personal data and secrets never go in git.
+
+### Files
+
+| File | What it does |
+|---|---|
+| `README.md` | This guide: what the kit is, how to set it up, and this map of the repository. |
+| `project-instructions.md` | Text to paste into a Claude Project's instructions: how Claude explains, gives exercises and checks answers. |
+
+### Folders
+
+| Folder | Purpose |
+|---|---|
+| `app/` | Self-hosted web app (Node, Express, SQLite) with a REST API and an MCP server. |
+| `artifact/` | The single-file "Dutch матеріали" page published as a claude.ai artifact. |
+| `starter/` | Starter data (words and grammar rules) imported into a new artifact. |
+| `skills/` | claude.ai skills that work with the artifact. |
+| `.claude/skills/` | Claude Code skills for working on this repository (project quality standards). |

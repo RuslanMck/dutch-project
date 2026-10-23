@@ -66,3 +66,31 @@ docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim sh -c "npm ci && np
 - **Data:** `${DATA_DIR}/dutch.db` (SQLite, WAL). Daily backups go to `${DATA_DIR}/backups/dutch-YYYY-MM-DD.db`, keeping 30. `GET /api/export` gives a JSON dump.
 - **Restore:** `docker compose stop app && cp "$DATA_DIR"/backups/dutch-<date>.db "$DATA_DIR"/dutch.db && rm -f "$DATA_DIR"/dutch.db-wal "$DATA_DIR"/dutch.db-shm && docker compose start app`
 - **Rotate a secret:** edit `.env`, then run `docker compose up -d app`. A new `SESSION_SECRET` logs out every browser. A new `MCP_SECRET` means updating the connector URL.
+
+## Files
+
+| File | What it does |
+|---|---|
+| `README.md` | How to run, connect and operate the app, and this map of the folder. |
+| `PLAN.md` | Design decisions and the REST/MCP contracts the app was built against. |
+| `package.json` | Package manifest: dependencies and the `start`, `import` and `test` scripts. |
+| `package-lock.json` | Locked dependency versions for reproducible `npm ci`. |
+| `Dockerfile` | Builds the production image (Node 24, production dependencies only, non-root user). |
+| `docker-compose.yml` | Runs the app on the external `web` network behind a shared Caddy, with `DATA_DIR` mounted as `/app/data`. |
+| `docker-compose.caddy.yml` | Optional overlay that adds a Caddy of its own for standalone use. |
+| `Caddyfile` | Caddy site configuration for the standalone overlay (HTTPS, security headers, no access log). |
+| `.env.example` | Template for `.env`, listing every environment variable with a comment. |
+| `.env` | The real secrets and data path for this server. Git-ignored; never committed. |
+| `.gitignore` | Keeps dependencies, personal data, databases, secrets and import reports out of git. |
+| `.dockerignore` | Keeps dependencies, data, secrets, tests and docs out of the Docker build context. |
+
+## Folders
+
+| Folder | Purpose |
+|---|---|
+| `src/` | Server code: HTTP server, REST API, MCP server, authentication, data access, backups. |
+| `public/` | Browser code and static files served to signed-in users (no build step). |
+| `migrations/` | Numbered SQL migrations that build the SQLite schema. |
+| `scripts/` | Command-line tools, such as the artifact-export import. |
+| `test/` | `node --test` suites for the server, the import and the browser logic. |
+| `docs/` | Background documents, such as the migration handoff spec. |
