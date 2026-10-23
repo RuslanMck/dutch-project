@@ -8,7 +8,10 @@ validation, documentation (MCP tool descriptions) and types (JSDoc).
 - `app/src/contracts/<domain>-contracts.js`, one file per domain (`word-contracts.js`, `rule-contracts.js`,
   `mistake-contracts.js`, `phrase-contracts.js`, `text-contracts.js`).
 - `shared-contracts.js` holds the building blocks used by several domains: `identifierSchema`,
-  `calendarDateSchema`, `articleSchema`, `learningStatusSchema`, `nonEmptyTextSchema`, `optionalTextSchema`.
+  `calendarDateSchema`, `articleSchema`, `learningStatusSchema`, and the text factories
+  `createNonEmptyTextSchema()` and `createOptionalTextSchema()`. Building blocks that one MCP tool may use for
+  several fields must be factories: the MCP SDK turns a reused schema instance into a JSON Schema `$ref`, which not
+  every MCP client resolves.
 - `environment-contracts.js` holds `environmentSchema`. `artifact-export-contracts.js` holds the shape of
   `dutch-export.json`, and `starter-data-contracts.js` holds the shapes of `starter/words.json` and
   `starter/rules.json`.
@@ -33,11 +36,16 @@ validation, documentation (MCP tool descriptions) and types (JSDoc).
 // contracts/word-contracts.js
 import { z } from 'zod';
 
-import { articleSchema, identifierSchema, learningStatusSchema, nonEmptyTextSchema } from './shared-contracts.js';
+import {
+  articleSchema,
+  createNonEmptyTextSchema,
+  identifierSchema,
+  learningStatusSchema,
+} from './shared-contracts.js';
 
 export const createWordInputSchema = z.object({
-  dutchText: nonEmptyTextSchema.describe('Dutch word or expression, e.g. "bestellen" or "hoe heet je?"'),
-  ukrainianText: nonEmptyTextSchema.describe('Ukrainian translation'),
+  dutchText: createNonEmptyTextSchema().describe('Dutch word or expression, e.g. "bestellen" or "hoe heet je?"'),
+  ukrainianText: createNonEmptyTextSchema().describe('Ukrainian translation'),
   article: articleSchema.default('').describe("'de', 'het' or '' for none"),
   exampleDutch: z.string().trim().optional().describe('Dutch example sentence'),
   exampleUkrainian: z.string().trim().optional().describe('Ukrainian translation of the example'),

@@ -3,28 +3,25 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { once } from 'node:events';
 
-// Env must be set before auth.js is imported (it reads the secrets at import time).
-process.env.NODE_ENV = 'test';
-process.env.APP_PASSWORD = 'correct horse';
-process.env.SESSION_SECRET = 'test-session-secret';
-process.env.API_TOKEN = 'test-api-token';
+import { parseEnvironmentConfiguration } from '../src/configuration/environment-configuration.js';
+import { createApplication } from '../src/server/create-application.js';
+import { createTestContext } from './database-test-helpers.js';
 
-const express = (await import('express')).default;
-const { authRoutes, requireAuth } = await import('../src/auth.js');
-const { createApiRouter } = await import('../src/api.js');
-const { createTestContext } = await import('./database-test-helpers.js');
-
+const configuration = parseEnvironmentConfiguration({
+  NODE_ENV: 'test',
+  APP_PASSWORD: 'correct horse',
+  SESSION_SECRET: 'test-session-secret',
+  API_TOKEN: 'test-api-token',
+});
 const context = createTestContext();
+const application = createApplication({
+  configuration,
+  services: context,
+  changeEventBus: context.changeEventBus,
+  clock: context.clock,
+});
 
-const app = express();
-app.disable('x-powered-by');
-app.use(express.urlencoded({ extended: false }), express.json());
-app.get('/api/health', (req, res) => res.json({ ok: true }));   // as in server.js, before auth
-app.use(authRoutes);
-app.use(requireAuth);
-app.use('/api', createApiRouter(context));
-
-const server = app.listen(0, '127.0.0.1');
+const server = application.listen(0, '127.0.0.1');
 let base;
 before(async () => {
   await once(server, 'listening');

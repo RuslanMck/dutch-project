@@ -90,7 +90,8 @@ export const logWordErrorInputSchema = z.object({
 export const logWordErrorByLookupInputSchema = z.object({
   id: identifierSchema.optional(),
   nl: createNonEmptyTextSchema().optional(),
-  uk: createNonEmptyTextSchema().optional().describe('Ukrainian translation; needed only when the word must be created'),
+  uk: createNonEmptyTextSchema().optional()
+    .describe('Ukrainian translation; needed only when the word must be created'),
   article: articleSchema.nullish(),
   source: mistakeSourceSchema.optional().describe("'exercise', 'lesson' (default) or 'practice'"),
   wrong_answer: createOptionalTextSchema().describe('what the learner wrote'),

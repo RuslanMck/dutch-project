@@ -1,4 +1,4 @@
-# Current state and migration map (analysis of 2026-10-23)
+# Current state and migration map (analysis of 2026-10-23, updated after steps 1–4)
 
 This records where the existing code differs from the standards, so a refactor can be planned in steps. Fix
 deviations in the code you touch, and fix whole areas as separate, behaviour-preserving changes with the tests green
@@ -14,21 +14,20 @@ before and after. Remove entries from this file as they are fixed.
 | `skills/dutch-exercise-check/` | Kit skill (artifact-based) | Template with `<ARTIFACT_URL>` |
 | `app/` | Self-hosted app with REST + MCP | Node 24, Express 5, better-sqlite3, Zod 3, MCP SDK 1.32 |
 
-No folder except `app/` has a README; `app/` has no README in any subfolder.
+## app/src and app/test
 
-## app/src: responsibilities
+`app/src` follows the target structure in `architecture.md` (domains with repository, service, routes and tools;
+`contracts/`, `errors/`, `configuration/`, `database/`, `authentication/`, `model-context-protocol/`,
+`change-events/`, `backups/`, and the composition root in `server/`). What is left:
 
-| Current file | Problem | Target |
+| Where | Problem | Target |
 |---|---|---|
-| `repo.js` (814 lines) | Five domains in one module; SQL, business rules and validation mixed; throws `httpError(400/404)` (HTTP in the data layer); uses the global `getDb()`; `notify()` called from data functions | `domains/<domain>/<domain>-repository.js` + `<domain>-service.js`; errors from `errors/domain-errors.js`; events published by services |
-| `mcp.js` (411 lines) | All tools in one file; Zod shapes copied from `repo.js` ("mirror the validation"); `import * as repo`; reads `process.env` per request | `model-context-protocol/create-mcp-server.js` + `domains/<domain>/<domain>-tools.js` using `contracts/` |
-| `api.js` | All routes in one router; `import * as repo` | `domains/<domain>/<domain>-routes.js`; one error middleware |
-| `auth.js` | Reads `process.env` at import and throws; cookie signing, rate limiting and routes in one file | `authentication/` split (see architecture.md); configuration injected |
-| `db.js` | Module singleton with `getDb()`/`setDb()` | `database/create-database-connection.js` + `run-database-migrations.js`; connection passed to factories |
-| `events.js` | Module-level `bus` singleton | `change-events/change-event-bus.js` factory |
-| `backup.js` | Reads env at import; uses `getDb()` | `backups/database-backup-scheduler.js` with injected database and configuration |
-| `server.js` | Mixes composition and start-up | `server/create-application.js` + `server/start-server.js` |
-| `scripts/import.js` | Validates with ad-hoc checks, not a contract | `scripts/import-artifact-export.js` + `artifactExportSchema` + an import service |
+| `contracts/*.js` | Input schemas are not `.strict()`, so unknown keys are still dropped instead of rejected (kept to avoid changing what clients may send) | `.strict()` on every input schema, in the coordinated wire change below |
+| `contracts/*.js` | No schemas for returned objects (`wordSchema`, `ruleSchema`, …); repositories return rows in the wire shape (snake_case, `nl`/`uk`) with no `map…Row` | `<entity>Schema` per domain object; repositories map rows to camelCase objects; tests assert `wordSchema.parse(result)` |
+| Services | Take inputs in the wire shape (`nl`, `example_nl`, `rule_code`) | camelCase inputs, together with the wire change |
+| `scripts/import.js` | Name; the export file is checked ad hoc (`collections` must be an object), not with a contract | `scripts/import-artifact-export.js` + `artifactExportSchema` (and `starter-data-contracts.js`) |
+| `authentication/authentication-routes.js` | The fallback login page (used only when `public/login.html` is missing) is inline HTML with inline styles | Drop it, or serve a proper page from `public/` |
+| `test/` | Suites test behaviour across layers (`domain-services`, `http`, `mcp`, `import`) instead of mirroring `src/` one file per module | `test/<mirror of src>/<module>.test.js`; update the `npm test` glob |
 
 ## app/public
 
@@ -52,7 +51,7 @@ No folder except `app/` has a README; `app/` has no README in any subfolder.
 | `mistake_cases.pattern_id` | `mistake_pattern_id` |
 | `idx_words_status`, `idx_words_nl`, `idx_word_errors_word`, `idx_patterns_rule`, `idx_cases_pattern`, `idx_rules_code`, `idx_attempts_word` | `index_<table>_on_<column>` |
 | `v_words`, `v_mistake_patterns`, `v_rule_errors` | `view_words_with_error_counts`, `view_mistake_patterns_with_counts`, `view_rule_error_counts` |
-| Single-letter aliases in views and queries (`p`, `c`, `w`, `v`, `t`) | full table names |
+| Single-letter aliases in the views (`p`, `c`, `w`, `v`, `t`); queries in JavaScript already use full names | full table names |
 
 Migration files `001_init.sql` and `002_practice_attempts.sql` keep their names; renames happen in a new
 `003-…sql`. Renaming columns changes REST fields, MCP tool arguments, the browser code, the server instructions, and
@@ -78,11 +77,9 @@ The REST API and MCP use snake_case fields today (`error_count`, `example_nl`, `
 
 ## Suggested order of work
 
-1. Add folder READMEs for the current layout (no code change).
-2. Add `contracts/` and `errors/`; switch `repo.js` and `mcp.js` to the shared contracts. Behaviour stays the same.
-3. Replace `getDb()` with injected connections, and split `repo.js` into domain repositories and services, one domain
-   at a time.
-4. Split `api.js` / `mcp.js` into per-domain routes and tools; add the composition root.
+Steps 1–4 (folder READMEs, contracts and errors, domain repositories and services with injected connections,
+per-domain routes and tools with the composition root) are done. Remaining:
+
 5. Split `public/app.js` into tabs; rename ids, classes and custom properties.
 6. One coordinated rename: database migration 003, camelCase wire format, env names, skills and docs.
 7. Bring `artifact/dutch-materials.html` and `starter/` naming in line, together.

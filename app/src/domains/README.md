@@ -1,6 +1,6 @@
 # domains
 
-The app's data and business rules, one folder per domain. Inside a domain, the *repository* holds the SQL and maps rows to the shape returned to callers, and the *service* holds the business rules, opens transactions and publishes change events. REST routes and MCP tools call the services, never the repositories.
+The app's data, business rules and their adapters, one folder per domain. Inside a domain, the *repository* holds the SQL and maps rows to the shape returned to callers; the *service* holds the business rules, opens transactions and publishes change events; the *routes* (REST) and *tools* (MCP) parse input with the contracts and call the same service functions, never the repositories.
 
 ## Files
 
@@ -32,5 +32,6 @@ The app's data and business rules, one folder per domain. Inside a domain, the *
 
 1. Create `domains/<domain>/` with `<domain>-repository.js` and `<domain>-service.js`, each exporting a `create…` factory.
 2. Add its contracts in `contracts/<domain>-contracts.js`.
-3. Wire it in `server/create-domain-services.js`, then add its routes and tools.
-4. Add a README for the folder and a row in this one.
+3. Wire it in `server/create-domain-services.js`.
+4. Add `<domain>-routes.js` (mount it in `server/create-api-router.js`) and `<domain>-tools.js` (register it in `model-context-protocol/create-mcp-server.js`).
+5. Add a README for the folder and a row in this one.

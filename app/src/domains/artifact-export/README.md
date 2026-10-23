@@ -12,3 +12,4 @@ The claude.ai artifact's JSON format (`dutch-export.json`): exporting all data i
 | `artifact-import-service.js` | Runs the import in one transaction: sections, rules, words with legacy error counts, phrases, texts, mistake patterns and cases. Publishes every collection. |
 | `artifact-import-mapping.js` | Pure mapping of export fields: rule topic → code and category, example → Dutch and Ukrainian, date → timestamp. |
 | `import-report-formatting.js` | Formats the plain-text import report: duplicate words and data issues. Pure. |
+| `artifact-export-routes.js` | REST adapter: `GET /api/export` as a `dutch-export-YYYY-MM-DD.json` download. |

@@ -2,24 +2,20 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 
-// Env must be set before the modules are used (the secret is read per request, the token too).
-process.env.NODE_ENV = 'test';
-process.env.MCP_SECRET = '0123456789abcdef'.repeat(4);   // 64 hex chars
-process.env.API_TOKEN = 'test-api-token-for-mcp';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const express = (await import('express')).default;
-const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-const { createMcpRouter } = await import('../src/mcp.js');
-const { createTestContext } = await import('./database-test-helpers.js');
-const { seed, SKIP } = await import('./seed.js');
+import { parseEnvironmentConfiguration } from '../src/configuration/environment-configuration.js';
+import { createApplication } from '../src/server/create-application.js';
+import { createTestContext } from './database-test-helpers.js';
+import { seed, SKIP } from './seed.js';
+
+const SECRET = '0123456789abcdef'.repeat(4);   // 64 hex chars
+const TOKEN = 'test-api-token-for-mcp';
 
 const context = createTestContext();
 // rules (5.5 among them), mistakes, words
 if (seed) context.artifactImportService.importArtifactExport(structuredClone(seed));
-
-const SECRET = process.env.MCP_SECRET;
-const TOKEN = process.env.API_TOKEN;
 
 const EXPECTED_TOOLS = [
   'stats', 'search_words', 'list_words', 'add_words', 'update_word', 'delete_word', 'set_word_status',
@@ -27,11 +23,14 @@ const EXPECTED_TOOLS = [
   'add_phrases', 'list_phrases', 'delete_phrase', 'add_text', 'list_texts', 'get_text',
 ];
 
-const app = express();
-app.disable('x-powered-by');
-app.use('/mcp', express.json(), createMcpRouter(context));
+const application = createApplication({
+  configuration: parseEnvironmentConfiguration({ NODE_ENV: 'test', MCP_SECRET: SECRET, API_TOKEN: TOKEN }),
+  services: context,
+  changeEventBus: context.changeEventBus,
+  clock: context.clock,
+});
 
-const server = app.listen(0, '127.0.0.1');
+const server = application.listen(0, '127.0.0.1');
 let base;
 const clients = [];
 

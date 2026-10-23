@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createChangeEventBus } from '../src/change-events/change-event-bus.js';
+import { parseEnvironmentConfiguration } from '../src/configuration/environment-configuration.js';
 import { createDatabaseConnection } from '../src/database/create-database-connection.js';
 import { runDatabaseMigrations } from '../src/database/run-database-migrations.js';
 import { createDomainServices } from '../src/server/create-domain-services.js';
@@ -21,8 +22,9 @@ if (!exportFilePath) {
 }
 
 const exportDocument = JSON.parse(fs.readFileSync(exportFilePath, 'utf8'));
+const { databasePath } = parseEnvironmentConfiguration(process.env, { shouldRequireSecrets: false });
 const clock = createSystemClock();
-const database = createDatabaseConnection({ databasePath: process.env.DB_PATH || './data/dutch.db' });
+const database = createDatabaseConnection({ databasePath });
 runDatabaseMigrations({ database, clock });
 const { artifactImportService } = createDomainServices({
   database,

@@ -44,5 +44,6 @@ export const logMistakeInputSchema = addMistakeCaseInputSchema.extend({
 export const logMistakeToolInputSchema = logMistakeInputSchema.extend({
   rule_code: createNonEmptyTextSchema().nullable().describe('rule code such as "5.5", or null when no rule fits'),
   pattern_id: identifierSchema.nullish().describe('existing pattern to add this case to'),
+  title: createNonEmptyTextSchema().nullish().describe('what went wrong, for a new pattern'),
   source: mistakeSourceSchema.nullish().describe("default 'exercise'"),
 });

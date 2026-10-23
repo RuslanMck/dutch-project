@@ -10,9 +10,9 @@ Test suites for `node --test`, run with `npm test` (in Docker, since the host ha
 | `database-test-helpers.js` | `createTestContext`: an in-memory database with all migrations and the domain services built on it. |
 | `domain-services.test.js` | Domain service behaviour: practice results, mistake logging, duplicate skipping, filters, errors, statistics and export. |
 | `import.test.js` | Import of the seed export through the artifact import service: counts, rule mapping, example splitting, idempotence and export round trip. |
-| `http.test.js` | HTTP behaviour: login, cookie and bearer authentication, rate limiting, REST contract, live-update stream and export download. |
-| `mcp.test.js` | MCP server over HTTP: instructions, tool list, every tool's behaviour, and the secret-path and bearer authentication. |
-| `auth-env.test.js` | The server refuses to start outside test mode when a required secret is missing. |
+| `http.test.js` | HTTP behaviour of the full application (`createApplication`): login, cookie and bearer authentication, rate limiting, REST contract, live-update stream and export download. |
+| `mcp.test.js` | MCP server over HTTP in the full application: instructions, tool list, every tool's behaviour, and the secret-path and bearer authentication. |
+| `environment-configuration.test.js` | The server refuses to start outside test mode when a required secret is missing; the configuration's defaults. |
 | `ui-logic.test.js` | Pure browser helpers in `public/logic.js`: escaping, answer checking and rule-body rendering. |
 
 ## Conventions

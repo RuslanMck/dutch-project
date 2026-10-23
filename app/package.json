@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=24" },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/server/start-server.js",
     "import": "node scripts/import.js",
     "test": "node --test 'test/*.test.js'"
   },
