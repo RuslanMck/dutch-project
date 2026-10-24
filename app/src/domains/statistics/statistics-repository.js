@@ -15,9 +15,15 @@ export function createStatisticsRepository({ database }) {
     texts: database.prepare('SELECT COUNT(*) FROM texts').pluck(),
   });
   const selectSectionCodesStatement = database.prepare('SELECT code FROM sections ORDER BY code').pluck();
+  const selectWordSchedulesStatement = database.prepare('SELECT fsrs_card, due_at FROM words');
 
   function listWordCountsByStatus() {
     return selectWordCountsByStatusStatement.all();
+  }
+
+  // One row per word: its FSRS card as JSON (NULL = New) and its due time (NULL = New).
+  function listWordSchedules() {
+    return selectWordSchedulesStatement.all();
   }
 
   // name: one of words, expressions, rules, mistakePatterns, mistakeCases, phrases, texts.
@@ -29,5 +35,5 @@ export function createStatisticsRepository({ database }) {
     return selectSectionCodesStatement.all();
   }
 
-  return Object.freeze({ listWordCountsByStatus, countRows, listSectionCodes });
+  return Object.freeze({ listWordCountsByStatus, listWordSchedules, countRows, listSectionCodes });
 }

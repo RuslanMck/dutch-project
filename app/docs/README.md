@@ -8,3 +8,4 @@ Background documents for the app that are longer than a README. Decisions and co
 |---|---|
 | `HANDOFF.md` | Migration spec from the claude.ai artifact: data snapshot, behaviour of every tab, schema, import rules and UI strings. |
 | `CLAUDE_PROJECT_INSTRUCTIONS.md` | Instructions to paste into a claude.ai Project so Claude teaches with, and logs to, the app through the Dutch MCP connector. |
+| `FSRS_PRACTICE_ARCHITECTURE.md` | Plan and implementation spec for the FSRS word practice: behaviour, data model, modules, REST and MCP surfaces, and the work packages. |

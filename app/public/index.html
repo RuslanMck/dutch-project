@@ -93,8 +93,7 @@
         <span id="card-body"></span>
       </button>
       <div id="card-actions" class="card-actions">
-        <button id="card-again" type="button">Ще раз</button>
-        <button id="card-know" class="primary" type="button">Знаю</button>
+        <button id="card-next" class="primary" type="button">Далі</button>
       </div>
       <p id="card-count" class="muted center"></p>
     </section>
@@ -104,8 +103,8 @@
       <label class="field">
         <span>Режим</span>
         <select id="practice-mode">
-          <option value="all">Слова: переклад → nl (з артиклем або без)</option>
-          <option value="art">Артикль: de чи het</option>
+          <option value="fsrs">Переклад (FSRS)</option>
+          <option value="art">Артикль</option>
         </select>
       </label>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
@@ -114,7 +113,12 @@
         <button id="practice-btn" class="primary" type="submit">Перевірити</button>
       </form>
       <p id="practice-msg" class="msg" aria-live="polite"></p>
+      <p id="practice-progress" class="muted"></p>
       <p id="practice-score" class="muted"></p>
+      <section id="practice-summary" class="practice-summary" aria-label="Підсумок сесії" hidden>
+        <ul id="practice-summary-list" class="practice-summary__list"></ul>
+      </section>
+      <button id="practice-restart-button" class="primary practice-restart" type="button" hidden>Почати знову</button>
     </section>
 
     <!-- 4 · Правила -->

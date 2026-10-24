@@ -5,6 +5,7 @@ import { createServerSentEventsRoutes } from '../change-events/server-sent-event
 import { createArtifactExportRoutes } from '../domains/artifact-export/artifact-export-routes.js';
 import { createMistakeRoutes } from '../domains/mistakes/mistake-routes.js';
 import { createPhraseRoutes } from '../domains/phrases/phrase-routes.js';
+import { createPracticeRoutes } from '../domains/practice/practice-routes.js';
 import { createRuleRoutes } from '../domains/rules/rule-routes.js';
 import { createStatisticsRoutes } from '../domains/statistics/statistics-routes.js';
 import { createTextRoutes } from '../domains/texts/text-routes.js';
@@ -13,6 +14,8 @@ import { createRestErrorHandler } from '../http/rest-error-handler.js';
 
 export function createApiRouter({
   wordService,
+  practiceService,
+  priorityService,
   ruleService,
   mistakeService,
   phraseService,
@@ -24,6 +27,7 @@ export function createApiRouter({
 }) {
   const apiRouter = express.Router();
   apiRouter.use(createWordRoutes({ wordService }));
+  apiRouter.use(createPracticeRoutes({ practiceService, priorityService }));
   apiRouter.use(createRuleRoutes({ ruleService }));
   apiRouter.use(createMistakeRoutes({ mistakeService }));
   apiRouter.use(createPhraseRoutes({ phraseService }));

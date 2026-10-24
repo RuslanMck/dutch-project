@@ -5,11 +5,16 @@ import { runDatabaseMigrations } from '../src/database/run-database-migrations.j
 import { createDomainServices } from '../src/server/create-domain-services.js';
 import { createSystemClock } from '../src/time/system-clock.js';
 
-// Returns { database, changeEventBus, clock, wordService, ruleService, … }.
-export function createTestContext() {
-  const clock = createSystemClock();
+// Returns { database, changeEventBus, clock, wordService, practiceService, priorityService, … }.
+// clock: any object with now(); the default is the system clock. isFsrsFuzzEnabled: false keeps FSRS due dates exact.
+export function createTestContext({ clock = createSystemClock(), isFsrsFuzzEnabled = false } = {}) {
   const database = createDatabaseConnection({ databasePath: ':memory:' });
   runDatabaseMigrations({ database, clock });
   const changeEventBus = createChangeEventBus({ clock });
-  return { database, changeEventBus, clock, ...createDomainServices({ database, changeEventBus, clock }) };
+  return {
+    database,
+    changeEventBus,
+    clock,
+    ...createDomainServices({ database, changeEventBus, clock, isFsrsFuzzEnabled }),
+  };
 }

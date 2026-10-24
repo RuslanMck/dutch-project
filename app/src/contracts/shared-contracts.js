@@ -6,12 +6,21 @@ export const ARTICLE_VALUES = Object.freeze(['', 'de', 'het']);
 export const WORD_KIND_VALUES = Object.freeze(['word', 'expression']);
 export const PRACTICE_MODE_VALUES = Object.freeze(['translate', 'article']);
 export const MISTAKE_SOURCE_VALUES = Object.freeze(['exercise', 'lesson', 'practice']);
+// FSRS card states, in the order of ts-fsrs's State enum (New = 0 … Relearning = 3).
+export const CARD_STATE_VALUES = Object.freeze(['new', 'learning', 'review', 'relearning']);
 
 export const learningStatusSchema = z.enum(LEARNING_STATUS_VALUES);
 export const articleSchema = z.enum(ARTICLE_VALUES);
 export const wordKindSchema = z.enum(WORD_KIND_VALUES);
 export const practiceModeSchema = z.enum(PRACTICE_MODE_VALUES);
 export const mistakeSourceSchema = z.enum(MISTAKE_SOURCE_VALUES);
+export const cardStateSchema = z.enum(CARD_STATE_VALUES);
+
+// A word priority, 1 is practised first, given as a JSON number (MCP arguments, JSON bodies).
+export const wordPriorityValueSchema = z.number().int().min(1).max(3);
+
+// The same priority given as text (REST query strings).
+export const wordPriorityParameterSchema = z.coerce.number().int().min(1).max(3);
 
 // A database id given as a JSON number (MCP arguments, JSON bodies).
 export const identifierSchema = z.number().int().positive().describe('numeric id');

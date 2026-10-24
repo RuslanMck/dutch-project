@@ -16,7 +16,9 @@ export function createWordRoutes({ wordService }) {
   const wordRouter = express.Router();
 
   wordRouter.get('/words', (request, response) => {
-    response.json(wordService.listWords(listWordsQuerySchema.parse(removeBlankQueryValues(request.query))));
+    const listQuery = listWordsQuerySchema.parse(removeBlankQueryValues(request.query));
+    const { due_before: dueBefore, ...wordFilters } = listQuery;
+    response.json(wordService.listWords({ ...wordFilters, dueBefore }));
   });
 
   wordRouter.post('/words', (request, response) => {

@@ -127,7 +127,7 @@ test('REST writes and errors use the JSON contract', async () => {
     body: JSON.stringify({ correct: false, mode: 'translate', answer: 'bestelen' }),
   });
   assert.equal(result.status, 200);
-  assert.equal((await result.json()).status, 'learning');
+  assert.equal((await result.json()).status, 'new', 'a wrong answer adds an error and keeps the status');
 
   const bad = await fetch(`${base}/api/words/${word.id}/result`, {
     method: 'POST',
@@ -175,6 +175,84 @@ test('export is served as an attachment with the handoff shape', async () => {
   assert.match(r.headers.get('content-disposition'), /attachment; filename="?dutch-export-\d{4}-\d{2}-\d{2}\.json"?/);
   const body = await r.json();
   assert.ok(Array.isArray(body.collections.words));
+});
+
+test('GET /api/words takes the priority, state, due and sort filters and returns the schedule', async () => {
+  const created = await fetch(`${base}/api/words`, {
+    method: 'POST',
+    headers: { ...BEARER, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nl: 'tafel', uk: 'стіл', article: 'de', section: '6.1' }),
+  });
+  const tafel = await created.json();
+  assert.equal(tafel.priority, 1);
+  assert.equal(tafel.state, 'new');
+  assert.equal(tafel.next_due_on, null);
+  assert.ok(Object.hasOwn(tafel, 'frequency_rank'));
+  assert.ok(Object.hasOwn(tafel, 'due_at'));
+
+  const filtered = await fetch(`${base}/api/words?priority=1&state=new&sort=due`, { headers: BEARER });
+  assert.equal(filtered.status, 200);
+  assert.deepEqual((await filtered.json()).map(word => word.id), [tafel.id]);
+  assert.equal((await fetch(`${base}/api/words?sort=frequency`, { headers: BEARER })).status, 200);
+  assert.equal((await fetch(`${base}/api/words?state=learning2`, { headers: BEARER })).status, 400);
+  assert.equal((await fetch(`${base}/api/words?priority=4`, { headers: BEARER })).status, 400);
+});
+
+// FSRS practice over REST: refused with 409 until the migration, then the batch, grades, statistics and preview work.
+const JSON_BEARER = { ...BEARER, 'Content-Type': 'application/json' };
+let practiceWordId;
+
+function postPracticeGrade(body) {
+  return fetch(`${base}/api/practice/grades`, { method: 'POST', headers: JSON_BEARER, body: JSON.stringify(body) });
+}
+
+test('practice REST refuses the batch and grades with 409 before the FSRS migration', async () => {
+  const created = await fetch(`${base}/api/words`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ nl: 'fiets', uk: 'велосипед', article: 'de', section: '6.1' }),
+  });
+  practiceWordId = (await created.json()).id;
+
+  const batch = await fetch(`${base}/api/practice/batch?session_id=http-before`, { headers: BEARER });
+  assert.equal(batch.status, 409);
+  assert.match((await batch.json()).error, /not set up yet/);
+  const grade = await postPracticeGrade({ word_id: practiceWordId, grade: 'good', session_id: 'http-before' });
+  assert.equal(grade.status, 409);
+});
+
+test('practice REST after the migration: batch, grade, repeat, unknown field, stats and preview', async () => {
+  context.practiceService.migrateToFsrs({ isDryRun: false });
+
+  const batch = await fetch(`${base}/api/practice/batch?session_id=http-after&max_reviews=1`, { headers: BEARER });
+  assert.equal(batch.status, 200);
+  const batchBody = await batch.json();
+  assert.equal(batchBody.session_id, 'http-after');
+  assert.ok(batchBody.reviews.length <= 1);
+  assert.ok(batchBody.new_words.some(word => word.id === practiceWordId));
+  const zeroReviewsUrl = `${base}/api/practice/batch?session_id=http-after&max_reviews=0`;
+  assert.equal((await fetch(zeroReviewsUrl, { headers: BEARER })).status, 400);
+
+  const gradeBody = { word_id: practiceWordId, grade: 'good', answer: 'fiets', session_id: 'http-after' };
+  const graded = await postPracticeGrade(gradeBody);
+  assert.equal(graded.status, 200);
+  assert.equal((await graded.json()).grade, 'good');
+  const repeated = await postPracticeGrade(gradeBody);
+  assert.equal(repeated.status, 409, 'a second grade of the word in the same session is refused');
+  const unknownField = await postPracticeGrade({ ...gradeBody, session_id: 'http-after-2', extra: true });
+  assert.equal(unknownField.status, 400);
+
+  const stats = await fetch(`${base}/api/practice/stats`, { headers: BEARER });
+  assert.equal(stats.status, 200);
+  assert.equal(typeof (await stats.json()).due_today, 'number');
+
+  const preview = await fetch(`${base}/api/practice/priorities/preview?chapter=5`, { headers: BEARER });
+  assert.equal(preview.status, 200);
+  assert.equal((await preview.json()).chapter, 5);
+
+  const [listedWord] = await (await fetch(`${base}/api/words?priority=1`, { headers: BEARER })).json();
+  assert.equal(Object.hasOwn(listedWord, 'fsrs_card'), false, 'the card JSON is internal');
+  assert.equal(typeof listedWord.state, 'string');
 });
 
 test('logout clears the cookie', async () => {

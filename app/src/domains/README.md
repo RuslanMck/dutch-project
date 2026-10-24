@@ -13,6 +13,7 @@ The app's data, business rules and their adapters, one folder per domain. Inside
 | Folder | Purpose |
 |---|---|
 | `words/` | Dictionary words and expressions, their errors, practice results and topics. |
+| `practice/` | FSRS practice: the batch and grades, each word's schedule, the daily new-word quota and priorities, the frequency list, and the migration to FSRS. |
 | `rules/` | Grammar rules, found by id or code. |
 | `mistakes/` | Mistake patterns and their cases. |
 | `phrases/` | Stable Dutch phrases with their context. |

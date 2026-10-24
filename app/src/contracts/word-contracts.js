@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import {
   articleSchema,
+  calendarDateSchema,
+  cardStateSchema,
   createNonEmptyTextSchema,
   createOptionalTextSchema,
   identifierParameterSchema,
@@ -11,9 +13,11 @@ import {
   mistakeSourceSchema,
   practiceModeSchema,
   wordKindSchema,
+  wordPriorityParameterSchema,
+  wordPriorityValueSchema,
 } from './shared-contracts.js';
 
-export const WORD_SORT_ORDER_VALUES = Object.freeze(['added', 'errors']);
+export const WORD_SORT_ORDER_VALUES = Object.freeze(['added', 'errors', 'due', 'frequency']);
 export const wordSortOrderSchema = z.enum(WORD_SORT_ORDER_VALUES);
 
 const MAXIMUM_WORDS_PER_CALL = 1000;
@@ -55,16 +59,31 @@ export const setWordStatusInputSchema = z.object({ status: learningStatusSchema 
 const wordListFilterSchema = z.object({
   status: learningStatusSchema.optional(),
   topic: createNonEmptyTextSchema().optional(),
-  sort: wordSortOrderSchema.optional().describe("'added' (default) or 'errors' (most errors first)"),
+  sort: wordSortOrderSchema.optional().describe(
+    "'added' (default, oldest first), 'errors' (most errors first), 'due' (earliest due first, New words last) "
+    + "or 'frequency' (most frequent first, unranked last)",
+  ),
+  state: cardStateSchema.optional().describe(
+    'FSRS state. In practice only "new" (not in rotation) and "review" occur (long-term mode); '
+    + 'learning progress is the status field',
+  ),
+  priority: wordPriorityValueSchema.optional().describe('1 is practised first, then 2, then 3'),
 });
 
+// REST: due_before is a timestamp in milliseconds.
 export const listWordsQuerySchema = wordListFilterSchema.extend({
+  priority: wordPriorityParameterSchema.optional(),
+  due_before: z.coerce.number().int().nonnegative().optional()
+    .describe('milliseconds: only words due before this time'),
   q: createNonEmptyTextSchema().optional(),
   limit: z.coerce.number().int().min(1).max(MAXIMUM_WORD_LIST_LIMIT).optional(),
 });
 
+// MCP: due_before is a calendar date in the practice time zone.
 export const listWordsToolInputSchema = wordListFilterSchema.extend({
   section: createNonEmptyTextSchema().optional().describe("textbook chapter code, e.g. '6.1'"),
+  due_before: calendarDateSchema.optional()
+    .describe('YYYY-MM-DD: only words due before the start of that day (Amsterdam time)'),
   limit: z.number().int().min(1).max(MAXIMUM_WORD_LIST_LIMIT).optional().describe('default 100'),
 });
 

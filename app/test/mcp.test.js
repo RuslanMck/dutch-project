@@ -21,6 +21,8 @@ const EXPECTED_TOOLS = [
   'stats', 'search_words', 'list_words', 'add_words', 'update_word', 'delete_word', 'set_word_status',
   'log_word_error', 'list_rules', 'get_rule', 'add_rule', 'update_rule', 'list_mistake_patterns', 'log_mistake',
   'add_phrases', 'list_phrases', 'delete_phrase', 'add_text', 'list_texts', 'get_text',
+  'get_practice_batch', 'grade_word', 'set_current_chapter', 'set_word_priority', 'import_frequency_list',
+  'preview_priorities', 'migrate_to_fsrs', 'practice_stats',
 ];
 
 const application = createApplication({
@@ -79,6 +81,9 @@ test('initialize result carries the instructions and all tools are listed', SKIP
   const reads = tools.filter(t => t.annotations?.readOnlyHint).map(t => t.name);
   assert.ok(reads.includes('search_words') && reads.includes('get_rule'));
   assert.equal(tools.find(t => t.name === 'delete_word').annotations.destructiveHint, true);
+  assert.equal(tools.find(t => t.name === 'migrate_to_fsrs').annotations.destructiveHint, true);
+  assert.equal(tools.find(t => t.name === 'practice_stats').annotations.readOnlyHint, true);
+  assert.equal(tools.find(t => t.name === 'preview_priorities').annotations.readOnlyHint, true);
 });
 
 test('bearer route on /mcp works and returns the same tools', SKIP, async () => {
@@ -133,7 +138,8 @@ test('list_words filters by section and returns compact rows', SKIP, async () =>
   assert.ok(rows.length >= 1 && rows.length <= 5);
   assert.ok(rows.every(r => r.section === '6.1'));
   assert.deepEqual(Object.keys(rows[0]).sort(), [
-    'article', 'error_count', 'example_nl', 'example_uk', 'id', 'kind', 'nl', 'section', 'status', 'topic', 'uk',
+    'article', 'error_count', 'example_nl', 'example_uk', 'frequency_rank', 'id', 'kind', 'next_due_on', 'nl',
+    'priority', 'priority_override', 'section', 'state', 'status', 'topic', 'uk',
   ]);
 });
 
@@ -143,11 +149,11 @@ test('update_word on a missing id returns isError', SKIP, async () => {
   assert.match(res.content[0].text, /not found/);
 });
 
-test('log_word_error on an unknown nl creates the word as learning with one error', SKIP, async () => {
+test('log_word_error on an unknown nl creates the word as new with one error', SKIP, async () => {
   const first = await call(client, 'log_word_error', { nl: 'de sleutel', uk: 'ключ', article: 'de', source: 'exercise', wrong_answer: 'het sleutel' });
   assert.equal(first.created, true);
   assert.equal(first.word.nl, 'de sleutel');
-  assert.equal(first.word.status, 'learning');
+  assert.equal(first.word.status, 'new');
   assert.equal(first.word.error_count, 1);
 
   const second = await call(client, 'log_word_error', { nl: 'DE SLEUTEL' });
@@ -163,7 +169,7 @@ test('log_word_error by id and by existing nl adds to the existing word', SKIP, 
   assert.equal(byId.created, false);
   assert.equal(byId.word.id, groot.id);
   assert.equal(byId.word.error_count, before + 1);
-  assert.equal(byId.word.status, 'learning');
+  assert.equal(byId.word.status, groot.status, 'an error does not change the status');
   const byNl = await call(client, 'log_word_error', { nl: 'Groot' });
   assert.equal(byNl.created, false);
   assert.equal(byNl.word.id, groot.id);
@@ -305,4 +311,109 @@ test('GET and DELETE with the bearer token get 405', SKIP, async () => {
   assert.equal(get.status, 405);
   const del = await fetch(`${base}/mcp`, { method: 'DELETE', headers: { Authorization: `Bearer ${TOKEN}` } });
   assert.equal(del.status, 405);
+});
+
+// Its own application and database, so the seeded words are not changed by the migration.
+test('grade_word round trip over HTTP: refused before the migration, graded once, a repeat refused', async () => {
+  const practiceContext = createTestContext();
+  const practiceApplication = createApplication({
+    configuration: parseEnvironmentConfiguration({ NODE_ENV: 'test', MCP_SECRET: SECRET, API_TOKEN: TOKEN }),
+    services: practiceContext,
+    changeEventBus: practiceContext.changeEventBus,
+    clock: practiceContext.clock,
+  });
+  const practiceServer = practiceApplication.listen(0, '127.0.0.1');
+  await once(practiceServer, 'listening');
+  try {
+    const practiceBase = `http://127.0.0.1:${practiceServer.address().port}`;
+    const practiceClient = await connect(new StreamableHTTPClientTransport(new URL(`${practiceBase}/mcp/${SECRET}`)));
+    await call(practiceClient, 'add_words', { words: [{ nl: 'de tafel', uk: 'стіл', article: 'de', section: '6.1' }] });
+
+    const beforeMigration = await practiceClient.callTool({
+      name: 'get_practice_batch',
+      arguments: { session_id: 'mcp-session' },
+    });
+    assert.equal(beforeMigration.isError, true);
+    assert.match(beforeMigration.content[0].text, /not set up yet/);
+
+    const dryRun = await call(practiceClient, 'migrate_to_fsrs');
+    assert.equal(dryRun.dry_run, true);
+    assert.equal(dryRun.new, 1);
+    assert.equal((await call(practiceClient, 'migrate_to_fsrs', { dry_run: false })).dry_run, false);
+
+    const batch = await call(practiceClient, 'get_practice_batch', { session_id: 'mcp-session' });
+    assert.equal(batch.new_words.length, 1);
+    const gradeArguments = { id: batch.new_words[0].id, grade: 'good', session_id: 'mcp-session' };
+    const graded = await call(practiceClient, 'grade_word', gradeArguments);
+    assert.equal(graded.grade, 'good');
+    assert.equal(graded.word.id, gradeArguments.id);
+    assert.equal(graded.state, 'review');
+    assert.match(graded.next_due_on, /^\d{4}-\d{2}-\d{2}$/);
+
+    const repeat = await practiceClient.callTool({ name: 'grade_word', arguments: gradeArguments });
+    assert.equal(repeat.isError, true);
+    assert.match(repeat.content[0].text, /already graded/);
+
+    const stats = await call(practiceClient, 'practice_stats');
+    assert.equal(stats.introduced_today, 1);
+  } finally {
+    practiceServer.closeAllConnections();
+    await new Promise(resolve => practiceServer.close(resolve));
+  }
+});
+
+test('set_word_priority returns the compact word of the word tools, with priority_override', async () => {
+  const priorityClient = await secretClient();
+  const added = await call(priorityClient, 'add_words', {
+    words: [{ nl: 'prioriteitstest', uk: 'тест', section: '5.1' }],
+  });
+  const [addedWord] = added.added;
+  assert.equal(addedWord.priority_override, null);
+
+  const updated = await call(priorityClient, 'set_word_priority', { id: addedWord.id, priority: 2 });
+  assert.equal(updated.id, addedWord.id);
+  assert.equal(updated.priority, 2);
+  assert.equal(updated.priority_override, 2);
+  assert.deepEqual(Object.keys(updated).sort(), Object.keys(addedWord).sort());
+  assert.equal(Object.hasOwn(updated, 'fsrs_card'), false);
+});
+
+test('add_words gives priorities; list_words filters by state, priority and due day (YYYY-MM-DD)', async () => {
+  const filterContext = createTestContext();
+  const filterApplication = createApplication({
+    configuration: parseEnvironmentConfiguration({ NODE_ENV: 'test', MCP_SECRET: SECRET, API_TOKEN: TOKEN }),
+    services: filterContext,
+    changeEventBus: filterContext.changeEventBus,
+    clock: filterContext.clock,
+  });
+  const filterServer = filterApplication.listen(0, '127.0.0.1');
+  await once(filterServer, 'listening');
+  try {
+    const filterBase = `http://127.0.0.1:${filterServer.address().port}`;
+    const filterClient = await connect(new StreamableHTTPClientTransport(new URL(`${filterBase}/mcp/${SECRET}`)));
+    const added = await call(filterClient, 'add_words', { words: [
+      { nl: 'huis', uk: 'дім', section: '6.1' },
+      { nl: 'raam', uk: 'вікно', section: '3.2' },
+    ] });
+    assert.deepEqual(added.added.map(word => word.priority), [1, 3]);
+    assert.deepEqual(added.added.map(word => word.state), ['new', 'new']);
+    assert.equal(added.added[0].next_due_on, null);
+    assert.equal(Object.hasOwn(added.added[0], 'fsrs_card'), false);
+
+    await call(filterClient, 'migrate_to_fsrs', { dry_run: false });
+    const [huis] = added.added;
+    await call(filterClient, 'grade_word', { id: huis.id, grade: 'good', session_id: 'mcp-filter' });
+
+    const reviewed = await call(filterClient, 'list_words', { state: 'review' });
+    assert.deepEqual(reviewed.map(word => word.id), [huis.id]);
+    assert.match(reviewed[0].next_due_on, /^\d{4}-\d{2}-\d{2}$/);
+    assert.deepEqual((await call(filterClient, 'list_words', { state: 'review', due_before: '2999-01-01' }))
+      .map(word => word.id), [huis.id]);
+    assert.deepEqual(await call(filterClient, 'list_words', { due_before: '2000-01-01' }), []);
+    assert.deepEqual((await call(filterClient, 'list_words', { priority: 3 })).map(word => word.nl), ['raam']);
+    assert.deepEqual((await call(filterClient, 'list_words', { sort: 'due' })).map(word => word.nl), ['huis', 'raam']);
+  } finally {
+    filterServer.closeAllConnections();
+    await new Promise(resolve => filterServer.close(resolve));
+  }
 });

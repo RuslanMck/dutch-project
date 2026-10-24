@@ -86,3 +86,28 @@ test('exportAll output imports back to the same counts', SKIP, () => {
   const second = createTestContext().artifactImportService.importArtifactExport(exported);
   assert.deepEqual(second.counts, first.counts);
 });
+
+const ONE_WORD_EXPORT = Object.freeze({
+  collections: { words: [{ id: 'w-after-fsrs', nl: 'nieuw', uk: 'новий', status: 'learned' }] },
+});
+
+test('the artifact import works before the FSRS migration', () => {
+  const beforeMigration = createTestContext();
+  beforeMigration.artifactImportService.importArtifactExport(structuredClone(ONE_WORD_EXPORT));
+  const status = beforeMigration.database.prepare("SELECT status FROM words WHERE legacy_id = 'w-after-fsrs'").pluck();
+  assert.equal(status.get(), 'learned');
+});
+
+test('after the FSRS migration the artifact import is refused and writes nothing', () => {
+  const migrated = createTestContext();
+  migrated.practiceService.migrateToFsrs({ isDryRun: false });
+  const before = snapshot(migrated.database);
+  assert.throws(
+    () => migrated.artifactImportService.importArtifactExport(structuredClone(ONE_WORD_EXPORT)),
+    {
+      name: 'ConflictError',
+      message: 'the artifact import is disabled after the FSRS migration: it would overwrite the schedule',
+    },
+  );
+  assert.deepEqual(snapshot(migrated.database), before);
+});

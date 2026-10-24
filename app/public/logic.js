@@ -12,6 +12,16 @@ export function normalise(value) {
   return String(value ?? '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+// Form of an answer used for comparison: normalise, typographic quotes -> ', punctuation dropped, spaces collapsed.
+// "hoe gaat het?" and "hoe gaat het" compare equal; "'s ochtends" and "’s ochtends" too.
+export function normalizeAnswerText(value) {
+  return normalise(value)
+    .replace(/[’‘]/g, "'")
+    .replace(/[?!.,;:…"()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Classic Levenshtein distance (two-row DP).
 export function levenshtein(a, b) {
   if (a === b) return 0;
@@ -71,6 +81,40 @@ export function checkAnswer(word, input, mode) {
     return { counted: true, correct: false, message: `Майже, перевір літери. Правильно: ${right}` };
   }
   return { counted: true, correct: false, message: `✗ Правильно: ${right}` };
+}
+
+// FSRS translation check: the learner types the Dutch for a Ukrainian word.
+// Returns { counted, grade, message }. grade is 'good' (fully right), 'hard' (right word with a wrong, missing or
+// extra article, or one letter off) or 'again' (anything else, including "DNK"). counted=false means nothing is graded.
+// Punctuation, typographic quotes and extra spaces are ignored on both sides (normalizeAnswerText); the message
+// shows the word as stored.
+export function gradeTranslationAnswer(word, input) {
+  const normalizedInput = normalizeAnswerText(input);
+  const normalizedTarget = normalizeAnswerText(word.nl);
+  const article = word.article || '';
+  const right = article ? `${article} ${word.nl}` : word.nl;
+
+  if (!normalizedInput) return { counted: false, grade: null, message: 'Напиши відповідь нідерландською' };
+  // Checked before the fuzzy match: "dnk" is three letters and would otherwise be one letter off some words.
+  if (normalizedInput === 'dnk') return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
+  if (normalizedInput === normalizeAnswerText(right)) return { counted: true, grade: 'good', message: '✓ Правильно' };
+
+  // Optional leading article in the typed answer.
+  const articleMatch = normalizedInput.match(/^(de|het) (.+)$/);
+  const typedArticle = articleMatch ? articleMatch[1] : '';
+  const rest = articleMatch ? articleMatch[2] : normalizedInput;
+
+  if (rest === normalizedTarget) {
+    let problem = 'без артикля';
+    if (!article) problem = 'артикль зайвий';
+    else if (typedArticle) problem = 'артикль інший';
+    return { counted: true, grade: 'hard', message: `Слово вірно, але ${problem}. Правильно: ${right}` };
+  }
+
+  if (levenshtein(rest, normalizedTarget) <= 1) {
+    return { counted: true, grade: 'hard', message: `Майже, перевір літери. Правильно: ${right}` };
+  }
+  return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
 }
 
 // Inline rule: escape first, then **x** -> <b>x</b>. Nothing else.

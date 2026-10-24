@@ -1,7 +1,7 @@
 // Dutch матеріали: UI controller. Static tab shells live in index.html; this file fills them
 // and keeps user input (form text, card index, practice question, open rules) across re-renders.
 import * as api from './api.js';
-import { esc, normalise, checkAnswer, renderRuleBody } from './logic.js';
+import { esc, normalise, checkAnswer, gradeTranslationAnswer, renderRuleBody } from './logic.js';
 
 const TABS = ['table', 'cards', 'practice', 'rules', 'phrases', 'texts'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
@@ -22,7 +22,11 @@ const LOADERS = {
   texts: api.listTexts,
 };
 const STATUS_LABEL = { new: 'нове', learning: 'вчу', learned: 'знаю' };
-const NEXT_STATUS = { new: 'learning', learning: 'learned', learned: 'new' };
+
+// Practice session ({ sessionId, calendarDate }): kept in sessionStorage so a reload resumes the same day's session.
+const PRACTICE_SESSION_KEY = 'practice-session-id';
+// Statuses of the FSRS practice in which a visit to the practice tab fetches a new batch.
+const FSRS_LOAD_STATUSES = ['idle', 'failed', 'unconfigured'];
 
 const $ = id => document.getElementById(id);
 
@@ -32,10 +36,25 @@ const ui = {
   tab: 'table',
   armed: null,                       // { kind, id }: the one row waiting for a second click on delete
   table: { q: '', topic: '', sortErrors: false },
-  cards: { idx: 0, flippedId: null, busy: false },
-  practice: { mode: 'all', cur: null, lastId: null, feedback: null, score: { ok: 0, tot: 0 } },
+  cards: { idx: 0, flippedId: null },
+  practice: { mode: 'fsrs', cur: null, lastId: null, feedback: null, score: { ok: 0, tot: 0 } },
+  // FSRS translation practice. status: idle | loading | ready | done | unconfigured | failed.
+  // queue: batch words still to answer (reviews, then new words; again/hard words go to the end).
+  // answered: word ids whose first answer was posted; tally counts first answers by grade.
+  fsrs: {
+    status: 'idle',
+    sessionId: '',
+    queue: [],
+    answered: new Set(),
+    tally: { again: 0, hard: 0, good: 0 },
+    introducedCount: 0,
+    current: null,                   // { word, checked, grade }
+    feedback: null,
+    dueTomorrow: null,
+  },
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
+let memorySession = null;          // { sessionId, calendarDate } used when sessionStorage is blocked
 
 // ---------- helpers ----------
 
@@ -111,6 +130,7 @@ function showTab(name) {
     $(`tab-${t}`).hidden = t !== ui.tab;
     document.querySelector(`.tabs [data-tab="${t}"]`).setAttribute('aria-selected', String(t === ui.tab));
   }
+  if (ui.tab === 'practice') ensureFsrsSession();
   render();
 }
 
@@ -153,7 +173,7 @@ function renderTable() {
       <td>${esc(w.section || '')}</td>
       <td>${esc(w.uk)}</td>
       <td class="num">${errs(w) || ''}</td>
-      <td><button class="status st-${esc(w.status)}" type="button" data-act="status" data-id="${w.id}">${esc(STATUS_LABEL[w.status] || w.status)}</button></td>
+      <td><span class="status st-${esc(w.status)}">${esc(STATUS_LABEL[w.status] || w.status)}</span></td>
       <td><button class="del${armed ? ' armed' : ''}" type="button" data-act="wdel" data-id="${w.id}" aria-label="${armed ? 'Підтвердити видалення' : 'Видалити слово'}">${armed ? 'видалити?' : '×'}</button></td>
     </tr>`;
   }).join('');
@@ -191,37 +211,24 @@ function renderCards() {
   $('card-count').textContent = `Залишилось: ${pool.length}`;
 }
 
-// "Знаю" marks the current word learned (pool shrinks, same index shows the next card).
-// "Ще раз" marks the current word learning, then moves on to the next card.
-async function markCard(status) {
-  const c = ui.cards;
+// "Далі" only moves to the next card: statuses now follow the FSRS schedule, not the flashcards.
+function showNextCard() {
   const pool = cardPool();
-  const w = pool[c.idx];
-  if (!w || c.busy) return;
-  c.busy = true;
-  try {
-    await api.updateWord(w.id, { status });
-    if (status === 'learning') c.idx = (c.idx + 1) % pool.length;
-    await refresh(['words']);
-  } catch (e) {
-    notice(e.message || 'Помилка');
-  } finally {
-    c.busy = false;
-    render();
-  }
+  if (!pool.length) return;
+  ui.cards.idx = (ui.cards.idx + 1) % pool.length;
+  renderCards();
 }
 
 // ---------- 3 · Практика ----------
 
-function practicePool(mode) {
-  return state.words.filter(w => w.status !== 'learned' &&
-    (mode !== 'art' || w.article === 'de' || w.article === 'het'));
+// Article drill (mode 'art'): a random word with de or het, never the same as the previous question.
+function articlePool() {
+  return state.words.filter(w => w.status !== 'learned' && (w.article === 'de' || w.article === 'het'));
 }
 
-// Random word from the pool, never the same as the previous question.
 function pickQuestion() {
   const p = ui.practice;
-  const pool = practicePool(p.mode);
+  const pool = articlePool();
   p.feedback = null;
   if (!pool.length) {
     p.cur = null;
@@ -229,67 +236,280 @@ function pickQuestion() {
   }
   const choices = pool.length > 1 ? pool.filter(w => w.id !== p.lastId) : pool;
   const word = choices[Math.floor(Math.random() * choices.length)];
-  p.cur = { word, mode: p.mode, checked: false };
+  p.cur = { word, checked: false };
   p.lastId = word.id;
 }
 
-function renderPractice() {
-  const p = ui.practice;
-  if (!p.cur || !state.words.some(w => w.id === p.cur.word.id)) pickQuestion();
+// A practice session is stored as { sessionId, calendarDate } in sessionStorage. The server hides every word graded
+// in a session, so a session only lasts for one Amsterdam calendar day. When storage is blocked the same pair
+// lives in memory.
+function todayInAmsterdam() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Amsterdam' });
+}
 
-  const q = $('practice-q');
-  const form = $('practice-form');
-  const input = $('practice-input');
-  const btn = $('practice-btn');
-  if (!p.cur) {
-    q.textContent = 'Немає слів для цього режиму';
-    form.hidden = true;
-  } else {
-    form.hidden = false;
-    q.textContent = p.cur.mode === 'all' ? p.cur.word.uk : p.cur.word.nl;
-    btn.textContent = p.cur.checked ? 'Далі' : 'Перевірити';
-    input.placeholder = p.cur.mode === 'art' ? 'de або het' : 'нідерландською';
+function createSessionId() {
+  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function saveSession(sessionId) {
+  memorySession = { sessionId, calendarDate: todayInAmsterdam() };
+  try { sessionStorage.setItem(PRACTICE_SESSION_KEY, JSON.stringify(memorySession)); } catch { /* storage unavailable */ }
+}
+
+// The stored pair, or null when nothing usable is stored (absent, blocked, or an older plain id).
+function readStoredSession() {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(PRACTICE_SESSION_KEY) || 'null');
+    if (typeof parsed?.sessionId === 'string' && typeof parsed?.calendarDate === 'string') return parsed;
+  } catch { /* storage unavailable or not JSON: use the in-memory pair */ }
+  return null;
+}
+
+// The session id for this visit: the stored one while it belongs to today, otherwise a new session.
+function readSessionId() {
+  const current = readStoredSession() ?? memorySession;
+  if (current?.calendarDate === todayInAmsterdam()) return current.sessionId;
+  const sessionId = createSessionId();
+  saveSession(sessionId);
+  return sessionId;
+}
+
+// Opens the FSRS practice on the first visit; a failed or not yet configured practice is tried again on a visit.
+function ensureFsrsSession() {
+  if (ui.practice.mode === 'fsrs' && FSRS_LOAD_STATUSES.includes(ui.fsrs.status)) {
+    loadFsrsBatch(readSessionId());
   }
+}
 
-  const msg = $('practice-msg');
-  msg.textContent = p.feedback ? p.feedback.text : '';
-  msg.className = 'msg' + (p.feedback ? (p.feedback.ok ? ' ok' : ' bad') : '');
-  $('practice-score').textContent = `Вірно: ${p.score.ok} з ${p.score.tot}`;
-  $('practice-mode').value = p.mode;
+// "Почати знову": a fresh batch under a new session id.
+function restartFsrsSession() {
+  const sessionId = createSessionId();
+  saveSession(sessionId);
+  loadFsrsBatch(sessionId);
+}
+
+async function loadFsrsBatch(sessionId) {
+  const session = ui.fsrs;
+  Object.assign(session, {
+    status: 'loading',
+    sessionId,
+    queue: [],
+    answered: new Set(),
+    tally: { again: 0, hard: 0, good: 0 },
+    introducedCount: 0,
+    current: null,
+    feedback: null,
+    dueTomorrow: null,
+  });
+  renderPractice();
+  try {
+    const batch = await api.getPracticeBatch(sessionId);
+    session.queue = [...batch.reviews, ...batch.new_words];
+    session.status = 'ready';
+    showNextFsrsWord();
+  } catch (error) {
+    if (error.status === 409) {
+      session.status = 'unconfigured';
+    } else {
+      session.status = 'failed';
+      notice(error.message || 'Помилка');
+    }
+  }
+  renderPractice();
+}
+
+// Shows the first word of the queue, or ends the session when the queue is empty.
+function showNextFsrsWord() {
+  const session = ui.fsrs;
+  session.feedback = null;
+  if (!session.queue.length) {
+    session.current = null;
+    session.status = 'done';
+    // The finished session stays on screen; the next visit gets a fresh session id.
+    saveSession(createSessionId());
+    loadDueTomorrow();
+    return;
+  }
+  session.current = { word: session.queue[0], checked: false, grade: null };
+}
+
+async function loadDueTomorrow() {
+  const sessionId = ui.fsrs.sessionId;
+  try {
+    const stats = await api.getPracticeStats();
+    if (ui.fsrs.sessionId === sessionId) ui.fsrs.dueTomorrow = stats.due_tomorrow;
+  } catch (error) {
+    notice(error.message || 'Помилка');
+  }
+  renderPractice();
 }
 
 // Enter or the button: check the answer; once checked the button reads "Далі" and moves on.
 function submitPractice() {
-  const p = ui.practice;
+  if (ui.practice.mode === 'fsrs') submitFsrsAnswer();
+  else submitArticleAnswer();
+}
+
+function submitFsrsAnswer() {
+  const session = ui.fsrs;
   const input = $('practice-input');
-  if (p.cur && p.cur.checked) {
+  if (session.current?.checked) {
+    advanceFsrsWord();
+    return;
+  }
+  if (!session.current) return;
+  const { word } = session.current;
+  const result = gradeTranslationAnswer(word, input.value);
+  if (!result.counted) {
+    input.focus();
+    return;
+  }
+  session.current.checked = true;
+  session.current.grade = result.grade;
+  session.feedback = { text: result.message, ok: result.grade === 'good' };
+  // Only the first answer to a word is graded; repeats of again/hard words are not posted.
+  if (!session.answered.has(word.id)) {
+    session.answered.add(word.id);
+    session.tally[result.grade] += 1;
+    if (word.state === 'new') session.introducedCount += 1;
+    postFsrsGrade(word, result.grade, normalise(input.value));
+  }
+  renderPractice();
+}
+
+// A 409 means this word was already graded in the session, which is not an error for the learner. Any other failure
+// undoes the local count of this first answer, so the next first answer to the word posts again.
+async function postFsrsGrade(word, grade, answer) {
+  const session = ui.fsrs;
+  const { sessionId, answered } = session;
+  try {
+    await api.gradePracticeWord({ word_id: word.id, grade, answer, session_id: sessionId });
+  } catch (error) {
+    if (error.status === 409) return;
+    // A new batch replaces the answered set and the tally, so only the batch that posted is rolled back.
+    if (session.answered === answered) {
+      answered.delete(word.id);
+      session.tally[grade] -= 1;
+      if (word.state === 'new') session.introducedCount -= 1;
+      renderPractice();
+    }
+    notice(error.message || 'Помилка');
+  }
+}
+
+// "Далі": a word answered 'good' leaves the queue; any other word comes back at the end, until it is right.
+function advanceFsrsWord() {
+  const session = ui.fsrs;
+  const { word, grade } = session.current;
+  session.queue.shift();
+  if (grade !== 'good') session.queue.push(word);
+  $('practice-input').value = '';
+  showNextFsrsWord();
+  renderPractice();
+  $('practice-input').focus();
+}
+
+function submitArticleAnswer() {
+  const practice = ui.practice;
+  const input = $('practice-input');
+  if (practice.cur && practice.cur.checked) {
     pickQuestion();
     input.value = '';
     renderPractice();
     input.focus();
     return;
   }
-  if (!p.cur || !input.value.trim()) {
+  if (!practice.cur || !input.value.trim()) {
     input.focus();
     return;
   }
-  const { word, mode } = p.cur;
-  const res = checkAnswer(word, input.value, mode);
-  if (!res.counted) {
-    p.feedback = { text: res.message, ok: false };
+  const { word } = practice.cur;
+  const result = checkAnswer(word, input.value, 'art');
+  if (!result.counted) {
+    practice.feedback = { text: result.message, ok: false };
     renderPractice();
     return;
   }
-  p.cur.checked = true;
-  p.feedback = { text: res.message, ok: res.correct };
-  p.score.tot += 1;
-  if (res.correct) p.score.ok += 1;
+  practice.cur.checked = true;
+  practice.feedback = { text: result.message, ok: result.correct };
+  practice.score.tot += 1;
+  if (result.correct) practice.score.ok += 1;
   renderPractice();
   act(() => api.recordResult(word.id, {
-    correct: res.correct,
-    mode: mode === 'art' ? 'article' : 'translate',
+    correct: result.correct,
+    mode: 'article',
     answer: normalise(input.value),
   }), ['words']);
+}
+
+function renderPractice() {
+  $('practice-mode').value = ui.practice.mode;
+  if (ui.practice.mode === 'fsrs') renderFsrsPractice();
+  else renderArticlePractice();
+}
+
+function setPracticeMessage(feedback) {
+  const messageElement = $('practice-msg');
+  messageElement.textContent = feedback ? feedback.text : '';
+  messageElement.className = 'msg' + (feedback ? (feedback.ok ? ' ok' : ' bad') : '');
+}
+
+function renderArticlePractice() {
+  const p = ui.practice;
+  if (!p.cur || !state.words.some(w => w.id === p.cur.word.id)) pickQuestion();
+
+  const hasQuestion = !!p.cur;
+  $('practice-q').textContent = hasQuestion ? p.cur.word.nl : 'Немає слів для цього режиму';
+  $('practice-form').hidden = !hasQuestion;
+  if (hasQuestion) {
+    $('practice-btn').textContent = p.cur.checked ? 'Далі' : 'Перевірити';
+    $('practice-input').placeholder = 'de або het';
+  }
+  $('practice-progress').textContent = '';
+  $('practice-summary').hidden = true;
+  $('practice-restart-button').hidden = true;
+  setPracticeMessage(p.feedback);
+  $('practice-score').textContent = `Вірно: ${p.score.ok} з ${p.score.tot}`;
+}
+
+function renderFsrsPractice() {
+  const session = ui.fsrs;
+  const isReady = session.status === 'ready' && !!session.current;
+  const answeredCount = session.tally.again + session.tally.hard + session.tally.good;
+  const questionByStatus = {
+    idle: '',
+    loading: 'Завантаження…',
+    ready: isReady ? session.current.word.uk : '',
+    done: answeredCount ? 'Сесію завершено' : 'На сьогодні слів немає',
+    unconfigured: 'Практика FSRS ще не налаштована',
+    failed: 'Не вдалося завантажити слова',
+  };
+  $('practice-q').textContent = questionByStatus[session.status];
+  $('practice-form').hidden = !isReady;
+  if (isReady) {
+    $('practice-btn').textContent = session.current.checked ? 'Далі' : 'Перевірити';
+    $('practice-input').placeholder = 'нідерландською';
+  }
+  $('practice-progress').textContent = isReady ? `Залишилось: ${session.queue.length}` : '';
+  $('practice-score').textContent = '';
+  $('practice-summary').hidden = session.status !== 'done';
+  $('practice-restart-button').hidden = session.status !== 'done' && session.status !== 'failed';
+  setPracticeMessage(session.feedback);
+  if (session.status === 'done') renderPracticeSummary();
+}
+
+function renderPracticeSummary() {
+  const session = ui.fsrs;
+  const items = [
+    ['Знову', session.tally.again],
+    ['Важко', session.tally.hard],
+    ['Добре', session.tally.good],
+    ['Нових слів', session.introducedCount],
+    ['Завтра повторити', session.dueTomorrow ?? '…'],
+  ];
+  $('practice-summary-list').innerHTML = items.map(([label, value]) =>
+    `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
 }
 
 // ---------- 4 · Правила ----------
@@ -442,22 +662,16 @@ function bindEvents() {
     renderTable();
   });
   $('words-body').addEventListener('click', e => {
-    const btn = e.target.closest('button[data-act]');
+    const btn = e.target.closest('button[data-act="wdel"]');
     if (!btn) return;
     const id = Number(btn.dataset.id);
-    const w = state.words.find(x => x.id === id);
-    if (!w) return;
-    if (btn.dataset.act === 'status') {
-      act(() => api.updateWord(id, { status: NEXT_STATUS[w.status] }), ['words']);
-    } else if (btn.dataset.act === 'wdel') {
-      if (isArmed('word', id)) {
-        ui.armed = null;
-        renderTable();
-        act(() => api.deleteWord(id), ['words']);
-      } else {
-        ui.armed = { kind: 'word', id };
-        renderTable();
-      }
+    if (isArmed('word', id)) {
+      ui.armed = null;
+      renderTable();
+      act(() => api.deleteWord(id), ['words']);
+    } else {
+      ui.armed = { kind: 'word', id };
+      renderTable();
     }
   });
 
@@ -468,20 +682,21 @@ function bindEvents() {
     ui.cards.flippedId = ui.cards.flippedId === w.id ? null : w.id;
     renderCards();
   });
-  $('card-know').addEventListener('click', () => markCard('learned'));
-  $('card-again').addEventListener('click', () => markCard('learning'));
+  $('card-next').addEventListener('click', showNextCard);
 
   // Практика
   $('practice-mode').addEventListener('change', e => {
     ui.practice.mode = e.target.value;
-    pickQuestion();
+    if (ui.practice.mode === 'art') pickQuestion();
     $('practice-input').value = '';
+    ensureFsrsSession();
     renderPractice();
   });
   $('practice-form').addEventListener('submit', e => {
     e.preventDefault();
     submitPractice();
   });
+  $('practice-restart-button').addEventListener('click', restartFsrsSession);
 
   // Правила
   $('rules-q').addEventListener('input', e => {

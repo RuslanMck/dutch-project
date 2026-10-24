@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node src/server/start-server.js",
     "import": "node scripts/import.js",
@@ -13,6 +15,7 @@
     "@modelcontextprotocol/sdk": "^1.17.0",
     "better-sqlite3": "^12.2.0",
     "express": "^5.1.0",
+    "ts-fsrs": "^5.4.2",
     "zod": "^3.25.0"
   }
 }

@@ -6,11 +6,14 @@ import { ZodError } from 'zod';
 
 import { addMistakeCaseInputSchema } from '../src/contracts/mistake-contracts.js';
 import { createWordInputSchema, wordPathParametersSchema } from '../src/contracts/word-contracts.js';
+import { findStartOfDay } from '../src/domains/practice/practice-calendar.js';
 import { NotFoundError, ValidationError } from '../src/errors/domain-errors.js';
 import { createTestContext } from './database-test-helpers.js';
 import { seed, SKIP } from './seed.js';
 
 const ADJ_HET_EEN = 'Додав -e до прикметника з het-словом (een / без артикля)';
+const MORNING_IN_AMSTERDAM = '2026-10-24T12:00:00+02:00';
+const TIME_ZONE = 'Europe/Amsterdam';
 
 let context;
 
@@ -29,16 +32,18 @@ test('practice: correct on a new word keeps it new', SKIP, () => {
   assert.equal(context.database.prepare('SELECT COUNT(*) FROM practice_attempts WHERE word_id = ?').pluck().get(id), 1);
 });
 
-test('practice: correct on a learning word makes it learned', SKIP, () => {
+test('practice: a correct answer never changes the status', SKIP, () => {
   const id = findWordId('bestellen');
   context.wordService.updateWordStatus(id, 'learning');
-  assert.equal(context.wordService.recordPracticeResult(id, { correct: true, mode: 'article', answer: 'de' }).status, 'learned');
+  const result = context.wordService.recordPracticeResult(id, { correct: true, mode: 'article', answer: 'de' });
+  assert.equal(result.status, 'learning');
 });
 
-test('practice: wrong answer sets learning and adds one error', SKIP, () => {
+test('practice: wrong answer adds one error and keeps the status', SKIP, () => {
   const id = findWordId('bestellen');
+  context.wordService.updateWordStatus(id, 'learned');
   const w = context.wordService.recordPracticeResult(id, { correct: false, mode: 'translate', answer: 'bestelen' });
-  assert.equal(w.status, 'learning');
+  assert.equal(w.status, 'learned');
   assert.equal(w.error_count, 1);
   const row = context.database.prepare("SELECT source, mode, wrong_answer FROM word_errors WHERE word_id = ?").get(id);
   assert.deepEqual({ ...row }, { source: 'practice', mode: 'translate', wrong_answer: 'bestelen' });
@@ -153,4 +158,157 @@ test('stats and exportAll report the imported data', SKIP, () => {
   const out = context.artifactExportService.exportCollections();
   assert.equal(out.collections.words.length, 586);
   assert.equal(out.collections.mistakes.find(m => m.id === 'hoeveelheid').rule, 'other');
+});
+
+// A clock that the test moves by hand. The practice rules run on it, so due dates are exact.
+function createFixedClock(isoText) {
+  let currentTime = Date.parse(isoText);
+  return {
+    now() {
+      return currentTime;
+    },
+    moveTo(nextIsoText) {
+      currentTime = Date.parse(nextIsoText);
+    },
+  };
+}
+
+function createWordIds(wordContext, wordInputs) {
+  return wordContext.wordService.createWords(wordInputs).added.map(word => word.id);
+}
+
+function listWordIds(wordContext, filters) {
+  return wordContext.wordService.listWords(filters).map(word => word.id);
+}
+
+test('logWordError adds one error and leaves the status alone; a lookup creates a missing word as new', () => {
+  const wordContext = createTestContext();
+  const [wordId] = createWordIds(wordContext, [{ nl: 'raam', uk: 'вікно', status: 'learned' }]);
+  const logged = wordContext.wordService.logWordError(wordId, { source: 'exercise', wrong_answer: 'x' });
+  assert.equal(logged.status, 'learned');
+  assert.equal(logged.error_count, 1);
+
+  const lookup = wordContext.wordService.logWordErrorByLookup({
+    nl: 'deur',
+    uk: 'двері',
+    article: 'de',
+    source: 'lesson',
+  });
+  assert.equal(lookup.created, true);
+  assert.equal(lookup.word.status, 'new');
+  assert.equal(lookup.word.error_count, 1);
+});
+
+test('add_words gives a new word its priority from the frequency list', () => {
+  const wordContext = createTestContext();
+  wordContext.priorityService.importFrequencyList([{ wordForm: 'tafel', frequencyRank: 100 }], {
+    shouldReplaceExisting: true,
+  });
+  const [added] = wordContext.wordService.createWords([
+    { nl: 'tafel', uk: 'стіл', article: 'de', section: '3.2' },
+  ]).added;
+  assert.equal(added.priority, 1);
+  assert.equal(added.frequency_rank, 100);
+});
+
+test('changing a word section re-ranks it and recalculates its priority', () => {
+  const wordContext = createTestContext();
+  const [wordId] = createWordIds(wordContext, [{ nl: 'raam', uk: 'вікно', section: '3.2' }]);
+  assert.equal(wordContext.wordService.getWord(wordId).priority, 3);
+  assert.equal(wordContext.wordService.updateWord(wordId, { section: '6.1' }).priority, 1);
+});
+
+test('once FSRS is set up, a word is always stored as new, and before it the given status is kept', () => {
+  const clock = createFixedClock(MORNING_IN_AMSTERDAM);
+  const wordContext = createTestContext({ clock });
+  const beforeMigration = wordContext.wordService.createWord({
+    nl: 'huis',
+    uk: 'дім',
+    section: '6.1',
+    status: 'learning',
+  });
+  assert.equal(beforeMigration.status, 'learning');
+
+  wordContext.practiceService.migrateToFsrs({ isDryRun: false });
+  assert.equal(wordContext.wordService.createWord({ nl: 'boom', uk: 'дерево', status: 'learned' }).status, 'new');
+  const [added] = wordContext.wordService.createWords([{ nl: 'vogel', uk: 'птах', status: 'learning' }]).added;
+  assert.equal(added.status, 'new');
+});
+
+test('once FSRS is set up, status learning or learned is refused, and new resets the card', () => {
+  const clock = createFixedClock(MORNING_IN_AMSTERDAM);
+  const wordContext = createTestContext({ clock });
+  const [wordId] = createWordIds(wordContext, [{ nl: 'huis', uk: 'дім', section: '6.1' }]);
+  wordContext.practiceService.migrateToFsrs({ isDryRun: false });
+  wordContext.practiceService.gradeWord({ wordId, grade: 'good', answer: 'huis', sessionId: 'session-1' });
+  assert.equal(wordContext.wordService.getWord(wordId).state, 'review');
+
+  assert.throws(() => wordContext.wordService.updateWordStatus(wordId, 'learning'), ValidationError);
+  assert.throws(() => wordContext.wordService.updateWord(wordId, { status: 'learned' }), ValidationError);
+  assert.throws(() => wordContext.wordService.updateWordStatus(wordId, 'learned'), ValidationError);
+
+  const reset = wordContext.wordService.updateWordStatus(wordId, 'new');
+  assert.equal(reset.status, 'new');
+  assert.equal(reset.state, 'new');
+  assert.equal(reset.next_due_on, null);
+  const row = wordContext.database.prepare(
+    'SELECT fsrs_card, due_at, introduced_on FROM words WHERE id = ?',
+  ).get(wordId);
+  assert.deepEqual({ ...row }, { fsrs_card: null, due_at: null, introduced_on: null });
+});
+
+test('list_words filters by state, priority and due day, and sorts by due and by frequency', () => {
+  const clock = createFixedClock(MORNING_IN_AMSTERDAM);
+  const wordContext = createTestContext({ clock });
+  const [huisId, tafelId, stoelId, raamId] = createWordIds(wordContext, [
+    { nl: 'huis', uk: 'дім', section: '6.1' },
+    { nl: 'tafel', uk: 'стіл', section: '6.1' },
+    { nl: 'stoel', uk: 'стілець', section: '3.2' },
+    { nl: 'raam', uk: 'вікно', section: '3.2' },
+  ]);
+  wordContext.practiceService.migrateToFsrs({ isDryRun: false });
+  wordContext.practiceService.gradeWord({ wordId: huisId, grade: 'good', sessionId: 'session-1' });
+  wordContext.practiceService.gradeWord({ wordId: stoelId, grade: 'good', sessionId: 'session-1' });
+  clock.moveTo('2026-11-03T12:00:00+01:00');
+  wordContext.practiceService.gradeWord({ wordId: stoelId, grade: 'again', sessionId: 'session-2' });
+
+  assert.deepEqual(listWordIds(wordContext, { state: 'new' }), [tafelId, raamId]);
+  assert.deepEqual(listWordIds(wordContext, { state: 'review' }), [huisId, stoelId]);
+  assert.deepEqual(listWordIds(wordContext, { state: 'learning' }), []);
+  assert.deepEqual(listWordIds(wordContext, { priority: 1 }), [huisId, tafelId]);
+  assert.deepEqual(listWordIds(wordContext, { priority: 3 }), [stoelId, raamId]);
+  assert.deepEqual(listWordIds(wordContext, { dueBefore: findStartOfDay('2026-10-26', TIME_ZONE) }), []);
+  assert.deepEqual(listWordIds(wordContext, { dueBefore: findStartOfDay('2026-11-04', TIME_ZONE) }), [huisId]);
+
+  assert.deepEqual(listWordIds(wordContext, { sort: 'due' }), [huisId, stoelId, tafelId, raamId]);
+
+  wordContext.priorityService.importFrequencyList([
+    { wordForm: 'raam', frequencyRank: 50 },
+    { wordForm: 'huis', frequencyRank: 500 },
+  ], { shouldReplaceExisting: true });
+  assert.deepEqual(listWordIds(wordContext, { sort: 'frequency' }), [raamId, huisId, tafelId, stoelId]);
+});
+
+test('stats reports the FSRS states and the words due today, overdue ones included', () => {
+  const clock = createFixedClock(MORNING_IN_AMSTERDAM);
+  const wordContext = createTestContext({ clock });
+  const [huisId, tafelId] = createWordIds(wordContext, [
+    { nl: 'huis', uk: 'дім', section: '6.1' },
+    { nl: 'tafel', uk: 'стіл', section: '6.1' },
+    { nl: 'raam', uk: 'вікно', section: '6.1' },
+  ]);
+  wordContext.practiceService.migrateToFsrs({ isDryRun: false });
+  const fsrsCounts = () => wordContext.statisticsService.calculateStatistics().fsrs;
+  assert.deepEqual(fsrsCounts(), { new: 3, learning: 0, review: 0, relearning: 0, due_today: 0 });
+
+  wordContext.practiceService.gradeWord({ wordId: huisId, grade: 'good', sessionId: 'session-1' });
+  wordContext.practiceService.gradeWord({ wordId: tafelId, grade: 'again', sessionId: 'session-1' });
+  assert.deepEqual(fsrsCounts(), { new: 1, learning: 0, review: 2, relearning: 0, due_today: 0 });
+
+  clock.moveTo('2026-11-03T12:00:00+01:00');
+  assert.deepEqual(fsrsCounts(), { new: 1, learning: 0, review: 2, relearning: 0, due_today: 2 });
+
+  // The long-term scheduler keeps a review card in review after a lapse; huis is due after today, so only tafel counts.
+  wordContext.practiceService.gradeWord({ wordId: huisId, grade: 'again', sessionId: 'session-2' });
+  assert.deepEqual(fsrsCounts(), { new: 1, learning: 0, review: 2, relearning: 0, due_today: 1 });
 });

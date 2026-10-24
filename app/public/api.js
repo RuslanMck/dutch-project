@@ -41,6 +41,10 @@ export const deletePhrase = id => request('DELETE', `/api/phrases/${enc(id)}`);
 
 export const listTexts = () => request('GET', '/api/texts');
 
+export const getPracticeBatch = sessionId => request('GET', `/api/practice/batch?session_id=${enc(sessionId)}`);
+export const gradePracticeWord = body => request('POST', '/api/practice/grades', body);
+export const getPracticeStats = () => request('GET', '/api/practice/stats');
+
 // Calls onChange(collection) for every live change. 'all' means refetch everything.
 // Uses SSE; while the stream is down (error or not yet open) it polls every 5 s.
 // Returns an unsubscribe function.

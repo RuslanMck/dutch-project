@@ -8,6 +8,7 @@ Numbered SQL files that build the SQLite schema. The runner applies them in name
 |---|---|
 | `001_init.sql` | Core schema from the handoff spec: sections, topics, rules, texts, words, word errors, phrases, mistake patterns and cases, plus the views with error counts. |
 | `002_practice_attempts.sql` | Adds `practice_attempts`, one row per practice answer, right or wrong. |
+| `003-add-fsrs-practice.sql` | Adds the FSRS card, due date, introduction date, frequency rank and priority columns to `words`, plus `review_logs`, `practice_settings` (seeded defaults) and `word_frequencies`. |
 
 ## Conventions
 

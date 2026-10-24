@@ -1,0 +1,103 @@
+// MCP adapter for the practice: registers the practice tools. Arguments are parsed by the MCP SDK with the practice
+// contracts; each tool calls the practice or priority service.
+import {
+  gradeWordToolInputSchema,
+  importFrequencyListInputSchema,
+  migrateToFsrsInputSchema,
+  practiceBatchToolInputSchema,
+  previewPrioritiesInputSchema,
+  setCurrentChapterInputSchema,
+  setWordPriorityInputSchema,
+} from '../../contracts/practice-contracts.js';
+import {
+  DESTRUCTIVE_TOOL_ANNOTATIONS,
+  READ_ONLY_TOOL_ANNOTATIONS,
+  registerJsonTool,
+} from '../../model-context-protocol/mcp-tool-registration.js';
+import { mapWordToCompactWord } from '../words/compact-word-mapping.js';
+
+export function registerPracticeTools({ mcpServer, practiceService, priorityService, wordService }) {
+  registerJsonTool(mcpServer, 'get_practice_batch', {
+    title: 'Get practice batch',
+    description: 'Words to practise now for one session: reviews that are due (most overdue first) and new words '
+      + '(at most 10 a day, split by priority). Show each word by its uk and ask for the Dutch; grade the first answer '
+      + 'with grade_word. Returns {session_id, reviews, new_words, counts}, each word {id, uk, nl, article, kind, '
+      + 'state, priority}.',
+    inputSchema: practiceBatchToolInputSchema.shape,
+    annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  }, ({ session_id: sessionId, max_reviews: maxReviews }) => practiceService.getPracticeBatch({
+    sessionId,
+    maxReviews,
+  }));
+
+  registerJsonTool(mcpServer, 'grade_word', {
+    title: 'Grade word',
+    description: 'Record the first answer to a word in this session and schedule its next review. Grades: '
+      + '"good" fully right; "hard" right word with a wrong or missing article, a spelling slip or a synonym; '
+      + '"again" wrong or not known. Only the first grade per word per session counts: a second one is refused. '
+      + '"again" and "hard" also log a word error. Returns {word, grade, state, status, interval_days, next_due_on}.',
+    inputSchema: gradeWordToolInputSchema.shape,
+  }, ({ id, grade, answer, session_id: sessionId }) => practiceService.gradeWord({
+    wordId: id,
+    grade,
+    answer,
+    sessionId,
+  }));
+
+  registerJsonTool(mcpServer, 'set_current_chapter', {
+    title: 'Set current chapter',
+    description: 'Set the textbook chapter the learner is on. Words of this chapter and the one before become '
+      + 'priority 1; other New words are prioritised by frequency. Manual priorities stay. Returns the preview for the '
+      + 'new chapter: {chapter, counts, unranked_count, examples}.',
+    inputSchema: setCurrentChapterInputSchema.shape,
+  }, ({ chapter }) => priorityService.setCurrentChapter(chapter));
+
+  registerJsonTool(mcpServer, 'set_word_priority', {
+    title: 'Set word priority',
+    description: 'Set one word to priority 1, 2 or 3 by hand; the setting survives chapter changes. Pass null to clear '
+      + 'the manual priority and go back to the computed one. Returns the word as the word tools return it, with '
+      + 'priority_override (null when none).',
+    inputSchema: setWordPriorityInputSchema.shape,
+  }, ({ id, priority }) => {
+    priorityService.setWordPriority(id, priority);
+    return mapWordToCompactWord(wordService.getWord(id));
+  });
+
+  registerJsonTool(mcpServer, 'import_frequency_list', {
+    title: 'Import frequency list',
+    description: 'Import word frequencies, rank 1 = most frequent, as {form, rank} entries (at most 20000 per call). '
+      + 'replace_existing true replaces the whole list; by default only the given forms change. Every word is '
+      + 're-ranked and its priority recalculated. Returns {imported, words_ranked, words_unranked}.',
+    inputSchema: importFrequencyListInputSchema.shape,
+  }, ({ entries, replace_existing: shouldReplaceExisting }) => priorityService.importFrequencyList(
+    entries.map(entry => ({ wordForm: entry.form, frequencyRank: entry.rank })),
+    { shouldReplaceExisting: shouldReplaceExisting ?? false },
+  ));
+
+  registerJsonTool(mcpServer, 'preview_priorities', {
+    title: 'Preview priorities',
+    description: 'Preview which priority the New words would get for a chapter (default: the current chapter). '
+      + 'Changes nothing. Returns {chapter, counts, unranked_count, examples}, where examples lists up to 10 words per '
+      + 'priority in queue order.',
+    inputSchema: previewPrioritiesInputSchema.shape,
+    annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  }, ({ chapter }) => priorityService.previewPriorities({ chapter }));
+
+  registerJsonTool(mcpServer, 'migrate_to_fsrs', {
+    title: 'Migrate practice to FSRS',
+    description: 'One-time switch of the practice to the FSRS schedule. Learning words are spread over the next '
+      + '4 days, learned words are due in 21 days, new words stay new. The default dry run only reports the counts '
+      + 'and writes nothing; run with dry_run false only after the learner agrees. Returns {dry_run, learning, '
+      + 'learned, new, learning_due_by_day, learned_due_on}.',
+    inputSchema: migrateToFsrsInputSchema.shape,
+    annotations: DESTRUCTIVE_TOOL_ANNOTATIONS,
+  }, ({ dry_run: isDryRun }) => practiceService.migrateToFsrs({ isDryRun: isDryRun ?? true }));
+
+  registerJsonTool(mcpServer, 'practice_stats', {
+    title: 'Practice statistics',
+    description: 'Practice numbers: reviews due today and tomorrow, words introduced today, New words waiting per '
+      + 'priority, words per state (new, learning, review, relearning) and the share of "good" grades over the last 7 '
+      + 'and 30 days (null when there were none).',
+    annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  }, () => practiceService.calculatePracticeStatistics());
+}

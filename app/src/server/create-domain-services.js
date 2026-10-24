@@ -9,6 +9,12 @@ import { createMistakeRepository } from '../domains/mistakes/mistake-repository.
 import { createMistakeService } from '../domains/mistakes/mistake-service.js';
 import { createPhraseRepository } from '../domains/phrases/phrase-repository.js';
 import { createPhraseService } from '../domains/phrases/phrase-service.js';
+import { createFrequencyRepository } from '../domains/practice/frequency-repository.js';
+import { createFsrsScheduler } from '../domains/practice/fsrs-scheduling.js';
+import { createPracticeRepository } from '../domains/practice/practice-repository.js';
+import { createPracticeService } from '../domains/practice/practice-service.js';
+import { createPracticeSettings } from '../domains/practice/practice-settings.js';
+import { createPriorityService } from '../domains/practice/priority-service.js';
 import { createRuleRepository } from '../domains/rules/rule-repository.js';
 import { createRuleService } from '../domains/rules/rule-service.js';
 import { createSectionRepository } from '../domains/sections/section-repository.js';
@@ -21,15 +27,39 @@ import { createTopicRepository } from '../domains/words/topic-repository.js';
 import { createWordRepository } from '../domains/words/word-repository.js';
 import { createWordService } from '../domains/words/word-service.js';
 
-export function createDomainServices({ database, changeEventBus, clock }) {
+export function createDomainServices({ database, changeEventBus, clock, isFsrsFuzzEnabled = true }) {
   const runInTransaction = createTransactionRunner({ database });
   const sharedDependencies = { runInTransaction, changeEventBus, clock };
 
   const sectionService = createSectionService({ sectionRepository: createSectionRepository({ database }) });
+  const wordRepository = createWordRepository({ database });
+  const practiceRepository = createPracticeRepository({ database });
+  const practiceSettings = createPracticeSettings({ practiceRepository });
+  const priorityService = createPriorityService({
+    practiceRepository,
+    frequencyRepository: createFrequencyRepository({ database }),
+    practiceSettings,
+    runInTransaction,
+    changeEventBus,
+  });
   const wordService = createWordService({
-    wordRepository: createWordRepository({ database }),
+    wordRepository,
     topicRepository: createTopicRepository({ database }),
     sectionService,
+    priorityService,
+    practiceSettings,
+    ...sharedDependencies,
+  });
+  const fsrsScheduler = createFsrsScheduler({
+    desiredRetention: practiceSettings.readSettings().desiredRetention,
+    isFuzzEnabled: isFsrsFuzzEnabled,
+  });
+  const practiceService = createPracticeService({
+    practiceRepository,
+    practiceSettings,
+    priorityService,
+    wordService,
+    fsrsScheduler,
     ...sharedDependencies,
   });
   const ruleService = createRuleService({
@@ -54,6 +84,8 @@ export function createDomainServices({ database, changeEventBus, clock }) {
   });
   const statisticsService = createStatisticsService({
     statisticsRepository: createStatisticsRepository({ database }),
+    practiceSettings,
+    clock,
   });
   const artifactExportService = createArtifactExportService({
     artifactExportRepository: createArtifactExportRepository({ database }),
@@ -65,11 +97,15 @@ export function createDomainServices({ database, changeEventBus, clock }) {
     artifactImportRepository: createArtifactImportRepository({ database }),
     sectionService,
     wordService,
+    practiceSettings,
     ...sharedDependencies,
   });
 
   return Object.freeze({
     wordService,
+    practiceService,
+    priorityService,
+    practiceSettings,
     ruleService,
     mistakeService,
     phraseService,

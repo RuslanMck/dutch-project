@@ -246,7 +246,9 @@ table.words td.num {
 }
 
 .status {
-  min-height: 36px;
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 4px 10px;
   font-size: 14px;
   white-space: nowrap;
@@ -314,7 +316,7 @@ table.words td.num {
 
 .card-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
@@ -350,6 +352,33 @@ table.words td.num {
 
 .msg.ok { color: var(--ok); }
 .msg.bad { color: var(--danger); }
+
+.practice-summary {
+  margin: 16px 0;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.practice-summary__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.practice-summary__item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.practice-summary__item:last-child {
+  border-bottom: none;
+}
+
+.practice-restart {
+  margin-top: 8px;
+}
 
 /* 4 · rules */
 .rules-list {

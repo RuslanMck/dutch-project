@@ -1,23 +1,28 @@
 // Idempotent import of a claude.ai artifact export (dutch-export.json): rows are matched by legacy_id, so a
-// second run updates what changed and adds only what is missing. Publishes every collection afterwards.
-import { ValidationError } from '../../errors/domain-errors.js';
+// second run updates what changed and adds only what is missing. Publishes every collection afterwards. Refused once
+// practice is on FSRS: the import would overwrite the status and add words that are never ranked.
+import { ConflictError, ValidationError } from '../../errors/domain-errors.js';
 import { detectWordKind } from '../words/expression-detection.js';
 import { parseCalendarDateToTimestamp, parseRuleTopic, splitExample } from './artifact-import-mapping.js';
 import { formatImportReport } from './import-report-formatting.js';
 
 const IMPORTED_COLLECTIONS = Object.freeze(['words', 'rules', 'mistakes', 'phrases', 'texts']);
 const OTHER_RULE_REFERENCE = 'other';
+const FSRS_IMPORT_REFUSAL_MESSAGE = 'the artifact import is disabled after the FSRS migration: '
+  + 'it would overwrite the schedule';
 
 export function createArtifactImportService({
   artifactImportRepository,
   sectionService,
   wordService,
+  practiceSettings,
   runInTransaction,
   changeEventBus,
   clock,
 }) {
   // Returns { counts, report }: row counts after the import and the plain-text report.
   function importArtifactExport(exportDocument) {
+    if (practiceSettings.isFsrsActive()) throw new ConflictError(FSRS_IMPORT_REFUSAL_MESSAGE);
     const collections = exportDocument?.collections;
     if (!collections || typeof collections !== 'object') {
       throw new ValidationError('export has no "collections" object');
