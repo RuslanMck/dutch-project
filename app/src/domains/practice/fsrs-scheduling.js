@@ -23,7 +23,8 @@ export function createFsrsScheduler({ desiredRetention, isFuzzEnabled }) {
     }),
   );
 
-  // A null card is a New word. Returns the next card, its due time in ms and its interval in whole days.
+  // A null card is a New word. Returns the next card, its due time in ms (the grade moment plus the interval, which the
+  // practice services move to the start of a calendar day) and its interval in whole days.
   function gradeCard(card, grade, timestamp) {
     if (!Object.hasOwn(RATING_BY_GRADE, grade)) {
       throw new ValidationError(`grade must be again, hard or good, got ${grade}`);
@@ -57,8 +58,11 @@ export function parseCard(json) {
   };
 }
 
-// Whole days between the last review and the next due time; 0 when the card was never reviewed.
+// The interval ts-fsrs scheduled, in whole days. The due time is no longer exactly that many days after the review
+// (the services move it to the start of a calendar day), so the scheduled interval is the source. Cards without one
+// fall back to the whole days between the last review and the due time; 0 when the card was never reviewed.
 export function calculateIntervalDays(card) {
+  if (Number.isFinite(card.scheduled_days) && card.scheduled_days > 0) return card.scheduled_days;
   if (!card.last_review) return 0;
   return Math.round((card.due.getTime() - card.last_review.getTime()) / MILLISECONDS_PER_DAY);
 }

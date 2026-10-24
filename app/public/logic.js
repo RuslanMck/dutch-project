@@ -83,6 +83,16 @@ export function checkAnswer(word, input, mode) {
   return { counted: true, correct: false, message: `✗ Правильно: ${right}` };
 }
 
+// The Dutch word as the learner sees it after a reveal: with its article when it has one ("het huis", "appel").
+export function formatDutchWithArticle(word) {
+  return word.article ? `${word.article} ${word.nl}` : word.nl;
+}
+
+// "Не знаю" and "DNK" in the translation practice: the answer is shown and the word is graded again.
+export function revealTranslationAnswer(word) {
+  return { counted: true, grade: 'again', message: `✗ Правильно: ${formatDutchWithArticle(word)}` };
+}
+
 // FSRS translation check: the learner types the Dutch for a Ukrainian word.
 // Returns { counted, grade, message }. grade is 'good' (fully right), 'hard' (right word with a wrong, missing or
 // extra article, or one letter off) or 'again' (anything else, including "DNK"). counted=false means nothing is graded.
@@ -92,11 +102,11 @@ export function gradeTranslationAnswer(word, input) {
   const normalizedInput = normalizeAnswerText(input);
   const normalizedTarget = normalizeAnswerText(word.nl);
   const article = word.article || '';
-  const right = article ? `${article} ${word.nl}` : word.nl;
+  const right = formatDutchWithArticle(word);
 
   if (!normalizedInput) return { counted: false, grade: null, message: 'Напиши відповідь нідерландською' };
   // Checked before the fuzzy match: "dnk" is three letters and would otherwise be one letter off some words.
-  if (normalizedInput === 'dnk') return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
+  if (normalizedInput === 'dnk') return revealTranslationAnswer(word);
   if (normalizedInput === normalizeAnswerText(right)) return { counted: true, grade: 'good', message: '✓ Правильно' };
 
   // Optional leading article in the typed answer.
@@ -115,6 +125,41 @@ export function gradeTranslationAnswer(word, input) {
     return { counted: true, grade: 'hard', message: `Майже, перевір літери. Правильно: ${right}` };
   }
   return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
+}
+
+// Ukrainian plural of "день" for a count of days: 1 день, 3 дні, 5 днів, 11 днів, 21 день.
+export function pluralizeDays(dayCount) {
+  const lastTwoDigits = dayCount % 100;
+  const lastDigit = dayCount % 10;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'днів';
+  if (lastDigit === 1) return 'день';
+  if (lastDigit >= 2 && lastDigit <= 4) return 'дні';
+  return 'днів';
+}
+
+// "через 3 дні": when a word or phrase comes back for review.
+export function formatDaysAway(dayCount) {
+  return `через ${dayCount} ${pluralizeDays(dayCount)}`;
+}
+
+const LEARNING_STATUS_LABEL = { new: 'нове', learning: 'вивчається', learned: 'вивчено' };
+
+// Status of a word or phrase in Ukrainian; a value that is not known is shown as it is.
+export function formatLearningStatus(status) {
+  return Object.hasOwn(LEARNING_STATUS_LABEL, status) ? LEARNING_STATUS_LABEL[status] : String(status ?? '');
+}
+
+// The line under the practice message after a checked answer, built from the grade response.
+export function buildNextReviewLine({ intervalDays, status, errorCount }) {
+  const reviewText = `Наступне повторення: ${formatDaysAway(intervalDays)}`;
+  return `${reviewText} · ${formatLearningStatus(status)} · помилок: ${errorCount ?? 0}`;
+}
+
+// "2026-10-25" -> "25.10" for the words table. Empty when there is no date (a new word has no next review).
+export function formatShortDate(isoDate) {
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate ?? ''));
+  if (!dateParts) return '';
+  return `${dateParts[3]}.${dateParts[2]}`;
 }
 
 // Inline rule: escape first, then **x** -> <b>x</b>. Nothing else.

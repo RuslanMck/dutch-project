@@ -52,6 +52,11 @@ error itself, so do not call `log_word_error` for practice answers. Finish with 
 `hard` and `good`, how many new words got their first answer in this session, and the number due tomorrow
 (`due_tomorrow` from `practice_stats`).
 
+**Phrase practice (FSRS).** I also score phrases myself in the web app's Картки tab (again / hard / good). When I ask
+to practise phrases, you can run a session too: call `get_phrase_batch` with a new `session_id` and grade the first
+answer to each phrase with `grade_phrase` (`again`, `hard` or `good`), as for words. Only the first grade per phrase
+counts, there are at most 5 new phrases a day, oldest first, and phrases have no word errors.
+
 **Chapters and priorities.** When I tell you which chapter I am on, call `set_current_chapter`: new words of that
 chapter and the one before get priority 1, and the call returns a preview. `set_word_priority` sets one word's priority
 by hand (1, 2 or 3; `null` clears it). `preview_priorities` shows which new words come next without changing anything.

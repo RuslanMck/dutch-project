@@ -15,6 +15,7 @@ import { createRestErrorHandler } from '../http/rest-error-handler.js';
 export function createApiRouter({
   wordService,
   practiceService,
+  phrasePracticeService,
   priorityService,
   ruleService,
   mistakeService,
@@ -27,7 +28,7 @@ export function createApiRouter({
 }) {
   const apiRouter = express.Router();
   apiRouter.use(createWordRoutes({ wordService }));
-  apiRouter.use(createPracticeRoutes({ practiceService, priorityService }));
+  apiRouter.use(createPracticeRoutes({ practiceService, priorityService, phrasePracticeService }));
   apiRouter.use(createRuleRoutes({ ruleService }));
   apiRouter.use(createMistakeRoutes({ mistakeService }));
   apiRouter.use(createPhraseRoutes({ phraseService }));

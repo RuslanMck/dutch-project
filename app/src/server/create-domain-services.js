@@ -11,6 +11,8 @@ import { createPhraseRepository } from '../domains/phrases/phrase-repository.js'
 import { createPhraseService } from '../domains/phrases/phrase-service.js';
 import { createFrequencyRepository } from '../domains/practice/frequency-repository.js';
 import { createFsrsScheduler } from '../domains/practice/fsrs-scheduling.js';
+import { createPhrasePracticeRepository } from '../domains/practice/phrase-practice-repository.js';
+import { createPhrasePracticeService } from '../domains/practice/phrase-practice-service.js';
 import { createPracticeRepository } from '../domains/practice/practice-repository.js';
 import { createPracticeService } from '../domains/practice/practice-service.js';
 import { createPracticeSettings } from '../domains/practice/practice-settings.js';
@@ -54,12 +56,19 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
     desiredRetention: practiceSettings.readSettings().desiredRetention,
     isFuzzEnabled: isFsrsFuzzEnabled,
   });
+  const phrasePracticeService = createPhrasePracticeService({
+    phrasePracticeRepository: createPhrasePracticeRepository({ database }),
+    practiceSettings,
+    fsrsScheduler,
+    ...sharedDependencies,
+  });
   const practiceService = createPracticeService({
     practiceRepository,
     practiceSettings,
     priorityService,
     wordService,
     fsrsScheduler,
+    phrasePracticeService,
     ...sharedDependencies,
   });
   const ruleService = createRuleService({
@@ -75,6 +84,7 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
   const phraseService = createPhraseService({
     phraseRepository: createPhraseRepository({ database }),
     sectionService,
+    practiceSettings,
     ...sharedDependencies,
   });
   const textService = createTextService({
@@ -104,6 +114,7 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
   return Object.freeze({
     wordService,
     practiceService,
+    phrasePracticeService,
     priorityService,
     practiceSettings,
     ruleService,

@@ -9,6 +9,13 @@ import {
   checkAnswer,
   gradeTranslationAnswer,
   renderRuleBody,
+  formatDutchWithArticle,
+  revealTranslationAnswer,
+  pluralizeDays,
+  formatDaysAway,
+  formatLearningStatus,
+  buildNextReviewLine,
+  formatShortDate,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -228,4 +235,67 @@ test('gradeTranslationAnswer: a real spelling slip is still hard after normalisa
 
 test('gradeTranslationAnswer: input that is only punctuation is not counted', () => {
   assert.equal(gradeTranslationAnswer(huis, '?').counted, false);
+});
+
+test('formatDutchWithArticle adds the article only when there is one', () => {
+  assert.equal(formatDutchWithArticle(huis), 'het huis');
+  assert.equal(formatDutchWithArticle(appel), 'appel');
+});
+
+test('revealTranslationAnswer ("Не знаю") is again and shows the word with its article', () => {
+  assert.deepEqual(revealTranslationAnswer(huis), { counted: true, grade: 'again', message: '✗ Правильно: het huis' });
+  assert.equal(revealTranslationAnswer(appel).message, '✗ Правильно: appel');
+});
+
+test('pluralizeDays: Ukrainian forms of "день"', () => {
+  assert.equal(pluralizeDays(1), 'день');
+  assert.equal(pluralizeDays(21), 'день');
+  assert.equal(pluralizeDays(31), 'день');
+  assert.equal(pluralizeDays(2), 'дні');
+  assert.equal(pluralizeDays(3), 'дні');
+  assert.equal(pluralizeDays(22), 'дні');
+  assert.equal(pluralizeDays(5), 'днів');
+  assert.equal(pluralizeDays(0), 'днів');
+  assert.equal(pluralizeDays(11), 'днів');
+  assert.equal(pluralizeDays(14), 'днів');
+  assert.equal(pluralizeDays(111), 'днів');
+});
+
+test('formatDaysAway builds the phrase used in the next-review line', () => {
+  assert.equal(formatDaysAway(1), 'через 1 день');
+  assert.equal(formatDaysAway(3), 'через 3 дні');
+  assert.equal(formatDaysAway(5), 'через 5 днів');
+  assert.equal(formatDaysAway(21), 'через 21 день');
+  assert.equal(formatDaysAway(11), 'через 11 днів');
+});
+
+test('formatLearningStatus maps the three statuses and shows unknown values as they are', () => {
+  assert.equal(formatLearningStatus('new'), 'нове');
+  assert.equal(formatLearningStatus('learning'), 'вивчається');
+  assert.equal(formatLearningStatus('learned'), 'вивчено');
+  assert.equal(formatLearningStatus('constructor'), 'constructor');
+  assert.equal(formatLearningStatus(undefined), '');
+});
+
+test('buildNextReviewLine: interval, status and error count', () => {
+  assert.equal(
+    buildNextReviewLine({ intervalDays: 3, status: 'learning', errorCount: 2 }),
+    'Наступне повторення: через 3 дні · вивчається · помилок: 2',
+  );
+  assert.equal(
+    buildNextReviewLine({ intervalDays: 21, status: 'learned', errorCount: 0 }),
+    'Наступне повторення: через 21 день · вивчено · помилок: 0',
+  );
+  assert.equal(
+    buildNextReviewLine({ intervalDays: 1, status: 'new' }),
+    'Наступне повторення: через 1 день · нове · помилок: 0',
+  );
+});
+
+test('formatShortDate: ISO date to day.month, empty without a date', () => {
+  assert.equal(formatShortDate('2026-10-25'), '25.10');
+  assert.equal(formatShortDate('2026-01-03'), '03.01');
+  assert.equal(formatShortDate(null), '');
+  assert.equal(formatShortDate(undefined), '');
+  assert.equal(formatShortDate('25.10.2026'), '');
 });

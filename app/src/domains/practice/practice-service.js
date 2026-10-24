@@ -28,6 +28,7 @@ export function createPracticeService({
   priorityService,
   wordService,
   fsrsScheduler,
+  phrasePracticeService,
   runInTransaction,
   changeEventBus,
   clock,
@@ -78,7 +79,12 @@ export function createPracticeService({
     const timestamp = clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     const cardBefore = parseCard(word.fsrs_card);
-    const { card: cardAfter, dueAt, intervalDays } = fsrsScheduler.gradeCard(cardBefore, grade, timestamp);
+    const { card: cardAfter } = fsrsScheduler.gradeCard(cardBefore, grade, timestamp);
+    // The due time is the start of the calendar day the interval lands on, so a grade late in the day or on a 25-hour
+    // day does not come back the same day.
+    const intervalDays = Math.max(1, cardAfter.scheduled_days);
+    const dueAt = findStartOfDay(addDaysToCalendarDate(today, intervalDays), settings.timeZone);
+    cardAfter.due = new Date(dueAt);
     const learningStatus = deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
     const cardAfterJson = serializeCard(cardAfter);
     const wrongAnswer = mapBlankTextToNull(answer);
@@ -99,8 +105,9 @@ export function createPracticeService({
       cardAfter: cardAfterJson,
     });
     if (grade !== 'good') wordService.recordPracticeError({ wordId, occurredAt: timestamp, wrongAnswer });
+    const gradedWordRow = getPracticeWordRowOrThrow(wordId);
     return {
-      word: mapToPracticeWord(getPracticeWordRowOrThrow(wordId)),
+      word: { ...mapToPracticeWord(gradedWordRow), error_count: gradedWordRow.error_count },
       grade,
       state: describeCardState(cardAfter),
       status: learningStatus,
@@ -128,6 +135,7 @@ export function createPracticeService({
   }
 
   // Due counts, introductions, New words per priority, words per state and the good share of the last 7 and 30 days.
+  // The phrases' own counts are added under phrases.
   function calculatePracticeStatistics() {
     const settings = practiceSettings.readSettings();
     const timestamp = clock.now();
@@ -150,6 +158,7 @@ export function createPracticeService({
       states: stateCounts,
       good_share_7_days: calculateGoodShareSince(today, SHORT_GOOD_SHARE_DAY_COUNT, settings.timeZone),
       good_share_30_days: calculateGoodShareSince(today, LONG_GOOD_SHARE_DAY_COUNT, settings.timeZone),
+      phrases: phrasePracticeService.calculatePhraseStatistics(),
     };
   }
 

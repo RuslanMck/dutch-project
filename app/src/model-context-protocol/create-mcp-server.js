@@ -16,6 +16,7 @@ const MCP_SERVER_INFORMATION = Object.freeze({ name: 'dutch', version: '1.0.0' }
 export function createMcpServer({
   wordService,
   practiceService,
+  phrasePracticeService,
   priorityService,
   ruleService,
   mistakeService,
@@ -26,7 +27,7 @@ export function createMcpServer({
   const mcpServer = new McpServer({ ...MCP_SERVER_INFORMATION }, { instructions: MCP_INSTRUCTIONS });
   registerStatisticsTools({ mcpServer, statisticsService });
   registerWordTools({ mcpServer, wordService });
-  registerPracticeTools({ mcpServer, practiceService, priorityService, wordService });
+  registerPracticeTools({ mcpServer, practiceService, phrasePracticeService, priorityService, wordService });
   registerRuleTools({ mcpServer, ruleService, mistakeService });
   registerMistakeTools({ mcpServer, mistakeService });
   registerPhraseTools({ mcpServer, phraseService });

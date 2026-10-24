@@ -201,6 +201,7 @@ test('GET /api/words takes the priority, state, due and sort filters and returns
 // FSRS practice over REST: refused with 409 until the migration, then the batch, grades, statistics and preview work.
 const JSON_BEARER = { ...BEARER, 'Content-Type': 'application/json' };
 let practiceWordId;
+let phrasePracticeId;
 
 function postPracticeGrade(body) {
   return fetch(`${base}/api/practice/grades`, { method: 'POST', headers: JSON_BEARER, body: JSON.stringify(body) });
@@ -219,6 +220,21 @@ test('practice REST refuses the batch and grades with 409 before the FSRS migrat
   assert.match((await batch.json()).error, /not set up yet/);
   const grade = await postPracticeGrade({ word_id: practiceWordId, grade: 'good', session_id: 'http-before' });
   assert.equal(grade.status, 409);
+
+  const phrase = await fetch(`${base}/api/phrases`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ nl: 'Hoe gaat het?', uk: 'Як справи?' }),
+  });
+  phrasePracticeId = (await phrase.json()).id;
+  const phraseBatch = await fetch(`${base}/api/practice/phrases/batch?session_id=http-before`, { headers: BEARER });
+  assert.equal(phraseBatch.status, 409);
+  const phraseGrade = await fetch(`${base}/api/practice/phrases/grades`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ phrase_id: phrasePracticeId, grade: 'good', session_id: 'http-before' }),
+  });
+  assert.equal(phraseGrade.status, 409);
 });
 
 test('practice REST after the migration: batch, grade, repeat, unknown field, stats and preview', async () => {
@@ -253,6 +269,70 @@ test('practice REST after the migration: batch, grade, repeat, unknown field, st
   const [listedWord] = await (await fetch(`${base}/api/words?priority=1`, { headers: BEARER })).json();
   assert.equal(Object.hasOwn(listedWord, 'fsrs_card'), false, 'the card JSON is internal');
   assert.equal(typeof listedWord.state, 'string');
+});
+
+test('phrase practice REST: batch, grade, repeat, unknown field, phrase list and stats', async () => {
+  const batch = await fetch(`${base}/api/practice/phrases/batch?session_id=http-phrases`, { headers: BEARER });
+  assert.equal(batch.status, 200);
+  const batchBody = await batch.json();
+  assert.equal(batchBody.session_id, 'http-phrases');
+  assert.ok(batchBody.new_phrases.some(phrase => phrase.id === phrasePracticeId));
+  assert.equal(batchBody.counts.new_today_remaining, 5);
+  assert.equal((await fetch(`${base}/api/practice/phrases/batch?session_id=x&max_reviews=0`, { headers: BEARER }))
+    .status, 400);
+
+  const gradeBody = { phrase_id: phrasePracticeId, grade: 'good', session_id: 'http-phrases' };
+  const graded = await fetch(`${base}/api/practice/phrases/grades`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify(gradeBody),
+  });
+  assert.equal(graded.status, 200);
+  const gradedBody = await graded.json();
+  assert.equal(gradedBody.grade, 'good');
+  assert.equal(gradedBody.phrase.id, phrasePracticeId);
+  assert.match(gradedBody.next_due_on, /^\d{4}-\d{2}-\d{2}$/);
+  const repeated = await fetch(`${base}/api/practice/phrases/grades`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify(gradeBody),
+  });
+  assert.equal(repeated.status, 409, 'a second grade of the phrase in the same session is refused');
+  const withAnswer = await fetch(`${base}/api/practice/phrases/grades`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ ...gradeBody, session_id: 'http-phrases-2', answer: 'x' }),
+  });
+  assert.equal(withAnswer.status, 400, 'phrases take no answer field');
+
+  const phrases = await (await fetch(`${base}/api/phrases`, { headers: BEARER })).json();
+  const gradedPhrase = phrases.find(phrase => phrase.id === phrasePracticeId);
+  assert.equal(gradedPhrase.status, 'learning');
+  assert.equal(gradedPhrase.next_due_on, gradedBody.next_due_on);
+  assert.equal(Object.hasOwn(gradedPhrase, 'due_at'), false);
+
+  const stats = await (await fetch(`${base}/api/practice/stats`, { headers: BEARER })).json();
+  assert.equal(typeof stats.phrases.due_today, 'number');
+  assert.equal(stats.phrases.introduced_today, 1);
+});
+
+test('a wrong word grade returns the word with its error count, read after the error is logged', async () => {
+  const created = await fetch(`${base}/api/words`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ nl: 'kat', uk: 'кіт', article: 'de', section: '6.1' }),
+  });
+  const wordId = (await created.json()).id;
+  const graded = await postPracticeGrade({
+    word_id: wordId,
+    grade: 'again',
+    answer: 'hond',
+    session_id: 'http-errors',
+  });
+  assert.equal(graded.status, 200);
+  const gradedBody = await graded.json();
+  assert.equal(gradedBody.word.id, wordId);
+  assert.equal(gradedBody.word.error_count, 1);
 });
 
 test('logout clears the cookie', async () => {

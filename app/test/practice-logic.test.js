@@ -167,6 +167,18 @@ test('buildMigrationCard: a learned card has a 21-day interval and is learned', 
   assert.equal(deriveLearningStatus(learnedCard, LEARNED_THRESHOLD_DAYS), 'learned');
 });
 
+test('calculateIntervalDays: the scheduled 21 days count as learned, though the due time is the start of a day', () => {
+  // Reviewed at 23:30 on 24 October, due at 00:00 on 14 November: 20 days and 1.5 hours, which rounds to 20.
+  const card = parseCard(JSON.stringify({
+    due: new Date(findStartOfDay('2026-11-14', TIME_ZONE)).toISOString(),
+    last_review: new Date(Date.parse('2026-10-24T23:30:00+02:00')).toISOString(),
+    scheduled_days: LEARNED_THRESHOLD_DAYS,
+    state: State.Review,
+  }));
+  assert.equal(calculateIntervalDays(card), LEARNED_THRESHOLD_DAYS);
+  assert.equal(deriveLearningStatus(card, LEARNED_THRESHOLD_DAYS), 'learned');
+});
+
 test('buildMigrationCard: an unknown group is a validation error', () => {
   assert.throws(
     () => buildMigrationCard({ group: 'new', dueAt: FIRST_REVIEW_TIMESTAMP, timestamp: FIRST_REVIEW_TIMESTAMP }),

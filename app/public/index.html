@@ -59,8 +59,12 @@
           <input name="section" inputmode="decimal" placeholder="6.1">
         </label>
         <label class="field wide">
-          <span>Приклад</span>
-          <input name="example" placeholder="NL — UK">
+          <span>Приклад NL</span>
+          <input name="example_nl" autocapitalize="none" spellcheck="false">
+        </label>
+        <label class="field wide">
+          <span>Приклад UK</span>
+          <input name="example_uk">
         </label>
         <button class="primary wide" type="submit">Додати</button>
       </form>
@@ -72,14 +76,17 @@
 
       <div class="table-wrap">
         <table class="words">
+          <caption class="sr-only">Слова</caption>
           <thead>
             <tr>
-              <th>Слово</th>
-              <th>Глава</th>
-              <th>Переклад</th>
-              <th><button id="sort-errors" class="th-btn" type="button" aria-pressed="false">Помилки ↓</button></th>
-              <th>Статус</th>
-              <th><span class="sr-only">Видалити</span></th>
+              <th scope="col">Слово</th>
+              <th scope="col">Глава</th>
+              <th scope="col">Переклад</th>
+              <th scope="col"><button id="sort-errors" class="th-btn" type="button" aria-pressed="false">Помилки ↓</button></th>
+              <th scope="col">Статус</th>
+              <th scope="col">Наступне</th>
+              <th scope="col">Пріоритет</th>
+              <th scope="col"><span class="sr-only">Видалити</span></th>
             </tr>
           </thead>
           <tbody id="words-body"></tbody>
@@ -89,31 +96,72 @@
 
     <!-- 2 · Картки -->
     <section id="tab-cards" class="tab" role="tabpanel" data-tab="cards" hidden>
+      <div class="cards-settings">
+        <label class="field">
+          <span>Набір</span>
+          <select id="cards-mode">
+            <option value="words">Картки — Слова</option>
+            <option value="phrases">Картки — Фрази</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Лицьовий бік</span>
+          <select id="cards-direction">
+            <option value="nl">нідерландська</option>
+            <option value="uk">українська</option>
+          </select>
+        </label>
+      </div>
+      <p id="cards-note" class="hint">Картки (Слова) не змінюють оцінку слова. Щоб покращити оцінку, відповідайте правильно в Практиці.</p>
       <button id="card" class="card" type="button" aria-label="Перевернути картку">
         <span id="card-body"></span>
       </button>
       <div id="card-actions" class="card-actions">
+        <button id="card-skip-button" type="button">Не знаю</button>
         <button id="card-next" class="primary" type="button">Далі</button>
       </div>
+      <div id="card-grades" class="card-grades" role="group" aria-label="Оцінка фрази" hidden>
+        <button type="button" data-card-grade="again">Знову</button>
+        <button type="button" data-card-grade="hard">Важко</button>
+        <button type="button" data-card-grade="good">Добре</button>
+      </div>
+      <p id="card-msg" class="msg" aria-live="polite"></p>
       <p id="card-count" class="muted center"></p>
     </section>
 
     <!-- 3 · Практика -->
     <section id="tab-practice" class="tab" role="tabpanel" data-tab="practice" hidden>
-      <label class="field">
-        <span>Режим</span>
+      <div class="hint-field">
+        <div class="hint-label">
+          <label for="practice-mode">Режим</label>
+          <button class="hint-button" type="button" aria-expanded="false" aria-controls="practice-mode-hint"
+            aria-label="Пояснення до режиму" data-hint-button>i</button>
+        </div>
         <select id="practice-mode">
           <option value="fsrs">Переклад (FSRS)</option>
           <option value="art">Артикль</option>
         </select>
-      </label>
+        <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" змінює розклад повторень кожного слова. "Артикль" — це тренування, яке нічого не змінює.</p>
+      </div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
       <form id="practice-form" class="row-form" autocomplete="off">
         <input id="practice-input" type="text" autocapitalize="none" spellcheck="false" aria-label="Відповідь">
         <button id="practice-btn" class="primary" type="submit">Перевірити</button>
       </form>
+      <button id="practice-skip-button" class="practice-skip" type="button" hidden>Не знаю</button>
       <p id="practice-msg" class="msg" aria-live="polite"></p>
-      <p id="practice-progress" class="muted"></p>
+      <p id="practice-schedule" class="muted practice-schedule"></p>
+      <div class="practice-meta">
+        <p id="practice-progress" class="muted practice-meta__progress"></p>
+        <button id="practice-progress-hint-button" class="hint-button" type="button" aria-expanded="false"
+          aria-controls="practice-progress-hint" aria-label="Пояснення до залишку" data-hint-button>i</button>
+        <button id="practice-delete-button" class="icon-button" type="button" aria-label="Видалити слово" hidden>
+          <svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>
+          </svg>
+        </button>
+      </div>
+      <p id="practice-progress-hint" class="hint" hidden>Скільки слів залишилось у сьогоднішній сесії, разом зі словами, які ви пропустили — вони повертаються в кінці, тому число може зростати.</p>
       <p id="practice-score" class="muted"></p>
       <section id="practice-summary" class="practice-summary" aria-label="Підсумок сесії" hidden>
         <ul id="practice-summary-list" class="practice-summary__list"></ul>
@@ -153,6 +201,16 @@
     </section>
   </main>
 </div>
+
+<dialog id="delete-dialog" class="dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-text">
+  <h2 id="delete-dialog-title" class="dialog__title">Видалити слово?</h2>
+  <p id="delete-dialog-text" class="dialog__text"></p>
+  <div class="dialog__actions">
+    <button id="delete-dialog-cancel" type="button">Скасувати</button>
+    <button id="delete-dialog-confirm" class="danger" type="button">Видалити</button>
+  </div>
+</dialog>
+
 <script type="module" src="app.js"></script>
 </body>
 </html>

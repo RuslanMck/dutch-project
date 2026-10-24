@@ -20,7 +20,8 @@ export function registerPhraseTools({ mcpServer, phraseService }) {
 
   registerJsonTool(mcpServer, 'list_phrases', {
     title: 'List phrases',
-    description: 'Phrases, newest first.',
+    description: 'Phrases, newest first. Each has status (new, learning or learned) and next_due_on (the day it is '
+      + 'due; null while New).',
     inputSchema: listPhrasesInputSchema.shape,
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, ({ limit }) => phraseService.listPhrases({ limit: limit ?? DEFAULT_LIST_LIMIT }));

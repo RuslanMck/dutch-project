@@ -20,9 +20,10 @@ Do not rename existing DB columns, REST/MCP fields or env vars. Do not touch `ar
 - Only the first answer to a word in a practice session is graded. A second grade of the same word in the same
   `session_id` is rejected with `ConflictError` and changes nothing.
 - A day is a calendar day in `Europe/Amsterdam` (setting `timezone`). "Due today" means `due_at` is before the
-  start of tomorrow in that time zone.
-- Status is derived: `new` when state is New; `learned` when the current interval
-  (`due − last_review`, rounded to whole days) is ≥ `learned_threshold_days` (21); otherwise `learning`. The
+  start of tomorrow in that time zone. Due dates are aligned to the start of a calendar day: a grade is due on today
+  + the interval in days (at least 1), at 00:00 in that time zone.
+- Status is derived: `new` when state is New; `learned` when the scheduled interval (`scheduled_days`, whole days)
+  is ≥ `learned_threshold_days` (21); otherwise `learning`. The
   existing `words.status` column is kept and rewritten after every scheduling change, so REST and MCP keep the
   field.
 - New words enter rotation at most `new_per_day` (10) per day, by priority quota P1 7 / P2 2 / P3 1. Unused slots
@@ -91,7 +92,7 @@ New domain folder `src/domains/practice/` (with `README.md`). Pure modules have 
 | File | Kind | Exports |
 |---|---|---|
 | `practice-calendar.js` | pure | `formatCalendarDateInTimeZone(timestamp, timeZone)` → `'YYYY-MM-DD'`; `findStartOfDay(calendarDate, timeZone)` → ms of 00:00 local; `addDaysToCalendarDate(calendarDate, dayCount)` → `'YYYY-MM-DD'`. Use `Intl.DateTimeFormat` with `timeZone`; must be right across DST (2026-10-25 is a 25-hour day in Amsterdam). |
-| `fsrs-scheduling.js` | pure (wraps ts-fsrs) | `createFsrsScheduler({ desiredRetention, isFuzzEnabled })` → `{ gradeCard(card, grade, timestamp) }` returning `{ card, dueAt, intervalDays }`; `card` null = new (use `createEmptyCard`). `serializeCard(card)` → JSON string with ISO dates; `parseCard(json)` → card with `Date` objects. `deriveLearningStatus(card, learnedThresholdDays)` → `'new' \| 'learning' \| 'learned'`. `calculateIntervalDays(card)` = round((due − last_review) / day). `buildMigrationCard({ group, dueAt, timestamp })` for groups `'learning'` (state Review, stability 1, difficulty 6, reps 1, lapses 1, last_review = timestamp − 1 day, scheduled_days 1) and `'learned'` (state Review, stability 21, difficulty 5, reps 3, lapses 0, last_review = timestamp, due = dueAt, scheduled_days 21). Grade map: again → `Rating.Again`, hard → `Rating.Hard`, good → `Rating.Good`. |
+| `fsrs-scheduling.js` | pure (wraps ts-fsrs) | `createFsrsScheduler({ desiredRetention, isFuzzEnabled })` → `{ gradeCard(card, grade, timestamp) }` returning `{ card, dueAt, intervalDays }`; `card` null = new (use `createEmptyCard`). `serializeCard(card)` → JSON string with ISO dates; `parseCard(json)` → card with `Date` objects. `deriveLearningStatus(card, learnedThresholdDays)` → `'new' \| 'learning' \| 'learned'`. `calculateIntervalDays(card)` = `card.scheduled_days` when it is set, else round((due − last_review) / day). `buildMigrationCard({ group, dueAt, timestamp })` for groups `'learning'` (state Review, stability 1, difficulty 6, reps 1, lapses 1, last_review = timestamp − 1 day, scheduled_days 1) and `'learned'` (state Review, stability 21, difficulty 5, reps 3, lapses 0, last_review = due − 21 days, due = dueAt, scheduled_days 21). Grade map: again → `Rating.Again`, hard → `Rating.Hard`, good → `Rating.Good`. |
 | `priority-calculation.js` | pure | `parseChapterNumber(sectionCode)` → integer or null. `calculatePriority({ priorityOverride, chapterNumber, frequencyRank, currentChapter })` → 1–3 (rules in §1). `compareQueueOrder(first, second)` for `{ priority, chapterNumber, frequencyRank, id }` (§1). `calculateFrequencyRank(dutchText, findRankByForm)`: lowercase, drop a leading `de `/`het `, strip punctuation `?!.,;:()"'…`; one token → its rank or null; several tokens → the largest (rarest) rank of the tokens, or null when any token is unranked. |
 | `new-word-allocation.js` | pure | `allocateNewWords({ candidatesByPriority, introducedTodayByPriority, newPerDay, tierQuota })` → ordered array of chosen candidates. Remaining = newPerDay − all introduced today. Each priority first gets min(its quota − introduced today in it, available). Leftover slots go to P1, then P2, then P3. Never more than remaining. Candidates in each list are already in queue order. Output order: P1 picks, then P2, then P3. |
 | `practice-repository.js` | SQL | Settings: `listSettings()` → `{ name: parsedJsonValue }`; `saveSetting(name, value)` (JSON.stringify, upsert). Cards: `listPracticeWords()` → all words with `id, nl, uk, article, kind, section_code, status, fsrs_card, due_at, introduced_on, frequency_rank, priority_override, priority, error_count` (from `v_words`); `findPracticeWordById(wordId)`; `updateWordSchedule(wordId, { fsrsCard, dueAt, introducedOn, learningStatus, updatedAt })`; `updateWordPriority(wordId, { priority, priorityOverride })` (priorityOverride undefined = leave as is); `updateWordFrequencyRank(wordId, frequencyRank)`; `listDueWordIds(beforeTimestamp)` ordered by `due_at` ascending; `countIntroducedOnByPriority(calendarDate)` → `{1: n, 2: n, 3: n}`; review logs: `createReviewLog({...})`, `findReviewLog(sessionId, wordId)`, `listWordIdsReviewedInSession(sessionId)`, `countFirstGradesSince(timestamp)` → `{ again, hard, good }`. |
@@ -128,7 +129,10 @@ and `practiceSettings` into `createWordService`, and returns `practiceService` a
 `gradeWord({ wordId, grade, answer, sessionId })` in one transaction:
 1. Refuse unless FSRS is active; word must exist (`NotFoundError`); a review log for (session, word) →
    `ConflictError("word N was already graded in session S")`.
-2. `fsrsScheduler.gradeCard(card, grade, now)`; status = `deriveLearningStatus`.
+2. `fsrsScheduler.gradeCard(card, grade, now)`. Due dates are aligned to the start of the calendar day:
+   `intervalDays = max(1, card.scheduled_days)`, `dueAt = findStartOfDay(addDaysToCalendarDate(today, intervalDays),
+   timeZone)` (`today` is the grade's calendar day in the setting's time zone), and `card.due = dueAt` before the card
+   is serialized. Status = `deriveLearningStatus`.
 3. Update the schedule; set `introduced_on` = today when the word was New.
 4. Insert the review log; on `again`/`hard` insert a `word_errors` row (`source 'practice'`, `mode 'translate'`,
    `wrong_answer` = answer) through `wordRepository.createWordError`.
@@ -220,3 +224,74 @@ Run: `docker run --rm -v /srv/dutch-project/app:/app -v /srv/data/dutch/seed:/se
 | 5 | Web and docs | `public/*`, `test/ui-logic.test.js`, `mcp-instructions.js`, `docs/*`, READMEs not owned above | 3 (routes) |
 
 Packages 1+2 run first, 3 next, then 4 and 5 in parallel. Nobody commits; the orchestrator commits after review.
+
+## 9. Phrase practice and the practice UI (second round, 24.10.2026)
+
+Ruslan's eleven UI changes; the decisions are settled.
+
+### 9.1 Backend (phrases on FSRS, plus one field for words)
+
+- `migrations/004-add-phrase-fsrs-practice.sql`: `phrases` gains `fsrs_card TEXT` (NULL = New), `due_at INTEGER`
+  (NULL = New), `introduced_on TEXT` (NULL = New) and `status TEXT NOT NULL DEFAULT 'new' CHECK (status IN
+  ('new','learning','learned'))` (cached derivation, like `words.status`); indexes `index_phrases_on_due_at`,
+  `index_phrases_on_introduced_on`. New table `phrase_review_logs` (same columns as `review_logs` with `phrase_id`
+  instead of `word_id`, no `answer`), `unique_index_phrase_review_logs_on_session_id_and_phrase_id`, indexes on
+  `phrase_id` and `reviewed_at`. Setting `('phrase_new_per_day', '5')`. Existing phrases start as New; no migration
+  tool is needed (phrases had no status before).
+- Rules: 5 new phrases per day, oldest first (`added_at`, then `id`), no priority tiers. One card per phrase whatever
+  side is shown. Only the first grade per phrase in a session counts (`ConflictError` on a second). Grades
+  again/hard/good chosen by the learner. Same FSRS scheduler, day boundary and status derivation as words. Due dates
+  are the start of the calendar day today + interval days (at least 1) in the settings' time zone, as for words. No
+  `word_errors`. Gated by the same `isFsrsActive()` check.
+- Files: `src/domains/practice/phrase-practice-repository.js` (SQL) and `phrase-practice-service.js`
+  (`getPhraseBatch({ sessionId, maxReviews })`, `gradePhrase({ phraseId, grade, sessionId })`,
+  `calculatePhraseStatistics()`), contracts in `practice-contracts.js`, routes in `practice-routes.js`, tools in
+  `practice-tools.js`.
+- REST: `GET /api/practice/phrases/batch?session_id=&max_reviews=` →
+  `{ session_id, reviews: [phrase], new_phrases: [phrase], counts: { due, introduced_today, new_today_remaining,
+  new_remaining } }`, phrase = `{ id, nl, uk, context, state, status }`.
+  `POST /api/practice/phrases/grades` `{ phrase_id, grade, session_id }` →
+  `{ phrase: { id, nl, uk, context, state, status, next_due_on }, grade, state, status, interval_days,
+  next_due_on }`. 409 before FSRS is active and on a repeat grade.
+- MCP: `get_phrase_batch` (`session_id`, `max_reviews?`, read-only), `grade_phrase` (`id`, `grade`, `session_id`).
+  `practice_stats` gains `phrases: { due_today, due_tomorrow, introduced_today, new_remaining, states }`.
+- Phrase list (REST `GET /api/phrases`, MCP `list_phrases`) adds `status` and `next_due_on`.
+- Words: the `grade_word` / `POST /api/practice/grades` result's `word` gains `error_count` (after the grade's own
+  error row is written), so the web app can show "помилок: N".
+
+### 9.2 Web (`public/`)
+
+Table tab
+1. The add-word form's single example input ("NL — UK", parsed by `splitExample`) becomes two inputs,
+   "Приклад NL" and "Приклад UK" (sent as `example_nl` / `example_uk`).
+2. Word table columns: Слово / Глава / Переклад / Помилки / Статус / Наступне / Пріоритет / delete. "Наступне" =
+   `next_due_on` formatted short (e.g. `25.10`), empty for new words; "Пріоритет" = `P1`–`P3`. At 390 px the page
+   must not scroll sideways; the table may scroll inside `.table-wrap`.
+
+Practice tab
+3. «Не знаю» button: on the first answer in the session it grades `again`, shows the right answer with its
+   article and requeues the word at the end; on a repeat it only shows the answer and requeues (no grade sent).
+4. After a checked answer, one more line under `#practice-msg` from the grade response:
+   "Наступне повторення: через N днів · <status> · помилок: <error_count>" (status labels for this line:
+   new «нове», learning «вивчається», learned «вивчено»; "через 1 день / 2–4 дні / 5+ днів" Ukrainian plural). On a
+   repeat: "повтор — не зараховується".
+5. An "i" hint button next to «Залишилось: N»: «Скільки слів залишилось у сьогоднішній сесії, разом зі словами,
+   які ви пропустили — вони повертаються в кінці, тому число може зростати.»
+6. An "i" hint button next to «Режим»: «"Переклад (FSRS)" змінює розклад повторень кожного слова. "Артикль" — це
+   тренування, яке нічого не змінює.» The article drill's pool becomes words in rotation (status learning or
+   learned) that have de/het.
+7. A trash button for the current word: an accessible `<dialog>` asks «Ви впевнені, що хочете видалити слово
+   "…"?» and says the word's review history and error count are deleted too. On confirm: DELETE the word, drop it
+   from the queue and move on. The word table's delete uses the same dialog (the two-step "видалити?" button goes).
+
+Cards tab
+8. Mode select "Картки — Слова" / "Картки — Фрази". Words mode shows today's practice batch (reviews + new words)
+   from `GET /api/practice/batch` with the practice session id (read-only, no grades, no side effects). A direction
+   switch: NL on the front or UK on the front. The counter shows how many cards are left in today's batch. A clear
+   note: «Картки (Слова) не змінюють оцінку слова. Щоб покращити оцінку, відповідайте правильно в Практиці.»
+9. Phrases mode: today's phrase batch from `GET /api/practice/phrases/batch` (same session id, same direction
+   switch). After revealing the back the learner grades «Знову» (again) / «Важко» (hard) / «Добре» (good); only the
+   first grade per phrase in the session is posted; again/hard phrases come back at the end of the session
+   (ungraded repeats). The Phrases tab shows each phrase's status.
+10. «Не знаю» in both card modes. Words: it only reveals the back (same as tapping the card).
+11. Phrases: «Не знаю» reveals the back and grades again in one step.

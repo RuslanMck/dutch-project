@@ -1,6 +1,7 @@
-// SQL for phrases; returns rows in the REST/MCP shape. No business rules.
+// SQL for phrases; returns rows in the REST/MCP shape, plus due_at for the service to turn into next_due_on.
+// No business rules.
 const PHRASE_SELECT = `
-  SELECT id, legacy_id, nl, uk, context, section_code AS section, added_at
+  SELECT id, legacy_id, nl, uk, context, section_code AS section, added_at, status, due_at
   FROM phrases
 `;
 

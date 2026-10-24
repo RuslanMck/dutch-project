@@ -29,12 +29,13 @@ before and after. Remove entries from this file as they are fixed.
 | `authentication/authentication-routes.js` | The fallback login page (used only when `public/login.html` is missing) is inline HTML with inline styles | Drop it, or serve a proper page from `public/` |
 | `test/` | Suites test behaviour across layers (`domain-services`, `http`, `mcp`, `import`) instead of mirroring `src/` one file per module | `test/<mirror of src>/<module>.test.js`; update the `npm test` glob |
 | `domains/practice/practice-repository.js`, `domains/statistics/statistics-repository.js`, `domains/words/word-repository.js` | The FSRS columns of `words` (`fsrs_card`, `due_at`, `introduced_on`, `priority`, `priority_override`, `frequency_rank`) are read and written with SQL outside the words repository's own tables: the practice repository writes the schedule and the priorities, the word repository reads them into word rows and clears the card when a status is set to new, and the statistics repository counts them. The FSRS plan keeps them on `words` (`docs/FSRS_PRACTICE_ARCHITECTURE.md` §2), so the queue, the batch and the list filters run on one table without a join. | Move the schedule to a `word_schedules` table keyed by `word_id`: one migration copies the columns and drops them from `words`; the practice repository owns that table, the word repository joins it for the word list, and statistics asks the practice service for its counts. REST and MCP fields stay as they are. |
+| `domains/practice/phrase-practice-repository.js` writes the FSRS columns of `phrases` (`fsrs_card`, `due_at`, `introduced_on`, `status`, migration 004), and `domains/phrases/phrase-repository.js` reads `status` and `due_at` into the phrase list | The same split as the words row: the schedule is kept on the phrase row, and the phrase domain's repository reads it | A `phrase_schedules` table keyed by `phrase_id`, written by the phrase practice repository and joined by the phrase repository for the list. One migration copies the columns and drops them from `phrases`. REST and MCP fields stay as they are. |
 
 ## app/public
 
 | Current | Problem | Target |
 |---|---|---|
-| `app.js` (546 lines) | All six tabs, state and event binding in one module; `$`, `esc`, `errs`, `ui.cards.idx`, `score.ok/tot` | `scripts/application.js` + `state-store.js` + `tabs/*-tab.js` |
+| `app.js` (1133 lines, `wc -l` when this was last checked) | All six tabs, state and event binding in one module; `$`, `esc`, `errs`, `ui.cards.idx`, `score.ok/tot` | `scripts/application.js` + `state-store.js` + `tabs/*-tab.js` |
 | `logic.js` | Several pure capabilities in one file; `esc` | `scripts/logic/` one module per capability |
 | `api.js` (browser) | Name clashes with `src/api.js` | `scripts/api-client.js` |
 | `app.css` | Short custom properties (`--bg`, `--soft`, `--ok`) and classes (`.del`, `.mh`, `.pat`, `.art`, `.th-btn`, `.sr-only`) | `--color-…` properties, BEM blocks |

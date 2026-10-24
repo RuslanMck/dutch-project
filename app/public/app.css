@@ -11,6 +11,7 @@
   --accent: #c2410c;
   --accent-ink: #ffffff;
   --danger: #dc2626;
+  --on-danger: #ffffff;
   --ok: #15803d;
   --radius: 10px;
 }
@@ -26,6 +27,7 @@
     --accent: #fb923c;
     --accent-ink: #1c1917;
     --danger: #dc2626;
+    --on-danger: #ffffff;
     --ok: #4ade80;
   }
 }
@@ -40,6 +42,7 @@
   --accent: #fb923c;
   --accent-ink: #1c1917;
   --danger: #dc2626;
+  --on-danger: #ffffff;
   --ok: #4ade80;
 }
 
@@ -197,7 +200,7 @@ button.ghost {
 
 table.words {
   width: 100%;
-  min-width: 480px;
+  min-width: 640px;
   border-collapse: collapse;
 }
 
@@ -314,15 +317,31 @@ table.words td.num {
   overflow-wrap: anywhere;
 }
 
-.card-actions {
+.cards-settings {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.card-actions button {
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-actions button,
+.card-grades button {
+  flex: 1 1 0;
   min-height: 52px;
   font-size: 17px;
+}
+
+.card-grades {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .done {
@@ -416,7 +435,7 @@ details.rule > summary::-webkit-details-marker {
 
 .badge {
   background: var(--danger);
-  color: #ffffff;
+  color: var(--on-danger);
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -562,6 +581,129 @@ details.rule > summary::-webkit-details-marker {
   margin-top: 8px;
 }
 
+/* practice: "i" hints, skip button, schedule line, delete button */
+.hint-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.hint-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hint-button {
+  flex: 0 0 auto;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  border-color: var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.hint {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: var(--soft);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.practice-skip {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.practice-schedule {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.practice-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.practice-meta__progress {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.icon-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.icon-button__icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* delete confirmation dialog */
+.dialog {
+  width: min(360px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  margin: auto;
+  padding: 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dialog__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.dialog__text {
+  margin: 0 0 16px;
+  overflow-wrap: anywhere;
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-danger);
+  font-weight: 600;
+}
+
 /* shared */
 .muted {
   color: var(--muted);
@@ -590,7 +732,7 @@ details.rule > summary::-webkit-details-marker {
   max-width: 608px;
   margin: 0 auto;
   background: var(--danger);
-  color: #ffffff;
+  color: var(--on-danger);
   padding: 10px 14px;
   border-radius: 10px;
   font-weight: 600;

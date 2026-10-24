@@ -8,7 +8,7 @@ Zod schemas for every shape that crosses a boundary: REST bodies, queries and pa
 |---|---|
 | `shared-contracts.js` | Building blocks used by several domains: enumerations (learning status, article, word kind, practice mode, mistake source, FSRS card state), word priority (as a JSON number and as query text), ids, calendar dates and text fields. |
 | `word-contracts.js` | Words: create, bulk add, update, status change, list and search, practice results, and word errors (by id or by lookup). |
-| `practice-contracts.js` | Practice: the batch, grading (`again`, `hard`, `good`), the current chapter and manual priorities, the frequency list (one entry per form), the frequency entry shared by the MCP tool and the import script, and the FSRS migration. |
+| `practice-contracts.js` | Practice: the batch, grading words (`again`, `hard`, `good`, with an answer) and phrases (the same grades, no answer), the current chapter and manual priorities, the frequency list (one entry per form), the frequency entry shared by the MCP tool and the import script, and the FSRS migration. |
 | `rule-contracts.js` | Grammar rules: create, update, and lookup by id or code. |
 | `mistake-contracts.js` | Mistake patterns and cases: list filters, create a pattern, add a case, and log a mistake. |
 | `phrase-contracts.js` | Phrases: create one, add several, and list. |

@@ -374,6 +374,31 @@ test('a grade at 23:30 counts for that day, and not for the next day', () => {
   assert.equal(readWordRow(context, wordId).introduced_on, '2026-10-24');
 });
 
+test('a grade at 00:30 on the 25-hour day 2026-10-25 is due on 2026-10-26, at the start of that day', () => {
+  const context = createPracticeContext('2026-10-25T00:30:00+02:00');
+  const [wordId] = addWords(context, '6.1', ['fout']);
+  migrate(context);
+
+  const result = context.practiceService.gradeWord({ wordId, grade: 'again', answer: 'x', sessionId: 's1' });
+
+  assert.equal(result.interval_days, 1);
+  assert.equal(result.next_due_on, '2026-10-26');
+  assert.equal(readWordRow(context, wordId).due_at, findStartOfDay('2026-10-26', TIME_ZONE));
+  assert.deepEqual(context.practiceService.getPracticeBatch({ sessionId: 's2' }).reviews, []);
+});
+
+test('a new word graded good at 20:00 on 2026-10-24 is due on 2026-10-27, at the start of that day', () => {
+  const context = createPracticeContext('2026-10-24T20:00:00+02:00');
+  const [wordId] = addWords(context, '6.1', ['goed']);
+  migrate(context);
+
+  const result = context.practiceService.gradeWord({ wordId, grade: 'good', sessionId: 's1' });
+
+  assert.equal(result.interval_days, 3);
+  assert.equal(result.next_due_on, '2026-10-27');
+  assert.equal(readWordRow(context, wordId).due_at, findStartOfDay('2026-10-27', TIME_ZONE));
+});
+
 test('practice_stats counts due words, introductions, states and the good share', () => {
   const context = createPracticeContext();
   addWords(context, '6.1', ['leren'], { status: 'learning' });

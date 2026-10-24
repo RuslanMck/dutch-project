@@ -1,4 +1,5 @@
-// Contracts for the practice: the batch, grading, chapter and priorities, the frequency list and the migration.
+// Contracts for the practice: the batch, grading words and phrases, chapter and priorities, the frequency list and the
+// migration.
 // REST query values arrive as text, so their numbers are read with z.coerce.
 import { z } from 'zod';
 
@@ -20,6 +21,11 @@ const PREVIEW_CHAPTER_DESCRIPTION = 'chapter to preview; default the current cha
 export const practiceGradeSchema = z.enum(PRACTICE_GRADE_VALUES).describe(
   "'good' fully right; 'hard' right word but wrong or missing article, a spelling slip or a synonym; "
   + "'again' wrong, or the learner did not know it (DNK)",
+);
+
+// Phrases are graded by the learner as well as by Claude, so the grade is described for either side.
+export const phraseGradeSchema = practiceGradeSchema.describe(
+  "'good' fully right; 'hard' right phrase with a slip; 'again' wrong, or the learner did not know it",
 );
 
 export const practiceSessionIdSchema = z.string().trim().min(1, 'required').max(100)
@@ -49,6 +55,20 @@ export const gradeWordToolInputSchema = gradeWordFieldsSchema.extend({
 
 export const gradeWordInputSchema = gradeWordFieldsSchema.extend({
   word_id: identifierSchema.describe('word id, from the practice batch'),
+}).strict();
+
+// A phrase has no article or answer text, so its grade takes no answer field.
+const gradePhraseFieldsSchema = z.object({
+  grade: phraseGradeSchema,
+  session_id: practiceSessionIdSchema,
+});
+
+export const gradePhraseToolInputSchema = gradePhraseFieldsSchema.extend({
+  id: identifierSchema.describe('phrase id, from get_phrase_batch'),
+}).strict();
+
+export const gradePhraseInputSchema = gradePhraseFieldsSchema.extend({
+  phrase_id: identifierSchema.describe('phrase id, from the phrase batch'),
 }).strict();
 
 export const setCurrentChapterInputSchema = z.object({

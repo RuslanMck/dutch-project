@@ -55,7 +55,9 @@ claude mcp add --transport http dutch https://<your-domain>/mcp --header "Author
 
 Tools: `stats, search_words, list_words, add_words, update_word, delete_word, set_word_status, log_word_error,
 list_rules, get_rule, add_rule, update_rule, list_mistake_patterns, log_mistake, add_phrases, list_phrases,
-delete_phrase, add_text, list_texts, get_text`. The server's instructions describe the lesson workflows (exercise
+delete_phrase, add_text, list_texts, get_text, get_practice_batch, grade_word, set_current_chapter,
+set_word_priority, import_frequency_list, preview_priorities, migrate_to_fsrs, practice_stats, get_phrase_batch,
+grade_phrase`. The server's instructions describe the lesson workflows (exercise
 check, translation). Writes show up live in open browser tabs.
 
 ## Operate

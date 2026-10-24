@@ -1,6 +1,7 @@
 // MCP adapter for the practice: registers the practice tools. Arguments are parsed by the MCP SDK with the practice
-// contracts; each tool calls the practice or priority service.
+// contracts; each tool calls the practice, phrase practice or priority service.
 import {
+  gradePhraseToolInputSchema,
   gradeWordToolInputSchema,
   importFrequencyListInputSchema,
   migrateToFsrsInputSchema,
@@ -16,7 +17,13 @@ import {
 } from '../../model-context-protocol/mcp-tool-registration.js';
 import { mapWordToCompactWord } from '../words/compact-word-mapping.js';
 
-export function registerPracticeTools({ mcpServer, practiceService, priorityService, wordService }) {
+export function registerPracticeTools({
+  mcpServer,
+  practiceService,
+  phrasePracticeService,
+  priorityService,
+  wordService,
+}) {
   registerJsonTool(mcpServer, 'get_practice_batch', {
     title: 'Get practice batch',
     description: 'Words to practise now for one session: reviews that are due (most overdue first) and new words '
@@ -41,6 +48,32 @@ export function registerPracticeTools({ mcpServer, practiceService, priorityServ
     wordId: id,
     grade,
     answer,
+    sessionId,
+  }));
+
+  registerJsonTool(mcpServer, 'get_phrase_batch', {
+    title: 'Get phrase batch',
+    description: 'Phrases to practise now for one session: phrase reviews that are due (most overdue first) and at '
+      + 'most 5 new phrases a day, oldest first. Show each phrase by its uk and ask for the Dutch; grade the first '
+      + 'answer with grade_phrase. Returns {session_id, reviews, new_phrases, counts}, each phrase {id, nl, uk, '
+      + 'context, state, status}.',
+    inputSchema: practiceBatchToolInputSchema.shape,
+    annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  }, ({ session_id: sessionId, max_reviews: maxReviews }) => phrasePracticeService.getPhraseBatch({
+    sessionId,
+    maxReviews,
+  }));
+
+  registerJsonTool(mcpServer, 'grade_phrase', {
+    title: 'Grade phrase',
+    description: 'Record the first answer to a phrase in this session and schedule its next review. Grades: "good" '
+      + 'fully right; "hard" right phrase with a small slip; "again" wrong or not known. Only the first grade per '
+      + 'phrase per session counts: a second one is refused. Phrases log no word errors. Returns {phrase, grade, '
+      + 'state, status, interval_days, next_due_on}.',
+    inputSchema: gradePhraseToolInputSchema.shape,
+  }, ({ id, grade, session_id: sessionId }) => phrasePracticeService.gradePhrase({
+    phraseId: id,
+    grade,
     sessionId,
   }));
 
@@ -97,7 +130,7 @@ export function registerPracticeTools({ mcpServer, practiceService, priorityServ
     title: 'Practice statistics',
     description: 'Practice numbers: reviews due today and tomorrow, words introduced today, New words waiting per '
       + 'priority, words per state (new, learning, review, relearning) and the share of "good" grades over the last 7 '
-      + 'and 30 days (null when there were none).',
+      + 'and 30 days (null when there were none). The phrases key holds the same kind of numbers for phrases.',
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, () => practiceService.calculatePracticeStatistics());
 }

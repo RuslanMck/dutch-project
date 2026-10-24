@@ -8,6 +8,7 @@ export function createPracticeSettings({ practiceRepository }) {
     return Object.freeze({
       currentChapter: settingByName.current_chapter,
       newPerDay: settingByName.new_per_day,
+      phraseNewPerDay: settingByName.phrase_new_per_day,
       tierQuota: Object.freeze({ ...settingByName.tier_quota }),
       desiredRetention: settingByName.desired_retention,
       learnedThresholdDays: settingByName.learned_threshold_days,

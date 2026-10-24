@@ -22,7 +22,7 @@ const EXPECTED_TOOLS = [
   'log_word_error', 'list_rules', 'get_rule', 'add_rule', 'update_rule', 'list_mistake_patterns', 'log_mistake',
   'add_phrases', 'list_phrases', 'delete_phrase', 'add_text', 'list_texts', 'get_text',
   'get_practice_batch', 'grade_word', 'set_current_chapter', 'set_word_priority', 'import_frequency_list',
-  'preview_priorities', 'migrate_to_fsrs', 'practice_stats',
+  'preview_priorities', 'migrate_to_fsrs', 'practice_stats', 'get_phrase_batch', 'grade_phrase',
 ];
 
 const application = createApplication({
@@ -416,4 +416,85 @@ test('add_words gives priorities; list_words filters by state, priority and due 
     filterServer.closeAllConnections();
     await new Promise(resolve => filterServer.close(resolve));
   }
+});
+
+// Runs one test against an MCP client on its own in-memory database, so each test starts from an empty schedule.
+async function withFreshMcpClient(runTest) {
+  const freshContext = createTestContext();
+  const freshApplication = createApplication({
+    configuration: parseEnvironmentConfiguration({ NODE_ENV: 'test', MCP_SECRET: SECRET, API_TOKEN: TOKEN }),
+    services: freshContext,
+    changeEventBus: freshContext.changeEventBus,
+    clock: freshContext.clock,
+  });
+  const freshServer = freshApplication.listen(0, '127.0.0.1');
+  await once(freshServer, 'listening');
+  try {
+    const freshBase = `http://127.0.0.1:${freshServer.address().port}`;
+    const freshClient = await connect(new StreamableHTTPClientTransport(new URL(`${freshBase}/mcp/${SECRET}`)));
+    await runTest(freshClient);
+  } finally {
+    freshServer.closeAllConnections();
+    await new Promise(resolve => freshServer.close(resolve));
+  }
+}
+
+test('the phrase practice tools are listed, and get_phrase_batch is read-only', async () => {
+  await withFreshMcpClient(async freshClient => {
+    const { tools } = await freshClient.listTools();
+    const toolByName = Object.fromEntries(tools.map(tool => [tool.name, tool]));
+    assert.ok(toolByName.grade_phrase, 'grade_phrase is listed');
+    assert.equal(toolByName.get_phrase_batch.annotations.readOnlyHint, true);
+    assert.deepEqual(Object.keys(toolByName.grade_phrase.inputSchema.properties).sort(), ['grade', 'id', 'session_id']);
+  });
+});
+
+test('grade_phrase round trip: refused before the migration, graded once, repeat refused, status listed', async () => {
+  await withFreshMcpClient(async freshClient => {
+    await call(freshClient, 'add_phrases', { phrases: [{ nl: 'Hoe gaat het?', uk: 'Як справи?' }] });
+
+    const beforeMigration = await freshClient.callTool({
+      name: 'get_phrase_batch',
+      arguments: { session_id: 'mcp-phrases' },
+    });
+    assert.equal(beforeMigration.isError, true);
+    assert.match(beforeMigration.content[0].text, /not set up yet/);
+
+    await call(freshClient, 'migrate_to_fsrs', { dry_run: false });
+    const batch = await call(freshClient, 'get_phrase_batch', { session_id: 'mcp-phrases' });
+    assert.equal(batch.new_phrases.length, 1);
+    const gradeArguments = { id: batch.new_phrases[0].id, grade: 'again', session_id: 'mcp-phrases' };
+    const graded = await call(freshClient, 'grade_phrase', gradeArguments);
+    assert.equal(graded.grade, 'again');
+    assert.equal(graded.phrase.id, gradeArguments.id);
+    assert.equal(graded.state, 'review');
+    assert.equal(graded.interval_days, 1);
+
+    const repeat = await freshClient.callTool({ name: 'grade_phrase', arguments: gradeArguments });
+    assert.equal(repeat.isError, true);
+    assert.match(repeat.content[0].text, /already graded/);
+
+    const listed = await call(freshClient, 'list_phrases');
+    assert.equal(listed[0].status, 'learning');
+    assert.equal(listed[0].next_due_on, graded.next_due_on);
+  });
+});
+
+test('grade_word returns the word with its error count, read after the error is logged', async () => {
+  await withFreshMcpClient(async freshClient => {
+    const added = await call(freshClient, 'add_words', {
+      words: [{ nl: 'de tafel', uk: 'стіл', article: 'de', section: '6.1' }],
+    });
+    await call(freshClient, 'migrate_to_fsrs', { dry_run: false });
+
+    const graded = await call(freshClient, 'grade_word', {
+      id: added.added[0].id,
+      grade: 'hard',
+      answer: 'het tafel',
+      session_id: 'mcp-errors',
+    });
+
+    assert.equal(graded.word.id, added.added[0].id);
+    assert.equal(graded.word.error_count, 1);
+  });
 });
