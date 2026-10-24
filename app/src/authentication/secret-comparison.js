@@ -14,6 +14,13 @@ export function readBearerToken(request) {
   return bearerMatch ? bearerMatch[1].trim() : null;
 }
 
+// The value of an "x-api-key" header, or null. claude.ai connectors send secrets this way, because they reserve
+// the Authorization header for OAuth.
+export function readApiKey(request) {
+  const apiKeyHeader = request.headers['x-api-key'];
+  return typeof apiKeyHeader === 'string' && apiKeyHeader.trim() !== '' ? apiKeyHeader.trim() : null;
+}
+
 // True when the request carries the expected bearer token. An empty expected token accepts nobody.
 export function hasValidBearerToken(request, expectedToken) {
   const bearerToken = readBearerToken(request);

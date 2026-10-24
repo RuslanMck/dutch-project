@@ -91,6 +91,25 @@ test('bearer route on /mcp works and returns the same tools', SKIP, async () => 
   assert.equal(typeof stats.words.total, 'number');
 });
 
+test('x-api-key header with the MCP secret works on /mcp (claude.ai connector headers)', SKIP, async () => {
+  const apiKeyClient = await connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+    requestInit: { headers: { 'x-api-key': SECRET } },
+  }));
+  const { tools } = await apiKeyClient.listTools();
+  assert.equal(tools.length, EXPECTED_TOOLS.length);
+});
+
+test('x-api-key is refused when wrong, empty, or carrying the API token', SKIP, async () => {
+  const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
+  for (const apiKey of ['nope', ' ', TOKEN]) {
+    const response = await fetch(`${base}/mcp`, { method: 'POST', headers: { ...headers, 'x-api-key': apiKey }, body });
+    assert.equal(response.status, 401, `x-api-key ${JSON.stringify(apiKey)} must be refused`);
+  }
+  const getResponse = await fetch(`${base}/mcp`, { method: 'GET', headers: { 'x-api-key': SECRET } });
+  assert.equal(getResponse.status, 405);
+});
+
 test('add_words then search_words finds the word; a repeat is reported as skipped', SKIP, async () => {
   const added = await call(client, 'add_words', {
     words: [{ nl: 'de fiets', uk: 'велосипед', article: 'de', section: '6.1', example_nl: 'Ik fiets naar school.', example_uk: 'Я їду до школи.' }],

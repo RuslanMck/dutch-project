@@ -1,11 +1,12 @@
 // The /mcp endpoint (Streamable HTTP, stateless). It is mounted before cookie authentication, so it checks its
 // own credentials:
-//   POST /mcp/<MCP_SECRET>            claude.ai connector (secret in the path)
-//   POST /mcp  Authorization: Bearer  Claude Code / scripts (API_TOKEN)
+//   POST /mcp  x-api-key: <MCP_SECRET>             claude.ai connector (request header)
+//   POST /mcp/<MCP_SECRET>                         claude.ai connector (secret in the path; older setups)
+//   POST /mcp  Authorization: Bearer <API_TOKEN>   Claude Code / scripts
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 
-import { hasValidBearerToken, isSameSecret } from '../authentication/secret-comparison.js';
+import { hasValidBearerToken, isSameSecret, readApiKey } from '../authentication/secret-comparison.js';
 
 const MINIMUM_SECRET_LENGTH = 32;
 const METHOD_NOT_ALLOWED_BODY = Object.freeze({
@@ -27,8 +28,9 @@ export function createMcpRoutes({ createMcpServer, mcpSecret, apiToken, logger =
     return hasValidSecret(request.params.secret) ? next() : sendUnauthorized(response);
   }
 
-  function requireBearerToken(request, response, next) {
-    return hasValidBearerToken(request, apiToken) ? next() : sendUnauthorized(response);
+  function requireHeaderCredential(request, response, next) {
+    const isAuthorized = hasValidBearerToken(request, apiToken) || hasValidSecret(readApiKey(request));
+    return isAuthorized ? next() : sendUnauthorized(response);
   }
 
   function hasValidSecret(givenSecret) {
@@ -54,12 +56,12 @@ export function createMcpRoutes({ createMcpServer, mcpSecret, apiToken, logger =
   }
 
   mcpRouter.post('/:secret', requireSecretPath, handleMcpRequest);
-  mcpRouter.post('/', requireBearerToken, handleMcpRequest);
+  mcpRouter.post('/', requireHeaderCredential, handleMcpRequest);
 
   mcpRouter.get('/:secret', requireSecretPath, sendMethodNotAllowed);
   mcpRouter.delete('/:secret', requireSecretPath, sendMethodNotAllowed);
-  mcpRouter.get('/', requireBearerToken, sendMethodNotAllowed);
-  mcpRouter.delete('/', requireBearerToken, sendMethodNotAllowed);
+  mcpRouter.get('/', requireHeaderCredential, sendMethodNotAllowed);
+  mcpRouter.delete('/', requireHeaderCredential, sendMethodNotAllowed);
 
   return mcpRouter;
 }

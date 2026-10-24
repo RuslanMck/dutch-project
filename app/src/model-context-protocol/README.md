@@ -7,7 +7,7 @@ The remote MCP server (Streamable HTTP, stateless) that lets Claude read and wri
 | File | What it does |
 |---|---|
 | `create-mcp-server.js` | Builds an MCP server named `dutch` with the instructions and asks each domain to register its tools. |
-| `mcp-routes.js` | The `/mcp` endpoint: `POST /mcp/<MCP_SECRET>` (claude.ai connector) and `POST /mcp` with the bearer token; other methods get 405. A fresh server per request. |
+| `mcp-routes.js` | The `/mcp` endpoint: `POST /mcp` with `x-api-key: <MCP_SECRET>` (claude.ai connector header) or `Authorization: Bearer <API_TOKEN>` (Claude Code, scripts), and `POST /mcp/<MCP_SECRET>` (secret in the path, older connector setups); other methods get 405. A fresh server per request. |
 | `mcp-instructions.js` | The server instructions: what the database holds and the lesson workflows. |
 | `mcp-tool-registration.js` | `registerJsonTool`: sends a tool's result as JSON text and turns errors into `isError` results; shared annotations. |
 

@@ -6,7 +6,7 @@ Who may use the app: the browser signs in with the password and gets a signed se
 
 | File | What it does |
 |---|---|
-| `secret-comparison.js` | Constant-time comparison of secrets, and reading and checking a bearer token. |
+| `secret-comparison.js` | Constant-time comparison of secrets, and reading a bearer token or an `x-api-key` header. |
 | `session-cookie.js` | `createSessionCookie`: creates, verifies and reads the signed `dutch_session` cookie value (expiry plus HMAC; no server state). |
 | `login-rate-limiter.js` | `createLoginRateLimiter`: refuses logins from an address after 10 failures within 15 minutes. |
 | `authentication-routes.js` | `GET /login`, `POST /auth/login` and `POST /auth/logout`. |

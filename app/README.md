@@ -44,7 +44,9 @@ docker compose run --rm -w /app/data app node /app/scripts/import.js /app/data/s
 ## Connect Claude (MCP)
 
 **claude.ai (also in the mobile app):** Settings → Connectors → Add custom connector. Use the URL
-`https://<your-domain>/mcp/<MCP_SECRET>` and leave OAuth empty. The URL is the password, so don't share it.
+`https://<your-domain>/mcp`, leave OAuth empty, and under **Request headers** add `x-api-key` with your
+`MCP_SECRET` as the value. (claude.ai reserves `Authorization` for OAuth.) Older setups put the secret in the URL instead,
+`https://<your-domain>/mcp/<MCP_SECRET>`, which still works.
 
 **Claude Code:**
 ```

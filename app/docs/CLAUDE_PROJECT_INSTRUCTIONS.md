@@ -2,8 +2,8 @@
 
 Use this instead of `../../project-instructions.md` when your materials live in the self-hosted app rather than in
 an artifact. Prerequisites:
-1. The **Dutch** custom connector is added on claude.ai (Settings → Connectors). Its URL is
-   `https://<your-domain>/mcp/<MCP_SECRET>`, and it is enabled in this Project's chats.
+1. The **Dutch** custom connector is added on claude.ai (Settings → Connectors): URL `https://<your-domain>/mcp`,
+   request header `x-api-key` = your `MCP_SECRET`, and it is enabled in this Project's chats.
 2. Optionally, the skills `dutch-exercise-check` and `dutch-sentence-translation` (MCP versions) are installed.
 
 Copy everything below the line into the Project's **instructions** field.
