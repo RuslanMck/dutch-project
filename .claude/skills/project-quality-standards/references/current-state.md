@@ -35,10 +35,10 @@ before and after. Remove entries from this file as they are fixed.
 
 | Current | Problem | Target |
 |---|---|---|
-| `app.js` (1133 lines, `wc -l` when this was last checked) | All six tabs, state and event binding in one module; `$`, `esc`, `errs`, `ui.cards.idx`, `score.ok/tot` | `scripts/application.js` + `state-store.js` + `tabs/*-tab.js` |
+| `app.js` (1269 lines, `wc -l` when this was last checked) | All six tabs, state and event binding in one module; `$`, `esc`, `errs`, `ui.cards.idx`, `score.ok/tot` | `scripts/application.js` + `state-store.js` + `tabs/*-tab.js` |
 | `logic.js` | Several pure capabilities in one file; `esc` | `scripts/logic/` one module per capability |
 | `api.js` (browser) | Name clashes with `src/api.js` | `scripts/api-client.js` |
-| `app.css` | Short custom properties (`--bg`, `--soft`, `--ok`) and classes (`.del`, `.mh`, `.pat`, `.art`, `.th-btn`, `.sr-only`) | `--color-…` properties, BEM blocks |
+| `app.css` | Short custom properties (`--bg`, `--soft`, `--ok`) and classes (`.del`, `.mh`, `.pat`, `.art`, `.sr-only`) | `--color-…` properties, BEM blocks |
 | `index.html` | ids with abbreviations (`table-q`, `rules-q`, `practice-q`, `practice-btn`, `practice-msg`); JavaScript hooks mixed with styling classes; `<s>` for wrong answers | scoped ids, `data-` hooks, `<del>`/`<ins>` |
 | Renderer | Emits `<b>`, per the handoff | `<strong>` (visual change: none) |
 

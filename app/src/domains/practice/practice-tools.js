@@ -1,6 +1,7 @@
 // MCP adapter for the practice: registers the practice tools. Arguments are parsed by the MCP SDK with the practice
 // contracts; each tool calls the practice, phrase practice or priority service.
 import {
+  addExtraNewWordsInputSchema,
   gradePhraseToolInputSchema,
   gradeWordToolInputSchema,
   importFrequencyListInputSchema,
@@ -27,9 +28,10 @@ export function registerPracticeTools({
   registerJsonTool(mcpServer, 'get_practice_batch', {
     title: 'Get practice batch',
     description: 'Words to practise now for one session: reviews that are due (most overdue first) and new words '
-      + '(at most 10 a day, split by priority). Show each word by its uk and ask for the Dutch; grade the first answer '
-      + 'with grade_word. Returns {session_id, reviews, new_words, counts}, each word {id, uk, nl, article, kind, '
-      + 'state, priority}.',
+      + '(at most 10 a day, split by priority). New words wait while any word is overdue: counts.new_words_blocked '
+      + 'is true then, and they come back once the overdue words are graded. Show each word by its uk and ask for the '
+      + 'Dutch; grade the first answer with grade_word. Returns {session_id, reviews, new_words, counts}, each word '
+      + '{id, uk, nl, article, kind, state, priority}.',
     inputSchema: practiceBatchToolInputSchema.shape,
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, ({ session_id: sessionId, max_reviews: maxReviews }) => practiceService.getPracticeBatch({
@@ -40,9 +42,10 @@ export function registerPracticeTools({
   registerJsonTool(mcpServer, 'grade_word', {
     title: 'Grade word',
     description: 'Record the first answer to a word in this session and schedule its next review. Grades: '
-      + '"good" fully right; "hard" right word with a wrong or missing article, a spelling slip or a synonym; '
-      + '"again" wrong or not known. Only the first grade per word per session counts: a second one is refused. '
-      + '"again" and "hard" also log a word error. Returns {word, grade, state, status, interval_days, next_due_on}.',
+      + '"good" fully right; the article is optional, so a missing or wrong de/het still counts as good (say what the '
+      + 'right article is). "hard" right word with a spelling slip, or a correct Dutch synonym; "again" wrong or not '
+      + 'known. Only the first grade per word per session counts: a second one is refused. "again" and "hard" also '
+      + 'log a word error. Returns {word, grade, state, status, interval_days, next_due_on}.',
     inputSchema: gradeWordToolInputSchema.shape,
   }, ({ id, grade, answer, session_id: sessionId }) => practiceService.gradeWord({
     wordId: id,
@@ -54,7 +57,8 @@ export function registerPracticeTools({
   registerJsonTool(mcpServer, 'get_phrase_batch', {
     title: 'Get phrase batch',
     description: 'Phrases to practise now for one session: phrase reviews that are due (most overdue first) and at '
-      + 'most 5 new phrases a day, oldest first. Show each phrase by its uk and ask for the Dutch; grade the first '
+      + 'most 5 new phrases a day, oldest first. No new phrase is offered while a phrase is overdue '
+      + '(counts.new_phrases_blocked). Show each phrase by its uk and ask for the Dutch; grade the first '
       + 'answer with grade_phrase. Returns {session_id, reviews, new_phrases, counts}, each phrase {id, nl, uk, '
       + 'context, state, status}.',
     inputSchema: practiceBatchToolInputSchema.shape,
@@ -76,6 +80,16 @@ export function registerPracticeTools({
     grade,
     sessionId,
   }));
+
+  registerJsonTool(mcpServer, 'add_extra_new_words', {
+    title: 'Add extra new words',
+    description: 'Give the learner more new words today, on top of the regular 10, when they ask for more (for example '
+      + 'after today\'s words are done: offer "ще 10 нових слів?"). Adds count (1 to 50, default 10) for today only; '
+      + 'it resets tomorrow. Refused while any word is overdue or the regular new words of today are not used up yet. '
+      + 'After a success, call get_practice_batch again with the same session_id to get the words. Returns '
+      + '{extra_new_words_today, new_today_remaining}.',
+    inputSchema: addExtraNewWordsInputSchema.shape,
+  }, ({ count }) => practiceService.addExtraNewWords({ count }));
 
   registerJsonTool(mcpServer, 'set_current_chapter', {
     title: 'Set current chapter',
@@ -128,9 +142,12 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'practice_stats', {
     title: 'Practice statistics',
-    description: 'Practice numbers: reviews due today and tomorrow, words introduced today, New words waiting per '
+    description: 'Practice numbers: reviews due today and tomorrow, overdue words, whether new words are held back by '
+      + 'them (new_words_blocked), words introduced today, extra new words added today, New words waiting per '
       + 'priority, words per state (new, learning, review, relearning) and the share of "good" grades over the last 7 '
-      + 'and 30 days (null when there were none). The phrases key holds the same kind of numbers for phrases.',
+      + 'and 30 days '
+      + '(null when there were none). The phrases key holds the same kind of numbers for phrases, with '
+      + 'new_phrases_blocked.',
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, () => practiceService.calculatePracticeStatistics());
 }

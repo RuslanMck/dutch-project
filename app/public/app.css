@@ -200,7 +200,7 @@ button.ghost {
 
 table.words {
   width: 100%;
-  min-width: 640px;
+  min-width: 420px;
   border-collapse: collapse;
 }
 
@@ -221,26 +221,6 @@ table.words th {
 table.words td.w {
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-
-table.words td.num {
-  text-align: right;
-  color: var(--danger);
-  font-weight: 600;
-}
-
-.th-btn {
-  min-height: 32px;
-  padding: 2px 8px;
-  font-size: 13px;
-  background: transparent;
-  border-color: transparent;
-  color: var(--muted);
-}
-
-.th-btn.on {
-  color: var(--accent);
-  border-color: var(--accent);
 }
 
 .art {
@@ -393,6 +373,11 @@ table.words td.num {
 
 .practice-summary__item:last-child {
   border-bottom: none;
+}
+
+.practice-summary__extra-button {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .practice-restart {

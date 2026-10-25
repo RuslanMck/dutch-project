@@ -1,6 +1,17 @@
 // Chooses which New words enter rotation today, by priority quota, with unused slots going to P1, P2, P3. Pure.
 const PRIORITIES_IN_ORDER = Object.freeze([1, 2, 3]);
 
+// The day's allowance with the extra new words added. The tier quota scales with the number of blocks of newPerDay the
+// effective allowance covers: with newPerDay 10 and 10 extra, two blocks give 14, 4 and 2.
+export function calculateNewWordAllowance({ newPerDay, tierQuota, extraNewWordCount }) {
+  const effectiveNewPerDay = newPerDay + extraNewWordCount;
+  const blockCount = Math.ceil(effectiveNewPerDay / newPerDay);
+  const scaledTierQuota = Object.freeze(Object.fromEntries(
+    PRIORITIES_IN_ORDER.map(priority => [priority, tierQuota[priority] * blockCount]),
+  ));
+  return Object.freeze({ effectiveNewPerDay, scaledTierQuota });
+}
+
 // candidatesByPriority lists are already in queue order. The result lists P1 picks, then P2, then P3.
 export function allocateNewWords({ candidatesByPriority, introducedTodayByPriority, newPerDay, tierQuota }) {
   const introducedTodayCount = PRIORITIES_IN_ORDER.reduce(

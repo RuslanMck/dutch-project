@@ -1,6 +1,6 @@
-// Phrase practice business rules: the batch of phrase reviews and New phrases, grading a phrase once per session and
-// the phrase statistics. Phrases use the word scheduler and day boundary, with no word errors and no priorities.
-// Publishes 'phrases' after each grade.
+// Phrase practice business rules: the batch of phrase reviews and New phrases (held back while a phrase is overdue),
+// grading a phrase once per session and the phrase statistics. Phrases use the word scheduler and day boundary, with no
+// word errors and no priorities. Publishes 'phrases' after each grade.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { deriveLearningStatus, describeCardState, parseCard, serializeCard } from './fsrs-scheduling.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
@@ -16,7 +16,8 @@ export function createPhrasePracticeService({
   clock,
 }) {
   // Phrases due before the start of tomorrow (most overdue first), minus the ones graded in this session, plus the
-  // New phrases the day's allowance still has room for (oldest first).
+  // New phrases the day's allowance still has room for (oldest first). While a phrase is overdue, no New phrase is
+  // offered.
   function getPhraseBatch({ sessionId, maxReviews }) {
     const settings = readActiveSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
@@ -27,21 +28,18 @@ export function createPhrasePracticeService({
       .filter(phrase => isDueBefore(phrase, tomorrowStart) && !gradedPhraseIds.has(phrase.id))
       .sort(compareMostOverdueFirst);
     const reviewPhrases = maxReviews === undefined ? duePhrases : duePhrases.slice(0, maxReviews);
-    const introducedTodayCount = phrasePracticeRepository.countIntroducedOn(today);
-    const newCandidates = phrases
-      .filter(phrase => phrase.fsrs_card === null && !gradedPhraseIds.has(phrase.id))
-      .sort(compareOldestFirst);
-    const newAllowanceCount = Math.max(0, settings.phraseNewPerDay - introducedTodayCount);
-    const newPhrases = newCandidates.slice(0, newAllowanceCount);
+    const newPlan = planNewPhrases({ settings, today, phrases, gradedPhraseIds });
     return {
       session_id: sessionId,
       reviews: reviewPhrases.map(mapToPracticePhrase),
-      new_phrases: newPhrases.map(mapToPracticePhrase),
+      new_phrases: newPlan.offeredPhrases.map(mapToPracticePhrase),
       counts: {
         due: duePhrases.length,
-        introduced_today: introducedTodayCount,
-        new_today_remaining: newAllowanceCount,
-        new_remaining: newCandidates.length - newPhrases.length,
+        overdue: newPlan.overdueCount,
+        introduced_today: newPlan.introducedTodayCount,
+        new_today_remaining: newPlan.allowanceCount,
+        new_remaining: newPlan.newCandidates.length - newPlan.offeredPhrases.length,
+        new_phrases_blocked: newPlan.isBlocked,
       },
     };
   }
@@ -93,7 +91,8 @@ export function createPhrasePracticeService({
     };
   }
 
-  // Due counts for today and tomorrow, phrases introduced today, New phrases waiting, and phrases per state.
+  // Due counts for today and tomorrow, overdue phrases, phrases introduced today, New phrases waiting, and phrases per
+  // state. new_phrases_blocked is judged for a fresh session, with no phrase graded yet.
   function calculatePhraseStatistics() {
     const settings = practiceSettings.readSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
@@ -102,12 +101,37 @@ export function createPhrasePracticeService({
     const phrases = phrasePracticeRepository.listPracticePhrases();
     const stateCounts = { new: 0, learning: 0, review: 0, relearning: 0 };
     for (const phrase of phrases) stateCounts[describeCardState(parseCard(phrase.fsrs_card))] += 1;
+    const newPlan = planNewPhrases({ settings, today, phrases, gradedPhraseIds: new Set() });
     return {
       due_today: phrases.filter(phrase => isDueBefore(phrase, tomorrowStart)).length,
       due_tomorrow: phrases.filter(phrase => isDueWithin(phrase, tomorrowStart, dayAfterTomorrowStart)).length,
-      introduced_today: phrasePracticeRepository.countIntroducedOn(today),
+      overdue: newPlan.overdueCount,
+      introduced_today: newPlan.introducedTodayCount,
       new_remaining: phrases.filter(phrase => phrase.fsrs_card === null).length,
+      new_phrases_blocked: newPlan.isBlocked,
       states: stateCounts,
+    };
+  }
+
+  // The New phrases offered today. Phrases overdue before today hold them back; isBlocked is true only when that holds
+  // back at least one phrase.
+  function planNewPhrases({ settings, today, phrases, gradedPhraseIds }) {
+    const todayStart = findStartOfDay(today, settings.timeZone);
+    const overdueCount = phrases.filter(phrase => isDueBefore(phrase, todayStart)).length;
+    const introducedTodayCount = phrasePracticeRepository.countIntroducedOn(today);
+    const newCandidates = phrases
+      .filter(phrase => phrase.fsrs_card === null && !gradedPhraseIds.has(phrase.id))
+      .sort(compareOldestFirst);
+    const allowanceCount = Math.max(0, settings.phraseNewPerDay - introducedTodayCount);
+    const allowedPhrases = newCandidates.slice(0, allowanceCount);
+    const isBlocked = overdueCount > 0 && allowedPhrases.length > 0;
+    return {
+      overdueCount,
+      introducedTodayCount,
+      allowanceCount,
+      newCandidates,
+      isBlocked,
+      offeredPhrases: isBlocked ? [] : allowedPhrases,
     };
   }
 

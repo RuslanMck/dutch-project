@@ -335,6 +335,64 @@ test('a wrong word grade returns the word with its error count, read after the e
   assert.equal(gradedBody.word.error_count, 1);
 });
 
+// Extra new words over REST, on a fake clock and a database of their own: 409 while today's new words are not all used
+// up (the regular ones, then the extra ones), 400 for a bad body, 200 once they are, and the default count of 10 for an
+// empty body.
+test('POST /api/practice/extra-new-words: 409 until today\'s words are used up, 400 bad body, 200 after', async () => {
+  const extraContext = createTestContext({ clock: { now: () => Date.parse('2026-10-24T12:00:00+02:00') } });
+  const extraApplication = createApplication({
+    configuration,
+    services: extraContext,
+    changeEventBus: extraContext.changeEventBus,
+    clock: extraContext.clock,
+  });
+  const extraServer = extraApplication.listen(0, '127.0.0.1');
+  await once(extraServer, 'listening');
+  try {
+    const extraBase = `http://127.0.0.1:${extraServer.address().port}`;
+    const postExtraNewWords = body => fetch(`${extraBase}/api/practice/extra-new-words`, {
+      method: 'POST',
+      headers: JSON_BEARER,
+      body: JSON.stringify(body),
+    });
+    extraContext.wordService.createWords(Array.from({ length: 30 }, (_, index) => ({
+      nl: `woord ${index + 1}`,
+      uk: `слово ${index + 1}`,
+      section: '6.1',
+    })));
+    extraContext.practiceService.migrateToFsrs({ isDryRun: false });
+
+    assert.equal((await postExtraNewWords({ count: 10 })).status, 409);
+    const batch = extraContext.practiceService.getPracticeBatch({ sessionId: 'http-extra' });
+    for (const word of batch.new_words) {
+      extraContext.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 'http-extra' });
+    }
+    assert.equal((await postExtraNewWords({ count: 0 })).status, 400);
+    assert.equal((await postExtraNewWords({ count: 51 })).status, 400);
+    assert.equal((await postExtraNewWords({ amount: 5 })).status, 400);
+
+    const added = await postExtraNewWords({ count: 10 });
+    assert.equal(added.status, 200);
+    assert.deepEqual(await added.json(), { extra_new_words_today: 10, new_today_remaining: 10 });
+    assert.equal((await postExtraNewWords({})).status, 409);
+    const extraBatch = extraContext.practiceService.getPracticeBatch({ sessionId: 'http-extra-2' });
+    for (const word of extraBatch.new_words) {
+      extraContext.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 'http-extra-2' });
+    }
+    const defaulted = await fetch(`${extraBase}/api/practice/extra-new-words`, { method: 'POST', headers: BEARER });
+    assert.equal(defaulted.status, 200);
+    assert.deepEqual(await defaulted.json(), { extra_new_words_today: 20, new_today_remaining: 10 });
+
+    const stats = await (await fetch(`${extraBase}/api/practice/stats`, { headers: BEARER })).json();
+    assert.equal(stats.extra_new_words_today, 20);
+    assert.equal(stats.overdue, 0);
+    assert.equal(stats.new_words_blocked, false);
+  } finally {
+    extraServer.closeAllConnections();
+    await new Promise(resolve => extraServer.close(resolve));
+  }
+});
+
 test('logout clears the cookie', async () => {
   const r = await fetch(`${base}/auth/logout`, { method: 'POST', ...noRedirect });
   assert.equal(r.status, 303);

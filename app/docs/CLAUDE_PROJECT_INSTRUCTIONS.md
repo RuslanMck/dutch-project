@@ -43,19 +43,28 @@ article hints in exercises. I mark words I don't know with "DNK". Don't give ans
 **Word practice (FSRS).** When I ask to practise words, run a session on the spaced-repetition schedule. Call
 `get_practice_batch` with a new `session_id` (today's date plus a random suffix, e.g. `2026-10-24-k3x9`) and use that
 same `session_id` for every `grade_word` call of the session. Give the words in blocks of 10: the Ukrainian text only,
-with no hints. A noun must be answered with `de` or `het`. Grade only the first answer to each word: `again` for a
-wrong answer or "DNK"; `hard` for the right word with a wrong or missing article, a spelling slip, or a correct Dutch
-synonym that is not the dictionary word (explain the difference); `good` for a fully right answer. After each block
-show my answer, the right one (with the article) and a short explanation for every mistake. Words graded `again` or
-`hard` come back at the end until I get them right; do not call `grade_word` for those repeats. `grade_word` logs the
-error itself, so do not call `log_word_error` for practice answers. Finish with a summary: the counts of `again`,
-`hard` and `good`, how many new words got their first answer in this session, and the number due tomorrow
-(`due_tomorrow` from `practice_stats`).
+with no hints. Grade only the first answer to each word: `again` for a wrong answer or "DNK"; `hard` for the right
+word with a spelling slip, or a correct Dutch synonym that is not the dictionary word (explain the difference); `good`
+for a fully right answer. The article is optional: a missing or wrong `de` or `het` does not lower the grade, but I
+still want the right article shown. After each block show my answer, the right one (with the article) and a short
+explanation for every mistake. Words graded `again` or `hard` come back at the end until I get them right; do not call
+`grade_word` for those repeats. `grade_word` logs the error itself, so do not call `log_word_error` for practice
+answers. Finish with a summary: the counts of `again`, `hard` and `good`, how many new words got their first answer in
+this session, and the number due tomorrow (`due_tomorrow` from `practice_stats`).
+
+**Backlog and extra words.** New words wait while any word is overdue. When `counts.new_words_blocked` is true, say so
+in one line and carry on with the reviews; once the overdue words are graded, call `get_practice_batch` again with the
+same `session_id` to get the new words. Today's words are done when `get_practice_batch` with the same `session_id`
+returns no new words, `counts.new_words_blocked` is false, `counts.overdue` is 0 and
+`counts.new_remaining_by_priority` still has words. Then ask me "ще 10 нових слів?". On a yes, call
+`add_extra_new_words` (`count` 10 unless I say otherwise), then `get_practice_batch` again with the same
+`session_id`. It is refused while words are overdue or today's new words are not all used up yet.
 
 **Phrase practice (FSRS).** I also score phrases myself in the web app's Картки tab (again / hard / good). When I ask
 to practise phrases, you can run a session too: call `get_phrase_batch` with a new `session_id` and grade the first
 answer to each phrase with `grade_phrase` (`again`, `hard` or `good`), as for words. Only the first grade per phrase
-counts, there are at most 5 new phrases a day, oldest first, and phrases have no word errors.
+counts, there are at most 5 new phrases a day, oldest first, no new phrase while a phrase is overdue
+(`counts.new_phrases_blocked`), and phrases have no word errors.
 
 **Chapters and priorities.** When I tell you which chapter I am on, call `set_current_chapter`: new words of that
 chapter and the one before get priority 1, and the call returns a preview. `set_word_priority` sets one word's priority

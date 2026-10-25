@@ -22,7 +22,7 @@ const EXPECTED_TOOLS = [
   'log_word_error', 'list_rules', 'get_rule', 'add_rule', 'update_rule', 'list_mistake_patterns', 'log_mistake',
   'add_phrases', 'list_phrases', 'delete_phrase', 'add_text', 'list_texts', 'get_text',
   'get_practice_batch', 'grade_word', 'set_current_chapter', 'set_word_priority', 'import_frequency_list',
-  'preview_priorities', 'migrate_to_fsrs', 'practice_stats', 'get_phrase_batch', 'grade_phrase',
+  'preview_priorities', 'migrate_to_fsrs', 'practice_stats', 'get_phrase_batch', 'grade_phrase', 'add_extra_new_words',
 ];
 
 const application = createApplication({
@@ -496,5 +496,41 @@ test('grade_word returns the word with its error count, read after the error is 
 
     assert.equal(graded.word.id, added.added[0].id);
     assert.equal(graded.word.error_count, 1);
+  });
+});
+
+test('add_extra_new_words: listed, refused until the regular words are used up, then adds; 10 by default', async () => {
+  await withFreshMcpClient(async freshClient => {
+    const { tools } = await freshClient.listTools();
+    const extraTool = tools.find(tool => tool.name === 'add_extra_new_words');
+    assert.deepEqual(Object.keys(extraTool.inputSchema.properties), ['count']);
+
+    const words = Array.from({ length: 12 }, (_, index) => ({
+      nl: `woord ${index + 1}`,
+      uk: `слово ${index + 1}`,
+      section: '6.1',
+    }));
+    await call(freshClient, 'add_words', { words });
+    await call(freshClient, 'migrate_to_fsrs', { dry_run: false });
+    const refused = await freshClient.callTool({ name: 'add_extra_new_words', arguments: {} });
+    assert.equal(refused.isError, true);
+    assert.match(refused.content[0].text, /not used up yet/);
+
+    const batch = await call(freshClient, 'get_practice_batch', { session_id: 'mcp-extra' });
+    for (const word of batch.new_words) {
+      await call(freshClient, 'grade_word', { id: word.id, grade: 'good', session_id: 'mcp-extra' });
+    }
+    const added = await call(freshClient, 'add_extra_new_words', { count: 2 });
+    assert.deepEqual(added, { extra_new_words_today: 2, new_today_remaining: 2 });
+    const nextBatch = await call(freshClient, 'get_practice_batch', { session_id: 'mcp-extra' });
+    assert.equal(nextBatch.new_words.length, 2);
+
+    // Without any arguments the SDK applies the contract's default: 10 more, so 12 extra for today.
+    for (const word of nextBatch.new_words) {
+      await call(freshClient, 'grade_word', { id: word.id, grade: 'good', session_id: 'mcp-extra' });
+    }
+    const defaulted = await freshClient.callTool({ name: 'add_extra_new_words' });
+    assert.notEqual(defaulted.isError, true, defaulted.content?.[0]?.text);
+    assert.deepEqual(JSON.parse(defaulted.content[0].text), { extra_new_words_today: 12, new_today_remaining: 10 });
   });
 });

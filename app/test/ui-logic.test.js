@@ -15,6 +15,7 @@ import {
   formatDaysAway,
   formatLearningStatus,
   buildNextReviewLine,
+  canOfferExtraNewWords,
   formatShortDate,
 } from '../public/logic.js';
 
@@ -146,24 +147,42 @@ test('gradeTranslationAnswer: word without article is good with the bare word', 
   assert.equal(gradeTranslationAnswer(appel, 'appel').grade, 'good');
 });
 
-test('gradeTranslationAnswer: wrong article on a de/het word is hard and shows the right article', () => {
+test('gradeTranslationAnswer: wrong article on a de/het word is good with the right article named', () => {
   const r = gradeTranslationAnswer(huis, 'de huis');
   assert.equal(r.counted, true);
-  assert.equal(r.grade, 'hard');
-  assert.equal(r.message, 'Слово вірно, але артикль інший. Правильно: het huis');
+  assert.equal(r.grade, 'good');
+  assert.equal(r.message, '✓ Правильно (артикль: het)');
 });
 
-test('gradeTranslationAnswer: missing article on a de/het word is hard and shows the right article', () => {
+test('gradeTranslationAnswer: missing article on a de/het word is good with the right article named', () => {
   const r = gradeTranslationAnswer(huis, 'huis');
   assert.equal(r.counted, true);
-  assert.equal(r.grade, 'hard');
-  assert.equal(r.message, 'Слово вірно, але без артикля. Правильно: het huis');
+  assert.equal(r.grade, 'good');
+  assert.equal(r.message, '✓ Правильно (артикль: het)');
+  assert.equal(gradeTranslationAnswer({ nl: 'kat', uk: 'кіт', article: 'de' }, 'kat').message, '✓ Правильно (артикль: de)');
 });
 
-test('gradeTranslationAnswer: extra article on a word without article is hard', () => {
+test('gradeTranslationAnswer: right article on a de/het word is good with the plain message', () => {
+  const r = gradeTranslationAnswer(huis, 'het huis');
+  assert.deepEqual(r, { counted: true, grade: 'good', message: '✓ Правильно' });
+});
+
+test('gradeTranslationAnswer: article typed on a word without article is good with the plain message', () => {
   const r = gradeTranslationAnswer(appel, 'de appel');
+  assert.deepEqual(r, { counted: true, grade: 'good', message: '✓ Правильно' });
+});
+
+test('gradeTranslationAnswer: a wrong article with a spelling slip is hard, not good', () => {
+  const r = gradeTranslationAnswer(huis, 'de huiz');
   assert.equal(r.grade, 'hard');
-  assert.equal(r.message, 'Слово вірно, але артикль зайвий. Правильно: appel');
+  assert.equal(r.message, 'Майже, перевір літери. Правильно: het huis');
+});
+
+test('gradeTranslationAnswer: an expression that starts with het is compared in full', () => {
+  const expression = { nl: 'het is goed', uk: 'це добре', article: '' };
+  assert.deepEqual(gradeTranslationAnswer(expression, 'het is goed'), { counted: true, grade: 'good', message: '✓ Правильно' });
+  assert.equal(gradeTranslationAnswer(expression, 'het is goet').grade, 'hard');
+  assert.equal(gradeTranslationAnswer(expression, 'is goed').grade, 'again');
 });
 
 test('gradeTranslationAnswer: one letter off is hard, with or without article', () => {
@@ -298,4 +317,12 @@ test('formatShortDate: ISO date to day.month, empty without a date', () => {
   assert.equal(formatShortDate(null), '');
   assert.equal(formatShortDate(undefined), '');
   assert.equal(formatShortDate('25.10.2026'), '');
+});
+
+test('canOfferExtraNewWords: only while the gate is open and New words remain today', () => {
+  assert.equal(canOfferExtraNewWords({ newWordsBlocked: false, newRemainingByPriority: { 1: 0, 2: 2, 3: 0 } }), true);
+  assert.equal(canOfferExtraNewWords({ newWordsBlocked: false, newRemainingByPriority: { 1: 0, 2: 0, 3: 0 } }), false);
+  assert.equal(canOfferExtraNewWords({ newWordsBlocked: true, newRemainingByPriority: { 1: 4, 2: 0, 3: 0 } }), false);
+  assert.equal(canOfferExtraNewWords({ newWordsBlocked: false, newRemainingByPriority: {} }), false);
+  assert.equal(canOfferExtraNewWords({ newWordsBlocked: undefined, newRemainingByPriority: undefined }), false);
 });

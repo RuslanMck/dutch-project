@@ -3,6 +3,7 @@
 import * as api from './api.js';
 import {
   buildNextReviewLine,
+  canOfferExtraNewWords,
   checkAnswer,
   esc,
   formatDutchWithArticle,
@@ -39,6 +40,12 @@ const GRADE_LABEL = { again: 'Знову', hard: 'Важко', good: 'Добре
 const PRACTICE_SESSION_KEY = 'practice-session-id';
 // Statuses of the FSRS practice in which a visit to the practice tab fetches a new batch.
 const FSRS_LOAD_STATUSES = ['idle', 'failed', 'unconfigured'];
+// The summary's "Хочете ще 10 нових слів?" asks for this many extra New words.
+const EXTRA_NEW_WORD_COUNT = 10;
+// Shown when the queue ran out and the batch, asked again, brought New words.
+const QUEUE_REFILLED_MESSAGE = 'Повторення завершено — далі нові слова дня.';
+// Shown when the server refuses extra New words and the batch brings none.
+const EXTRA_NEW_WORDS_REFUSED_MESSAGE = 'Зараз додати нові слова не можна.';
 
 const $ = id => document.getElementById(id);
 
@@ -47,7 +54,7 @@ const state = { words: [], topics: [], rules: [], patterns: [], phrases: [], tex
 const ui = {
   tab: 'table',
   armed: null,                       // { kind: 'phrase', id }: the phrase row waiting for a second click on delete
-  table: { q: '', topic: '', sortErrors: false },
+  table: { q: '', topic: '' },
   // Cards: 'words' shows today's practice batch without grades; 'phrases' grades like the practice does.
   cards: {
     mode: 'words',
@@ -56,6 +63,7 @@ const ui = {
     // words.index is the card on screen; past the last card the batch is finished.
     words: { status: 'idle', deck: [], index: 0 },
     // queue: phrases still to show; answered: ids whose first grade was posted; tally counts first grades by grade.
+    // pendingGradePosts: grade posts still in flight; the next batch request waits for them.
     // calendarDate: the Amsterdam day the batch was loaded for. revealed / grade / repeat / message describe the card.
     phrases: {
       status: 'idle',
@@ -63,6 +71,7 @@ const ui = {
       calendarDate: '',
       queue: [],
       answered: new Set(),
+      pendingGradePosts: new Set(),
       tally: { again: 0, hard: 0, good: 0 },
       revealed: false,
       grade: null,
@@ -74,16 +83,20 @@ const ui = {
   // FSRS translation practice. status: idle | loading | ready | done | unconfigured | failed.
   // queue: batch words still to answer (reviews, then new words; again/hard words go to the end).
   // answered: word ids whose first answer was posted; tally counts first answers by grade.
+  // pendingGradePosts: answer posts still in flight; the next batch request waits for them.
   fsrs: {
     status: 'idle',
     sessionId: '',
     queue: [],
     answered: new Set(),
+    pendingGradePosts: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
     introducedCount: 0,
     current: null,                   // { word, checked, grade, repeat, schedule }
     feedback: null,
     dueTomorrow: null,
+    newWordsBlocked: false,          // the latest batch held New words back for overdue reviews
+    newRemainingByPriority: {},      // the latest batch: New words left after this batch, by priority
   },
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
@@ -131,6 +144,13 @@ async function act(fn, keys = []) {
   } catch (error) {
     notice(error.message || 'Помилка');
   }
+}
+
+// A grade post stays in its pending set until it settles, so the next batch request can wait for it.
+function trackPendingPost(pendingPosts, post) {
+  const settle = () => pendingPosts.delete(post);
+  pendingPosts.add(post);
+  post.then(settle, settle);
 }
 
 // "i" buttons: aria-expanded says whether the text block named by aria-controls is open.
@@ -201,21 +221,18 @@ function syncTopicOptions() {
 }
 
 function renderTable() {
-  const { q, topic, sortErrors } = ui.table;
+  const { q, topic } = ui.table;
   syncTopicOptions();
   const nq = normalise(q);
   const rows = state.words
     .filter(word => (!topic || word.topic === topic) &&
       (!nq || normalise(word.nl).includes(nq) || normalise(word.uk).includes(nq)))
-    .sort((a, b) => (sortErrors ? errs(b) - errs(a) : 0) || a.added_at - b.added_at);
-
-  $('sort-errors').setAttribute('aria-pressed', String(sortErrors));
-  $('sort-errors').classList.toggle('on', sortErrors);
+    .sort((a, b) => a.added_at - b.added_at);
 
   const body = $('words-body');
   if (!rows.length) {
     const emptyMessage = state.words.length ? 'Нічого не знайдено.' : 'Слів поки немає.';
-    body.innerHTML = `<tr><td colspan="8" class="empty">${emptyMessage}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty">${emptyMessage}</td></tr>`;
     return;
   }
   body.innerHTML = rows.map(word => {
@@ -225,8 +242,6 @@ function renderTable() {
       <td class="w">${word.article ? `<span class="art">${esc(word.article)}</span> ` : ''}${esc(word.nl)}</td>
       <td>${esc(word.section || '')}</td>
       <td>${esc(word.uk)}</td>
-      <td class="num">${word.error_count || ''}</td>
-      <td><span class="status st-${esc(word.status)}">${esc(STATUS_LABEL[word.status] || word.status)}</span></td>
       <td>${nextDateCell}</td>
       <td>${word.priority ? `P${esc(word.priority)}` : ''}</td>
       <td><button class="del" type="button" data-act="wdel" data-id="${word.id}" aria-label="Видалити слово ${esc(word.nl)}">×</button></td>
@@ -274,6 +289,7 @@ async function loadCardPhrases(sessionId) {
     calendarDate: formatTodayInAmsterdam(),
     queue: [],
     answered: new Set(),
+    pendingGradePosts: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
     revealed: false,
     grade: null,
@@ -431,7 +447,7 @@ function gradeCardPhrase(grade, isSkip) {
     phrases.answered.add(phrase.id);
     phrases.tally[grade] += 1;
     phrases.message = `${isSkip ? 'Не знаю. ' : ''}Записано: ${GRADE_LABEL[grade]}`;
-    postPhraseGrade(phrase, grade);
+    trackPendingPost(phrases.pendingGradePosts, postPhraseGrade(phrase, grade));
   }
   renderCards();
   // The grade buttons are hidden now; «Далі» is the next action.
@@ -467,12 +483,44 @@ async function postPhraseGrade(phrase, grade) {
 }
 
 // "Далі" after a grade: a phrase graded good leaves the queue; any other phrase comes back at the end.
+// When the deck runs out, the phrase batch is asked again.
 function advanceCardPhrase() {
   const phrases = ui.cards.phrases;
   if (!phrases.queue.length || phrases.grade === null) return;
   const phrase = phrases.queue.shift();
   if (phrases.grade !== 'good') phrases.queue.push(phrase);
   Object.assign(phrases, { revealed: false, grade: null, repeat: false, message: '' });
+  if (!phrases.queue.length) {
+    refillCardPhrases();
+    return;
+  }
+  renderCards();
+}
+
+// The end of the phrase deck: the batch is asked again with the same session. New phrases that were unlocked continue
+// the deck; without them the end message stays.
+async function refillCardPhrases() {
+  const phrases = ui.cards.phrases;
+  const sessionId = phrases.sessionId;
+  phrases.status = 'loading';
+  renderCards();
+  // The last grade must be stored first: the batch leaves out phrases graded today, and the gate reads the store.
+  await Promise.allSettled([...phrases.pendingGradePosts]);
+  if (ui.cards.phrases.sessionId !== sessionId) return;
+  let batch;
+  try {
+    batch = await api.getPhraseBatch(sessionId);
+  } catch (error) {
+    if (ui.cards.phrases.sessionId === sessionId) {
+      phrases.status = 'ready';
+      notice(error.message || 'Помилка');
+      renderCards();
+    }
+    return;
+  }
+  if (ui.cards.phrases.sessionId !== sessionId) return;
+  phrases.queue = batch.new_phrases.filter(phrase => !phrases.answered.has(phrase.id));
+  phrases.status = 'ready';
   renderCards();
 }
 
@@ -563,16 +611,20 @@ async function loadFsrsBatch(sessionId) {
     queue: [],
     answered: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
+    pendingGradePosts: new Set(),
     introducedCount: 0,
     current: null,
     feedback: null,
     dueTomorrow: null,
+    newWordsBlocked: false,
+    newRemainingByPriority: {},
   });
   renderPractice();
   try {
     const batch = await api.getPracticeBatch(sessionId);
     session.queue = [...batch.reviews, ...batch.new_words];
     session.status = 'ready';
+    rememberFsrsBatchCounts(batch);
     showNextFsrsWord();
   } catch (error) {
     if (error.status === 409) {
@@ -585,19 +637,99 @@ async function loadFsrsBatch(sessionId) {
   renderPractice();
 }
 
-// Shows the first word of the queue, or ends the session when the queue is empty.
+// The gate line and the summary button read these from the latest batch.
+function rememberFsrsBatchCounts(batch) {
+  ui.fsrs.newWordsBlocked = batch.counts?.new_words_blocked === true;
+  ui.fsrs.newRemainingByPriority = batch.counts?.new_remaining_by_priority ?? {};
+}
+
+// Shows the first word of the queue. An empty queue asks the batch again with the same session id: the gate may have
+// opened, or extra New words may have been added. The session ends only when that brings no New words.
 function showNextFsrsWord() {
   const session = ui.fsrs;
   session.feedback = null;
-  if (!session.queue.length) {
-    session.current = null;
-    session.status = 'done';
-    // The finished session stays on screen; the next visit gets a fresh session id.
-    saveSession(createSessionId());
-    loadDueTomorrow();
+  if (session.queue.length) {
+    session.current = { word: session.queue[0], checked: false, grade: null, repeat: false, schedule: null };
     return;
   }
-  session.current = { word: session.queue[0], checked: false, grade: null, repeat: false, schedule: null };
+  session.current = null;
+  refillFsrsQueue(QUEUE_REFILLED_MESSAGE);
+}
+
+// Asks the batch again with the same session id. New words that came back continue the session, with continueMessage
+// when given; without them the session ends and the summary shows. Resolves to true when the session continued.
+async function refillFsrsQueue(continueMessage = '') {
+  const session = ui.fsrs;
+  const sessionId = session.sessionId;
+  session.current = null;
+  session.status = 'loading';
+  renderPractice();
+  // The last answer must be stored first: the batch leaves out words graded today, and the gate reads the store.
+  await Promise.allSettled([...session.pendingGradePosts]);
+  if (ui.fsrs.sessionId !== sessionId) return false;
+  let batch;
+  try {
+    batch = await api.getPracticeBatch(sessionId);
+  } catch (error) {
+    if (ui.fsrs.sessionId !== sessionId) return false;
+    if (error.status === 409) {
+      session.status = 'unconfigured';
+    } else {
+      session.status = 'failed';
+      notice(error.message || 'Помилка');
+    }
+    renderPractice();
+    return false;
+  }
+  if (ui.fsrs.sessionId !== sessionId) return false;
+  rememberFsrsBatchCounts(batch);
+  // A word answered in this session never comes back as a question, even if the batch still lists it.
+  const newWords = batch.new_words.filter(word => !session.answered.has(word.id));
+  if (!newWords.length) {
+    finishFsrsSession();
+    return false;
+  }
+  session.queue.push(...newWords);
+  session.status = 'ready';
+  // The session continues, so its id stays the stored one (finishing replaced it).
+  saveSession(sessionId);
+  showNextFsrsWord();
+  session.feedback = continueMessage ? { text: continueMessage, ok: true } : null;
+  renderPractice();
+  return true;
+}
+
+// Nothing is left to answer: the summary shows. The stored session id is replaced, so the next visit gets a fresh
+// batch.
+function finishFsrsSession() {
+  const session = ui.fsrs;
+  session.current = null;
+  session.status = 'done';
+  saveSession(createSessionId());
+  loadDueTomorrow();
+  renderPractice();
+}
+
+// The summary's "Хочете ще 10 нових слів?": the server raises today's quota, then the batch is asked again. A refused
+// request (409) is not shown as an error: whatever is available continues, and only when nothing comes back does the
+// summary stay with a notice.
+async function handleExtraNewWordsClick() {
+  const button = $('practice-extra-words-button');
+  button.disabled = true;
+  let refused = false;
+  try {
+    await api.addExtraNewWords({ count: EXTRA_NEW_WORD_COUNT });
+  } catch (error) {
+    if (error.status !== 409) {
+      notice(error.message || 'Помилка');
+      return;
+    }
+    refused = true;
+  } finally {
+    button.disabled = false;
+  }
+  const isContinued = await refillFsrsQueue(refused ? QUEUE_REFILLED_MESSAGE : '');
+  if (refused && !isContinued && ui.fsrs.status === 'done') notice(EXTRA_NEW_WORDS_REFUSED_MESSAGE);
 }
 
 // A deleted word leaves the practice at once, so the session never asks for it again. When it is the question on
@@ -669,7 +801,7 @@ function answerFsrsWord(result, answer) {
     session.answered.add(word.id);
     session.tally[result.grade] += 1;
     if (word.state === 'new') session.introducedCount += 1;
-    postFsrsGrade(current, answer);
+    trackPendingPost(session.pendingGradePosts, postFsrsGrade(current, answer));
   }
   renderPractice();
 }
@@ -779,6 +911,7 @@ function renderArticlePractice() {
   $('practice-skip-button').hidden = true;
   $('practice-schedule').textContent = '';
   $('practice-progress').textContent = '';
+  $('practice-gate').hidden = true;
   $('practice-summary').hidden = true;
   $('practice-restart-button').hidden = true;
   setPracticeMessage(practice.feedback);
@@ -819,9 +952,15 @@ function renderFsrsPractice() {
     $('practice-input').placeholder = 'нідерландською';
   }
   $('practice-progress').textContent = isReady ? `Залишилось: ${session.queue.length}` : '';
+  const isGateShown = session.newWordsBlocked && (isReady || session.status === 'done');
+  $('practice-gate').hidden = !isGateShown;
   $('practice-schedule').textContent = formatScheduleLine(current);
   $('practice-score').textContent = '';
   $('practice-summary').hidden = session.status !== 'done';
+  $('practice-extra-words-button').hidden = session.status !== 'done' || !canOfferExtraNewWords({
+    newWordsBlocked: session.newWordsBlocked,
+    newRemainingByPriority: session.newRemainingByPriority,
+  });
   $('practice-restart-button').hidden = session.status !== 'done' && session.status !== 'failed';
   setPracticeMessage(session.feedback);
   if (session.status === 'done') renderPracticeSummary();
@@ -1003,10 +1142,6 @@ function bindEvents() {
     ui.table.topic = event.target.value;
     renderTable();
   });
-  $('sort-errors').addEventListener('click', () => {
-    ui.table.sortErrors = !ui.table.sortErrors;
-    renderTable();
-  });
   $('words-body').addEventListener('click', event => {
     const button = event.target.closest('button[data-act="wdel"]');
     if (!button) return;
@@ -1069,6 +1204,7 @@ function bindEvents() {
     if (word) askDeleteWord(word, () => deleteWordEverywhere(word.id));
   });
   $('practice-restart-button').addEventListener('click', restartFsrsSession);
+  $('practice-extra-words-button').addEventListener('click', handleExtraNewWordsClick);
 
   // Правила
   $('rules-q').addEventListener('input', event => {

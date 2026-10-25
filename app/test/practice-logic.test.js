@@ -13,7 +13,7 @@ import {
   parseCard,
   serializeCard,
 } from '../src/domains/practice/fsrs-scheduling.js';
-import { allocateNewWords } from '../src/domains/practice/new-word-allocation.js';
+import { allocateNewWords, calculateNewWordAllowance } from '../src/domains/practice/new-word-allocation.js';
 import {
   addDaysToCalendarDate,
   findStartOfDay,
@@ -357,4 +357,45 @@ test('allocateNewWords: never more words than candidates exist', () => {
     tierQuota: { 1: 7, 2: 2, 3: 1 },
   });
   assert.deepEqual(selectedWords.map(word => word.id), [100]);
+});
+
+test('calculateNewWordAllowance: no extra words keeps 10 a day and 7, 2, 1', () => {
+  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, extraNewWordCount: 0 });
+  assert.deepEqual(allowance, { effectiveNewPerDay: 10, scaledTierQuota: { 1: 7, 2: 2, 3: 1 } });
+});
+
+test('calculateNewWordAllowance: each block of 10 scales the tier quota, so 10 extra gives 20 and 14, 4, 2', () => {
+  const allowance = calculateNewWordAllowance({
+    newPerDay: 10,
+    tierQuota: { 1: 7, 2: 2, 3: 1 },
+    extraNewWordCount: 10,
+  });
+  assert.deepEqual(allowance, { effectiveNewPerDay: 20, scaledTierQuota: { 1: 14, 2: 4, 3: 2 } });
+});
+
+test('calculateNewWordAllowance: a partly used block still counts as a block (11 gives two blocks)', () => {
+  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, extraNewWordCount: 1 });
+  assert.deepEqual(allowance, { effectiveNewPerDay: 11, scaledTierQuota: { 1: 14, 2: 4, 3: 2 } });
+  const fourBlocks = calculateNewWordAllowance({
+    newPerDay: 10,
+    tierQuota: { 1: 7, 2: 2, 3: 1 },
+    extraNewWordCount: 21,
+  });
+  assert.deepEqual(fourBlocks, { effectiveNewPerDay: 31, scaledTierQuota: { 1: 28, 2: 8, 3: 4 } });
+});
+
+test('allocateNewWords with the scaled quota: 20 effective, 10 introduced 7, 2, 1, the next 10 split 7, 2, 1', () => {
+  const allowance = calculateNewWordAllowance({
+    newPerDay: 10,
+    tierQuota: { 1: 7, 2: 2, 3: 1 },
+    extraNewWordCount: 10,
+  });
+  const selectedWords = allocateNewWords({
+    candidatesByPriority: { 1: createCandidates(1, 20), 2: createCandidates(2, 20), 3: createCandidates(3, 20) },
+    introducedTodayByPriority: { 1: 7, 2: 2, 3: 1 },
+    newPerDay: allowance.effectiveNewPerDay,
+    tierQuota: allowance.scaledTierQuota,
+  });
+  assert.equal(selectedWords.length, 10);
+  assert.deepEqual(countByPriority(selectedWords), [7, 2, 1]);
 });

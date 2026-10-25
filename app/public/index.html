@@ -82,8 +82,6 @@
               <th scope="col">Слово</th>
               <th scope="col">Глава</th>
               <th scope="col">Переклад</th>
-              <th scope="col"><button id="sort-errors" class="th-btn" type="button" aria-pressed="false">Помилки ↓</button></th>
-              <th scope="col">Статус</th>
               <th scope="col">Наступне</th>
               <th scope="col">Пріоритет</th>
               <th scope="col"><span class="sr-only">Видалити</span></th>
@@ -161,10 +159,13 @@
           </svg>
         </button>
       </div>
+      <p id="practice-gate" class="hint" role="status" hidden>Нові слова з'являться, коли ви повторите всі прострочені слова.</p>
       <p id="practice-progress-hint" class="hint" hidden>Скільки слів залишилось у сьогоднішній сесії, разом зі словами, які ви пропустили — вони повертаються в кінці, тому число може зростати.</p>
       <p id="practice-score" class="muted"></p>
       <section id="practice-summary" class="practice-summary" aria-label="Підсумок сесії" hidden>
         <ul id="practice-summary-list" class="practice-summary__list"></ul>
+        <button id="practice-extra-words-button" class="primary practice-summary__extra-button" type="button"
+          hidden>Хочете ще 10 нових слів?</button>
       </section>
       <button id="practice-restart-button" class="primary practice-restart" type="button" hidden>Почати знову</button>
     </section>

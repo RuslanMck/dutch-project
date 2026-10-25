@@ -1,5 +1,6 @@
-// Practice business rules: the batch of reviews and new words, grading a word once per session, the one-time migration
-// to FSRS and the practice statistics. Publishes 'words' after each write.
+// Practice business rules: the batch of reviews and new words (with the backlog gate and the extra new words), grading
+// a word once per session, the one-time migration to FSRS and the practice statistics. Publishes 'words' after each
+// write.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { mapBlankTextToNull } from '../blank-text.js';
 import {
@@ -9,9 +10,8 @@ import {
   parseCard,
   serializeCard,
 } from './fsrs-scheduling.js';
-import { allocateNewWords } from './new-word-allocation.js';
+import { calculateNewWordAllowance } from './new-word-allocation.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
-import { compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
 
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
 const FSRS_ALREADY_SET_UP_MESSAGE = 'FSRS practice is already set up: migrate_to_fsrs has run';
@@ -20,10 +20,10 @@ const LEARNED_MIGRATION_DAY_COUNT = 21;
 const SHORT_GOOD_SHARE_DAY_COUNT = 7;
 const LONG_GOOD_SHARE_DAY_COUNT = 30;
 const GOOD_SHARE_DECIMAL_PLACES = 3;
-const PRIORITY_VALUES = Object.freeze([1, 2, 3]);
 
 export function createPracticeService({
   practiceRepository,
+  newWordPlanner,
   practiceSettings,
   priorityService,
   wordService,
@@ -33,34 +33,52 @@ export function createPracticeService({
   changeEventBus,
   clock,
 }) {
-  // The words to practise now: reviews due before tomorrow (most overdue first) and the New words allowed today.
-  // Words already graded in this session are left out.
+  // The words to practise now: reviews due before tomorrow (most overdue first) and the New words allowed today. New
+  // words wait while any word is overdue. Words already graded in this session are left out.
   function getPracticeBatch({ sessionId, maxReviews }) {
     const settings = readActiveSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession(sessionId));
     const dueWordIds = listWordIdsDueToday(today, settings.timeZone).filter(wordId => !gradedWordIds.has(wordId));
     const reviewWordIds = maxReviews === undefined ? dueWordIds : dueWordIds.slice(0, maxReviews);
-    const introducedTodayByPriority = practiceRepository.countIntroducedOnByPriority(today);
-    const introducedTodayCount = sumCounts(introducedTodayByPriority);
-    const candidatesByPriority = groupNewWordCandidatesByPriority(gradedWordIds);
-    const chosenCandidates = allocateNewWords({
-      candidatesByPriority,
-      introducedTodayByPriority,
-      newPerDay: settings.newPerDay,
-      tierQuota: settings.tierQuota,
-    });
+    const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds });
     return {
       session_id: sessionId,
       reviews: reviewWordIds.map(wordId => mapToPracticeWord(getPracticeWordRowOrThrow(wordId))),
-      new_words: chosenCandidates.map(candidate => mapToPracticeWord(candidate.word)),
+      new_words: newWordPlan.offeredCandidates.map(candidate => mapToPracticeWord(candidate.word)),
       counts: {
         due: dueWordIds.length,
-        introduced_today: introducedTodayCount,
-        new_today_remaining: Math.max(0, settings.newPerDay - introducedTodayCount),
-        new_remaining_by_priority: countRemainingCandidates(candidatesByPriority, chosenCandidates),
+        overdue: newWordPlan.overdueCount,
+        introduced_today: newWordPlan.introducedTodayCount,
+        new_today_remaining: newWordPlan.newTodayRemainingCount,
+        new_remaining_by_priority: newWordPlan.remainingByPriority,
+        new_words_blocked: newWordPlan.isBlocked,
       },
     };
+  }
+
+  // Adds `count` extra New words for today on top of the regular allowance. Refused while a word is overdue, and while
+  // today's New words are not all introduced yet. The extra count resets on the next calendar day.
+  function addExtraNewWords({ count }) {
+    const settings = readActiveSettings();
+    const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
+    const addResult = runInTransaction(() => {
+      const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
+      newWordPlanner.assertExtraNewWordsAllowed({ newWordPlan });
+      const extraNewWordCount = newWordPlanner.countExtraNewWordsOn(settings, today) + count;
+      practiceSettings.saveExtraNewWords({ calendarDate: today, count: extraNewWordCount });
+      const { effectiveNewPerDay } = calculateNewWordAllowance({
+        newPerDay: settings.newPerDay,
+        tierQuota: settings.tierQuota,
+        extraNewWordCount,
+      });
+      return {
+        extra_new_words_today: extraNewWordCount,
+        new_today_remaining: Math.max(0, effectiveNewPerDay - newWordPlan.introducedTodayCount),
+      };
+    });
+    changeEventBus.publishChange('words');
+    return addResult;
   }
 
   // Grades a word's first answer in a session. Again and hard are logged as word errors. Returns the word's new state.
@@ -134,8 +152,8 @@ export function createPracticeService({
     return summarizeMigration(plan, { isDryRun: false });
   }
 
-  // Due counts, introductions, New words per priority, words per state and the good share of the last 7 and 30 days.
-  // The phrases' own counts are added under phrases.
+  // Due counts, overdue words, introductions, New words per priority, words per state and the good share of the last 7
+  // and 30 days. The phrases' own counts are added under phrases.
   function calculatePracticeStatistics() {
     const settings = practiceSettings.readSettings();
     const timestamp = clock.now();
@@ -149,11 +167,15 @@ export function createPracticeService({
       stateCounts[describeCardState(parseCard(word.fsrs_card))] += 1;
       if (word.fsrs_card === null) newCounts[word.priority] += 1;
     }
+    const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
     return {
       due_today: listWordIdsDueToday(today, settings.timeZone).length,
       due_tomorrow: words.filter(word => word.due_at !== null && word.due_at >= tomorrowStart
         && word.due_at < dayAfterTomorrowStart).length,
-      introduced_today: sumCounts(practiceRepository.countIntroducedOnByPriority(today)),
+      overdue: newWordPlan.overdueCount,
+      introduced_today: newWordPlan.introducedTodayCount,
+      new_words_blocked: newWordPlan.isBlocked,
+      extra_new_words_today: newWordPlanner.countExtraNewWordsOn(settings, today),
       new_remaining_by_priority: newCounts,
       states: stateCounts,
       good_share_7_days: calculateGoodShareSince(today, SHORT_GOOD_SHARE_DAY_COUNT, settings.timeZone),
@@ -171,16 +193,6 @@ export function createPracticeService({
   function listWordIdsDueToday(today, timeZone) {
     const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), timeZone);
     return practiceRepository.listDueWordIds(tomorrowStart);
-  }
-
-  function groupNewWordCandidatesByPriority(gradedWordIds) {
-    const candidates = practiceRepository.listPracticeWords()
-      .filter(word => word.fsrs_card === null && !gradedWordIds.has(word.id))
-      .map(mapToQueueCandidate)
-      .sort(compareQueueOrder);
-    const candidatesByPriority = { 1: [], 2: [], 3: [] };
-    for (const candidate of candidates) candidatesByPriority[candidate.priority].push(candidate);
-    return candidatesByPriority;
   }
 
   function getPracticeWordRowOrThrow(wordId) {
@@ -201,6 +213,7 @@ export function createPracticeService({
 
   return Object.freeze({
     getPracticeBatch,
+    addExtraNewWords,
     gradeWord,
     migrateToFsrs,
     calculatePracticeStatistics,
@@ -217,29 +230,6 @@ function mapToPracticeWord(wordRow) {
     state: describeCardState(parseCard(wordRow.fsrs_card)),
     priority: wordRow.priority,
   };
-}
-
-function mapToQueueCandidate(wordRow) {
-  return {
-    id: wordRow.id,
-    priority: wordRow.priority,
-    chapterNumber: parseChapterNumber(wordRow.section_code),
-    frequencyRank: wordRow.frequency_rank,
-    word: wordRow,
-  };
-}
-
-function countRemainingCandidates(candidatesByPriority, chosenCandidates) {
-  const remainingCounts = {};
-  for (const priority of PRIORITY_VALUES) {
-    const chosenCount = chosenCandidates.filter(candidate => candidate.priority === priority).length;
-    remainingCounts[priority] = candidatesByPriority[priority].length - chosenCount;
-  }
-  return remainingCounts;
-}
-
-function sumCounts(countByPriority) {
-  return PRIORITY_VALUES.reduce((total, priority) => total + (countByPriority[priority] ?? 0), 0);
 }
 
 // Learning words are spread over the next four days, most errors first; learned words are due in 21 days; new words

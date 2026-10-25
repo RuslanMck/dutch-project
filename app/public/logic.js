@@ -94,10 +94,10 @@ export function revealTranslationAnswer(word) {
 }
 
 // FSRS translation check: the learner types the Dutch for a Ukrainian word.
-// Returns { counted, grade, message }. grade is 'good' (fully right), 'hard' (right word with a wrong, missing or
-// extra article, or one letter off) or 'again' (anything else, including "DNK"). counted=false means nothing is graded.
-// Punctuation, typographic quotes and extra spaces are ignored on both sides (normalizeAnswerText); the message
-// shows the word as stored.
+// Returns { counted, grade, message }. grade is 'good' (the word is right; the article is optional), 'hard' (one
+// letter off) or 'again' (anything else, including "DNK"). counted=false means nothing is graded.
+// The article never changes the grade: a missing or wrong de/het with the right word is 'good', and the message names
+// the right article. Punctuation, typographic quotes and extra spaces are ignored on both sides (normalizeAnswerText).
 export function gradeTranslationAnswer(word, input) {
   const normalizedInput = normalizeAnswerText(input);
   const normalizedTarget = normalizeAnswerText(word.nl);
@@ -107,24 +107,33 @@ export function gradeTranslationAnswer(word, input) {
   if (!normalizedInput) return { counted: false, grade: null, message: 'Напиши відповідь нідерландською' };
   // Checked before the fuzzy match: "dnk" is three letters and would otherwise be one letter off some words.
   if (normalizedInput === 'dnk') return revealTranslationAnswer(word);
+  // The full text comes first: an expression whose own text starts with de or het has no article field.
   if (normalizedInput === normalizeAnswerText(right)) return { counted: true, grade: 'good', message: '✓ Правильно' };
 
-  // Optional leading article in the typed answer.
   const articleMatch = normalizedInput.match(/^(de|het) (.+)$/);
   const typedArticle = articleMatch ? articleMatch[1] : '';
   const rest = articleMatch ? articleMatch[2] : normalizedInput;
 
   if (rest === normalizedTarget) {
-    let problem = 'без артикля';
-    if (!article) problem = 'артикль зайвий';
-    else if (typedArticle) problem = 'артикль інший';
-    return { counted: true, grade: 'hard', message: `Слово вірно, але ${problem}. Правильно: ${right}` };
+    // A word without an article typed with one is simply right; a missing or wrong article is named.
+    const isArticleMissingOrWrong = article !== '' && typedArticle !== article;
+    if (!isArticleMissingOrWrong) return { counted: true, grade: 'good', message: '✓ Правильно' };
+    return { counted: true, grade: 'good', message: `✓ Правильно (артикль: ${article})` };
   }
 
-  if (levenshtein(rest, normalizedTarget) <= 1) {
+  // Both readings are compared, so an expression that starts with de or het is not cut before the comparison.
+  const distance = Math.min(levenshtein(rest, normalizedTarget), levenshtein(normalizedInput, normalizedTarget));
+  if (distance <= 1) {
     return { counted: true, grade: 'hard', message: `Майже, перевір літери. Правильно: ${right}` };
   }
   return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
+}
+
+// The "Хочете ще 10 нових слів?" button of the practice summary: only while the gate is open and New words remain
+// today.
+export function canOfferExtraNewWords({ newWordsBlocked, newRemainingByPriority }) {
+  const newRemainingCount = Object.values(newRemainingByPriority ?? {}).reduce((total, count) => total + count, 0);
+  return newWordsBlocked !== true && newRemainingCount > 0;
 }
 
 // Ukrainian plural of "день" for a count of days: 1 день, 3 дні, 5 днів, 11 днів, 21 день.

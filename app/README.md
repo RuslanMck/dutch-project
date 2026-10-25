@@ -57,7 +57,7 @@ Tools: `stats, search_words, list_words, add_words, update_word, delete_word, se
 list_rules, get_rule, add_rule, update_rule, list_mistake_patterns, log_mistake, add_phrases, list_phrases,
 delete_phrase, add_text, list_texts, get_text, get_practice_batch, grade_word, set_current_chapter,
 set_word_priority, import_frequency_list, preview_priorities, migrate_to_fsrs, practice_stats, get_phrase_batch,
-grade_phrase`. The server's instructions describe the lesson workflows (exercise
+grade_phrase, add_extra_new_words`. The server's instructions describe the lesson workflows (exercise
 check, translation). Writes show up live in open browser tabs.
 
 ## Operate

@@ -11,6 +11,7 @@ import { createPhraseRepository } from '../domains/phrases/phrase-repository.js'
 import { createPhraseService } from '../domains/phrases/phrase-service.js';
 import { createFrequencyRepository } from '../domains/practice/frequency-repository.js';
 import { createFsrsScheduler } from '../domains/practice/fsrs-scheduling.js';
+import { createNewWordPlanner } from '../domains/practice/new-word-planning.js';
 import { createPhrasePracticeRepository } from '../domains/practice/phrase-practice-repository.js';
 import { createPhrasePracticeService } from '../domains/practice/phrase-practice-service.js';
 import { createPracticeRepository } from '../domains/practice/practice-repository.js';
@@ -62,8 +63,10 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
     fsrsScheduler,
     ...sharedDependencies,
   });
+  const newWordPlanner = createNewWordPlanner({ practiceRepository });
   const practiceService = createPracticeService({
     practiceRepository,
+    newWordPlanner,
     practiceSettings,
     priorityService,
     wordService,

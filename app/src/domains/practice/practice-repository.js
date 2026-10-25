@@ -48,6 +48,11 @@ export function createPracticeRepository({ database }) {
     WHERE words.due_at < @beforeTimestamp
     ORDER BY words.due_at ASC, words.id ASC
   `).pluck();
+  const countWordsDueBeforeStatement = database.prepare(`
+    SELECT COUNT(*)
+    FROM words
+    WHERE words.due_at < @beforeTimestamp
+  `).pluck();
   const selectIntroducedOnCountsStatement = database.prepare(`
     SELECT words.priority, COUNT(*) AS word_count
     FROM words
@@ -126,6 +131,11 @@ export function createPracticeRepository({ database }) {
     return selectDueWordIdsStatement.all({ beforeTimestamp });
   }
 
+  // Number of words, of any session, whose due_at is before beforeTimestamp (ms): the overdue words.
+  function countWordsDueBefore(beforeTimestamp) {
+    return countWordsDueBeforeStatement.get({ beforeTimestamp });
+  }
+
   // calendarDate: 'YYYY-MM-DD' in the practice time zone. Every priority is present, zero when none.
   function countIntroducedOnByPriority(calendarDate) {
     const countRows = selectIntroducedOnCountsStatement.all({ calendarDate });
@@ -175,6 +185,7 @@ export function createPracticeRepository({ database }) {
     updateWordPriority,
     updateWordFrequencyRank,
     listDueWordIds,
+    countWordsDueBefore,
     countIntroducedOnByPriority,
     createReviewLog,
     findReviewLog,

@@ -15,7 +15,7 @@ Do not rename existing DB columns, REST/MCP fields or env vars. Do not touch `ar
   production). No card (NULL) means state New.
 - With `enable_short_term: false` ts-fsrs moves a New card straight to Review and keeps Review after a lapse,
   so the FSRS states seen in practice are `new` and `review`; status (new/learning/learned) is what tells them apart.
-- Grades: `again` (wrong or "DNK"), `hard` (right word, wrong/missing article or a spelling slip, or a synonym),
+- Grades: `again` (wrong or "DNK"), `hard` (right word with a spelling slip, or a synonym; since §10 the article never affects the grade),
   `good` (fully right). `easy` is never used.
 - Only the first answer to a word in a practice session is graded. A second grade of the same word in the same
   `session_id` is rejected with `ConflictError` and changes nothing.
@@ -95,11 +95,12 @@ New domain folder `src/domains/practice/` (with `README.md`). Pure modules have 
 | `fsrs-scheduling.js` | pure (wraps ts-fsrs) | `createFsrsScheduler({ desiredRetention, isFuzzEnabled })` → `{ gradeCard(card, grade, timestamp) }` returning `{ card, dueAt, intervalDays }`; `card` null = new (use `createEmptyCard`). `serializeCard(card)` → JSON string with ISO dates; `parseCard(json)` → card with `Date` objects. `deriveLearningStatus(card, learnedThresholdDays)` → `'new' \| 'learning' \| 'learned'`. `calculateIntervalDays(card)` = `card.scheduled_days` when it is set, else round((due − last_review) / day). `buildMigrationCard({ group, dueAt, timestamp })` for groups `'learning'` (state Review, stability 1, difficulty 6, reps 1, lapses 1, last_review = timestamp − 1 day, scheduled_days 1) and `'learned'` (state Review, stability 21, difficulty 5, reps 3, lapses 0, last_review = due − 21 days, due = dueAt, scheduled_days 21). Grade map: again → `Rating.Again`, hard → `Rating.Hard`, good → `Rating.Good`. |
 | `priority-calculation.js` | pure | `parseChapterNumber(sectionCode)` → integer or null. `calculatePriority({ priorityOverride, chapterNumber, frequencyRank, currentChapter })` → 1–3 (rules in §1). `compareQueueOrder(first, second)` for `{ priority, chapterNumber, frequencyRank, id }` (§1). `calculateFrequencyRank(dutchText, findRankByForm)`: lowercase, drop a leading `de `/`het `, strip punctuation `?!.,;:()"'…`; one token → its rank or null; several tokens → the largest (rarest) rank of the tokens, or null when any token is unranked. |
 | `new-word-allocation.js` | pure | `allocateNewWords({ candidatesByPriority, introducedTodayByPriority, newPerDay, tierQuota })` → ordered array of chosen candidates. Remaining = newPerDay − all introduced today. Each priority first gets min(its quota − introduced today in it, available). Leftover slots go to P1, then P2, then P3. Never more than remaining. Candidates in each list are already in queue order. Output order: P1 picks, then P2, then P3. |
+| `new-word-planning.js` | service (reads only) | `createNewWordPlanner({ practiceRepository })` → `{ planNewWords({ settings, today, gradedWordIds }), assertExtraNewWordsAllowed({ newWordPlan }), countExtraNewWordsOn(settings, calendarDate) }`. `planNewWords` returns `{ overdueCount, isBlocked, offeredCandidates, introducedTodayCount, newTodayRemainingCount, remainingByPriority }` (the backlog gate of §10.1 and the allowance with the extra words). |
 | `practice-repository.js` | SQL | Settings: `listSettings()` → `{ name: parsedJsonValue }`; `saveSetting(name, value)` (JSON.stringify, upsert). Cards: `listPracticeWords()` → all words with `id, nl, uk, article, kind, section_code, status, fsrs_card, due_at, introduced_on, frequency_rank, priority_override, priority, error_count` (from `v_words`); `findPracticeWordById(wordId)`; `updateWordSchedule(wordId, { fsrsCard, dueAt, introducedOn, learningStatus, updatedAt })`; `updateWordPriority(wordId, { priority, priorityOverride })` (priorityOverride undefined = leave as is); `updateWordFrequencyRank(wordId, frequencyRank)`; `listDueWordIds(beforeTimestamp)` ordered by `due_at` ascending; `countIntroducedOnByPriority(calendarDate)` → `{1: n, 2: n, 3: n}`; review logs: `createReviewLog({...})`, `findReviewLog(sessionId, wordId)`, `listWordIdsReviewedInSession(sessionId)`, `countFirstGradesSince(timestamp)` → `{ again, hard, good }`. |
 | `frequency-repository.js` | SQL | `replaceAllFrequencies(entries)` (delete all, insert), `upsertFrequencies(entries)`, `findRankByForm(wordForm)` → rank or null, `countFrequencies()`. |
 | `practice-settings.js` | service | `createPracticeSettings({ practiceRepository })` → `{ readSettings(), saveCurrentChapter(chapter), isFsrsActive(), markFsrsMigrated(timestamp) }`. `readSettings` returns camelCase `{ currentChapter, newPerDay, tierQuota: {1,2,3}, desiredRetention, learnedThresholdDays, timeZone, fsrsMigratedAt }`. |
 | `priority-service.js` | service | `createPriorityService({ practiceRepository, frequencyRepository, practiceSettings, runInTransaction, changeEventBus })`: `recalculatePriorities({ wordIds } = {})` (all words when no ids; writes `priority`), `assignNewWordRanking(wordIds)` (frequency rank + priority for just-added words; runs inside the caller's transaction, no event), `setWordPriority(wordId, priorityOrNull)`, `setCurrentChapter(chapter)` (save, recalc all, return preview), `previewPriorities({ chapter })` (no writes; `{ chapter, counts: {1,2,3}, unranked_count, examples: {1: [...], 2: [...], 3: [...]} }` over New words, 10 examples each in queue order `{ id, nl, uk, section, frequency_rank }`), `importFrequencyList(entries, { shouldReplaceExisting })` (writes table, re-ranks every word, recalculates priorities; returns `{ imported, words_ranked, words_unranked }`). Publishes `'words'`. |
-| `practice-service.js` | service | `createPracticeService({ practiceRepository, practiceSettings, priorityService, wordRepository, fsrsScheduler, runInTransaction, changeEventBus, clock })`: `getPracticeBatch({ sessionId, maxReviews })`, `gradeWord({ wordId, grade, answer, sessionId })`, `migrateToFsrs({ isDryRun })`, `calculatePracticeStatistics()`. Details in §4. Publishes `'words'`. |
+| `practice-service.js` | service | `createPracticeService({ practiceRepository, newWordPlanner, practiceSettings, priorityService, wordService, fsrsScheduler, phrasePracticeService, runInTransaction, changeEventBus, clock })`: `getPracticeBatch({ sessionId, maxReviews })`, `gradeWord({ wordId, grade, answer, sessionId })`, `migrateToFsrs({ isDryRun })`, `calculatePracticeStatistics()`. Details in §4. Publishes `'words'`. |
 | `practice-tools.js` | MCP adapter | Registers the 8 tools in §5. |
 | `practice-routes.js` | REST adapter | `GET /practice/batch?session_id=&max_reviews=`, `POST /practice/grades` `{ word_id, grade, answer, session_id }`, `GET /practice/stats`, `GET /practice/priorities/preview?chapter=`. |
 
@@ -189,8 +190,8 @@ how a script opens the database and services).
   FSRS mode: on open, a session id (`crypto.randomUUID()`, kept in `sessionStorage` as `{ sessionId, calendarDate }`
   and replaced when the Amsterdam day changes or a session finishes) and a batch from
   `/api/practice/batch`; questions show `uk`, the learner types Dutch; `gradeTranslationAnswer(word, input)` in
-  `logic.js` returns `{ grade, message }` (exact incl. right article → good; right word with wrong or missing
-  article for de/het nouns, or Levenshtein ≤ 1 → hard; else again; empty input → not counted); the first answer
+  `logic.js` returns `{ grade, message }` (right word → good, the article is ignored since §10; Levenshtein ≤ 1 →
+  hard; else again; empty input → not counted); the first answer
   per word posts to `/api/practice/grades`; again/hard words go to the end of the local queue and repeat ungraded
   until right; the end shows a summary (again/hard/good counts, new words introduced, due tomorrow from
   `/api/practice/stats`). If the batch request returns 409 (not migrated), show "Практика FSRS ще не налаштована".
@@ -295,3 +296,51 @@ Cards tab
    (ungraded repeats). The Phrases tab shows each phrase's status.
 10. «Не знаю» in both card modes. Words: it only reveals the back (same as tapping the card).
 11. Phrases: «Не знаю» reveals the back and grades again in one step.
+
+## 10. Third round: backlog gate, extra new words, optional article (25.10.2026)
+
+Ruslan's new rules; the decisions are settled.
+
+### 10.1 Backend
+
+- **Backlog gate.** A review is *overdue* when its `due_at` is before the start of today (settings' time zone).
+  While any word is overdue, `get_practice_batch` returns no new words (`new_words: []`). The check is live: once
+  the last overdue word is graded, today's new words unlock the same day. The same rule holds for phrases: while
+  any phrase is overdue, `get_phrase_batch` returns no new phrases.
+- Batch `counts` gain `overdue` (number of overdue items, not filtered by session) and `new_words_blocked`
+  (phrases: `new_phrases_blocked`), true when the gate holds back new items that would otherwise be offered.
+- **Extra new words.** A setting `extra_new_words` = `{ "calendar_date": "YYYY-MM-DD", "count": n }` raises
+  today's word quota: effective per day = `new_per_day` + (`count` when `calendar_date` is today, else 0). The
+  tier quota scales with the number of blocks: blocks = ceil(effective / `new_per_day`), each tier quota × blocks
+  (20 → 14/4/2), then the usual redistribution.
+- `addExtraNewWords({ count })` (1–50; the contract default is 10): refuses with `ConflictError` while words are
+  overdue or while today's New words, regular and extra, are not all introduced yet (`new_today_remaining > 0`), so
+  a second call waits until the first extra words are graded; otherwise adds `count` to today's extra (resetting
+  it when the stored date is not today) and returns `{ extra_new_words_today, new_today_remaining }`.
+  REST `POST /api/practice/extra-new-words` `{ count? }`; MCP tool `add_extra_new_words` (`count?`). Both parse
+  `count` with the same contract, so an empty body and no arguments add 10.
+- `practice_stats` gains `overdue`, `new_words_blocked`, `extra_new_words_today`; `phrases` gains `overdue` and
+  `new_phrases_blocked`.
+- Claude instructions (`mcp-instructions.js`, `docs/CLAUDE_PROJECT_INSTRUCTIONS.md`): the article is optional in
+  translation practice (ignore a missing or wrong de/het when grading, but mention the right article; article
+  practice is separate); explain the backlog gate (new words only once nothing is overdue) and
+  `add_extra_new_words` (offer "ще 10 нових слів?" when today's words are done).
+
+### 10.2 Web
+
+- **Article optional.** `gradeTranslationAnswer`: the article no longer affects the grade. A missing or wrong
+  de/het with the right word → `good`, message «✓ Правильно (артикль: de)» when the article was missing or wrong.
+  Spelling slip (Levenshtein ≤ 1) → `hard`; otherwise `again`. Expressions whose own text starts with de/het
+  (no `article`) are still compared in full first.
+- **Gate in the Practice tab.** When the batch has `new_words_blocked`, show under the progress line: «Нові слова
+  з'являться, коли ви повторите всі прострочені слова.» When the queue empties, fetch the batch again with the same
+  session: if it now has new words (the gate opened), add them to the queue and continue with the line «Повторення
+  завершено — далі нові слова дня.»
+- **Next 10.** When the queue is empty, no new words came back, `new_words_blocked` is false and New words remain
+  (sum of `new_remaining_by_priority` > 0), the summary shows a button «Хочете ще 10 нових слів?». It posts
+  `POST /api/practice/extra-new-words` `{ count: 10 }`, fetches the batch again and continues. It may be used
+  repeatedly.
+- **Cards → Фрази** gets the same refetch at the end of the deck (unlocked phrases continue the deck). Cards →
+  Слова shows whatever the batch returns.
+- **Table.** Remove the «Помилки» and «Статус» columns (and the error-sort toggle that lives in the Помилки header).
+  Columns: Слово / Глава / Переклад / Наступне / Пріоритет / delete.
