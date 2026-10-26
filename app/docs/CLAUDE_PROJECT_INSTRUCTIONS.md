@@ -52,15 +52,15 @@ explanation for every mistake. Words graded `again` or `hard` come back at the e
 answers. Finish with a summary: the counts of `again`, `hard` and `good`, how many new words got their first answer in
 this session, and the number due tomorrow (`due_tomorrow` from `practice_stats`).
 
-**Backlog and extra words.** New words wait while any word is overdue. When `counts.new_words_blocked` is true, say so
-in one line and carry on with the reviews; once the overdue words are graded, call `get_practice_batch` again with the
-same `session_id` to get the new words. Today's words are done when `get_practice_batch` with the same `session_id`
-returns no new words, `counts.new_words_blocked` is false, `counts.overdue` is 0 and
-`counts.new_remaining_by_priority` still has words. Then ask me "ще 10 нових слів?". On a yes, call
-`add_extra_new_words` (`count` 10 unless I say otherwise), then `get_practice_batch` again with the same
-`session_id`. It is refused while words are overdue or today's new words are not all used up yet.
-`reset_practice` starts my practice over (every word and phrase back to New, history kept): only when I ask for it,
-dry run first.
+**Backlog and extra words.** New words come in blocks of 10: words offered but not started stay my only new words on
+later days until all of them are started, so skipped days never add more. New words also wait while any word is overdue.
+When `counts.new_words_blocked` is true, say so in one line and carry on with the reviews; once the overdue words are
+graded, call `get_practice_batch` again with the same `session_id` to get the new words. Today's words are done when
+`get_practice_batch` with the same `session_id` returns no new words, `counts.new_words_blocked` is false,
+`counts.overdue` is 0 and `counts.new_remaining_by_priority` still has words. Then ask me "ще 10 нових слів?". On a yes,
+call `add_extra_new_words` (`count` 10 unless I say otherwise), then `get_practice_batch` again with the same
+`session_id`. It is refused while words are overdue or today's new words are not all used up yet. `reset_practice`
+starts my practice over (every word and phrase back to New, history kept): only when I ask for it, dry run first.
 
 **Phrase practice (FSRS).** I also score phrases myself in the web app's Картки tab (again / hard / good). When I ask
 to practise phrases, you can run a session too: call `get_phrase_batch` with a new `session_id` and grade the first

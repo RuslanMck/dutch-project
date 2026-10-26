@@ -224,7 +224,7 @@ test('a phrase due at the start of tomorrow in Amsterdam waits for tomorrow, eve
   assert.deepEqual(nextDayBatch.reviews.map(phrase => phrase.id), [justBeforeId, startOfTomorrowId]);
 });
 
-test('a grade late in the evening counts for that Amsterdam day; the allowance starts again after midnight', () => {
+test('a grade late in the evening counts for that Amsterdam day; after midnight only the block\'s leftovers come', () => {
   const context = createPhraseContext('2026-10-24T23:30:00+02:00');
   const phraseIds = addPhrases(context, makeNames('Zin', 6));
   activatePractice(context);
@@ -236,8 +236,8 @@ test('a grade late in the evening counts for that Amsterdam day; the allowance s
   context.clock.moveTo('2026-10-25T00:10:00+02:00');
   const nextDayBatch = context.phrasePracticeService.getPhraseBatch({ sessionId: 's3' });
   assert.equal(nextDayBatch.counts.introduced_today, 0);
-  assert.equal(nextDayBatch.counts.new_today_remaining, 5);
-  assert.deepEqual(nextDayBatch.new_phrases.map(phrase => phrase.id), phraseIds.slice(1, 6));
+  assert.equal(nextDayBatch.counts.new_today_remaining, 4, 'the unfinished block carries over: no fresh 5');
+  assert.deepEqual(nextDayBatch.new_phrases.map(phrase => phrase.id), phraseIds.slice(1, 5));
 });
 
 test('a phrase graded again at 00:30 on the 25-hour day 2026-10-25 is due at the start of 2026-10-26', () => {

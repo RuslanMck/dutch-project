@@ -1,6 +1,6 @@
-// Starts the practice over: every word and phrase goes back to New (no card, not due, not introduced) and today's
-// extra new words are cleared, so the next batch holds only the day's new words. Review logs and word errors are kept
-// as history. Publishes 'words' and 'phrases' after the commit.
+// Starts the practice over: every word and phrase goes back to New (no card, not due, not introduced) and the intake
+// blocks (with any extra new words) are cleared, so the next batch holds only the day's new words. Review logs and
+// word errors are kept as history. Publishes 'words' and 'phrases' after the commit.
 import { ConflictError } from '../../errors/domain-errors.js';
 
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
@@ -29,7 +29,8 @@ export function createPracticeResetService({
       for (const phrase of scheduledPhrases) {
         phrasePracticeRepository.updatePhraseSchedule(phrase.id, { learningStatus: NEW_LEARNING_STATUS });
       }
-      practiceSettings.saveExtraNewWords({ calendarDate: null, count: 0 });
+      practiceSettings.saveNewWordBlock(null);
+      practiceSettings.saveNewPhraseBlock(null);
     });
     changeEventBus.publishChange('words');
     changeEventBus.publishChange('phrases');

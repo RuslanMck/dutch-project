@@ -145,7 +145,8 @@ export function registerPracticeTools({
   registerJsonTool(mcpServer, 'reset_practice', {
     title: 'Reset practice',
     description: 'Start the practice over: every word and phrase goes back to New and today\'s extra new words are '
-      + 'cleared, so the next batch holds only the day\'s new words. Review history and error counts are kept. Use only '
+      + 'cleared, so the next batch holds only the day\'s new words. Review history and error counts are kept. '
+      + 'Use only '
       + 'when the learner asks for a fresh start. The default dry run only reports the counts; run with dry_run false '
       + 'after the learner agrees. Returns {dry_run, words_reset, phrases_reset}.',
     inputSchema: resetPracticeInputSchema.shape,

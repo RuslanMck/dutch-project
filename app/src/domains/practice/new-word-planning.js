@@ -1,7 +1,8 @@
-// Plans today's New words: the backlog gate, the day's allowance with the extra new words, the words offered by
-// priority quota, and the refusal of extra new words while today's allowance is not used up. Reads the words through
-// the practice repository and writes nothing.
+// Plans the New words on offer: the backlog gate, the intake block (the day's 10, extra blocks on request, and the
+// leftovers of an unfinished block from an earlier day), the words offered by priority quota, and the refusal of extra
+// new words while the block is not finished. Reads the words through the practice repository and writes nothing.
 import { ConflictError } from '../../errors/domain-errors.js';
+import { resolveIntakeBlock } from './intake-block.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
 import { findStartOfDay } from './practice-calendar.js';
 import { compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
@@ -9,40 +10,47 @@ import { compareQueueOrder, parseChapterNumber } from './priority-calculation.js
 const PRIORITY_VALUES = Object.freeze([1, 2, 3]);
 
 export function createNewWordPlanner({ practiceRepository }) {
-  // The New words for today, shared by the batch, the statistics and addExtraNewWords. The backlog gate holds them back
-  // while any word is overdue (counted over all words, not only this session); isBlocked is true only when that
-  // actually holds back some words.
+  // The New words on offer, shared by the batch, the statistics, grading and addExtraNewWords. The backlog gate holds
+  // them back while any word is overdue (counted over all words, not only this session); isBlocked is true only when
+  // that actually holds back some words. Words started since the block opened count against it, so a block left
+  // unfinished on an earlier day offers only its leftovers, and a new block opens only once it is finished.
   function planNewWords({ settings, today, gradedWordIds }) {
     const todayStart = findStartOfDay(today, settings.timeZone);
     const overdueCount = practiceRepository.countWordsDueBefore(todayStart);
-    const introducedTodayByPriority = practiceRepository.countIntroducedOnByPriority(today);
-    const introducedTodayCount = sumCounts(introducedTodayByPriority);
-    const { effectiveNewPerDay, scaledTierQuota } = calculateNewWordAllowance({
+    const block = resolveIntakeBlock({
+      storedBlock: settings.newWordBlock,
+      today,
+      perDayCount: settings.newPerDay,
+      introducedTotals: practiceRepository.countIntroducedByPriority(),
+    });
+    const { scaledTierQuota } = calculateNewWordAllowance({
       newPerDay: settings.newPerDay,
       tierQuota: settings.tierQuota,
-      extraNewWordCount: countExtraNewWordsOn(settings, today),
+      extraNewWordCount: Math.max(0, block.size - settings.newPerDay),
     });
     const candidatesByPriority = groupNewWordCandidatesByPriority(gradedWordIds);
     const allocatedCandidates = allocateNewWords({
       candidatesByPriority,
-      introducedTodayByPriority,
-      newPerDay: effectiveNewPerDay,
+      introducedTodayByPriority: block.introducedByGroup,
+      newPerDay: block.size,
       tierQuota: scaledTierQuota,
     });
     const isBlocked = overdueCount > 0 && allocatedCandidates.length > 0;
     const offeredCandidates = isBlocked ? [] : allocatedCandidates;
     return {
+      block,
       overdueCount,
       isBlocked,
       offeredCandidates,
-      introducedTodayCount,
-      newTodayRemainingCount: Math.max(0, effectiveNewPerDay - introducedTodayCount),
+      introducedTodayCount: sumCounts(practiceRepository.countIntroducedOnByPriority(today)),
+      newTodayRemainingCount: Math.max(0, block.size - block.introducedCount),
+      extraNewWordsToday: block.openedOn === today ? Math.max(0, block.size - settings.newPerDay) : 0,
       remainingByPriority: countRemainingCandidates(candidatesByPriority, offeredCandidates),
     };
   }
 
-  // Refused while a word is overdue, and while today's New words (regular and extra) are not all introduced yet, so the
-  // extra words come only once the effective allowance of today is used up.
+  // Refused while a word is overdue, and while the intake block is not finished (its words are not all started), so
+  // extra words come only once everything on offer has been started.
   function assertExtraNewWordsAllowed({ newWordPlan }) {
     if (newWordPlan.overdueCount > 0) {
       throw new ConflictError(`${newWordPlan.overdueCount} overdue words: review them before adding extra new words`);
@@ -62,12 +70,7 @@ export function createNewWordPlanner({ practiceRepository }) {
     return candidatesByPriority;
   }
 
-  return Object.freeze({ planNewWords, assertExtraNewWordsAllowed, countExtraNewWordsOn });
-}
-
-// The extra new words counted for a calendar date: the stored count when it was added on that date, otherwise zero.
-function countExtraNewWordsOn(settings, calendarDate) {
-  return settings.extraNewWords.calendarDate === calendarDate ? settings.extraNewWords.count : 0;
+  return Object.freeze({ planNewWords, assertExtraNewWordsAllowed });
 }
 
 function mapToQueueCandidate(wordRow) {

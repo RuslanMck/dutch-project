@@ -13,6 +13,7 @@ import {
   parseCard,
   serializeCard,
 } from '../src/domains/practice/fsrs-scheduling.js';
+import { resolveIntakeBlock } from '../src/domains/practice/intake-block.js';
 import { allocateNewWords, calculateNewWordAllowance } from '../src/domains/practice/new-word-allocation.js';
 import {
   addDaysToCalendarDate,
@@ -398,4 +399,63 @@ test('allocateNewWords with the scaled quota: 20 effective, 10 introduced 7, 2, 
   });
   assert.equal(selectedWords.length, 10);
   assert.deepEqual(countByPriority(selectedWords), [7, 2, 1]);
+});
+
+test('resolveIntakeBlock: no stored block opens a fresh block of the day count today, nothing started yet', () => {
+  const block = resolveIntakeBlock({
+    storedBlock: null,
+    today: '2026-10-26',
+    perDayCount: 10,
+    introducedTotals: { 1: 4, 2: 1, 3: 0 },
+  });
+  assert.equal(block.openedOn, '2026-10-26');
+  assert.equal(block.size, 10);
+  assert.equal(block.introducedCount, 0);
+  assert.deepEqual(block.introducedAtOpen, { 1: 4, 2: 1, 3: 0 });
+  assert.equal(block.isStored, false);
+});
+
+test('resolveIntakeBlock: an unfinished block from an earlier day stays open with only its own started items', () => {
+  const storedBlock = { openedOn: '2026-10-25', size: 10, introducedAtOpen: { 1: 4, 2: 1, 3: 0 } };
+  const block = resolveIntakeBlock({
+    storedBlock,
+    today: '2026-10-26',
+    perDayCount: 10,
+    introducedTotals: { 1: 7, 2: 1, 3: 1 },
+  });
+  assert.equal(block.openedOn, '2026-10-25');
+  assert.equal(block.introducedCount, 4);
+  assert.deepEqual(block.introducedByGroup, { 1: 3, 2: 0, 3: 1 });
+  assert.equal(block.isStored, true);
+});
+
+test('resolveIntakeBlock: a finished block from an earlier day gives way to a fresh block from zero', () => {
+  const storedBlock = { openedOn: '2026-10-25', size: 10, introducedAtOpen: { 1: 0, 2: 0, 3: 0 } };
+  const block = resolveIntakeBlock({
+    storedBlock,
+    today: '2026-10-26',
+    perDayCount: 10,
+    introducedTotals: { 1: 7, 2: 2, 3: 1 },
+  });
+  assert.equal(block.openedOn, '2026-10-26');
+  assert.equal(block.introducedCount, 0, 'items of the earlier block never count against the new one');
+  assert.deepEqual(block.introducedAtOpen, { 1: 7, 2: 2, 3: 1 });
+});
+
+test('resolveIntakeBlock: a block finished today stays, and a reset never gives a negative count', () => {
+  const finishedToday = resolveIntakeBlock({
+    storedBlock: { openedOn: '2026-10-26', size: 10, introducedAtOpen: { phrases: 0 } },
+    today: '2026-10-26',
+    perDayCount: 10,
+    introducedTotals: { phrases: 10 },
+  });
+  assert.equal(finishedToday.isStored, true);
+  assert.equal(finishedToday.size - finishedToday.introducedCount, 0);
+  const afterReset = resolveIntakeBlock({
+    storedBlock: { openedOn: '2026-10-26', size: 5, introducedAtOpen: { phrases: 3 } },
+    today: '2026-10-26',
+    perDayCount: 5,
+    introducedTotals: { phrases: 0 },
+  });
+  assert.equal(afterReset.introducedCount, 0);
 });

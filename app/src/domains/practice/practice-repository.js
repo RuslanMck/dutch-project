@@ -59,6 +59,12 @@ export function createPracticeRepository({ database }) {
     WHERE words.introduced_on = @calendarDate
     GROUP BY words.priority
   `);
+  const selectIntroducedCountsStatement = database.prepare(`
+    SELECT words.priority, COUNT(*) AS word_count
+    FROM words
+    WHERE words.introduced_on IS NOT NULL
+    GROUP BY words.priority
+  `);
   const insertReviewLogStatement = database.prepare(`
     INSERT INTO review_logs (word_id, session_id, reviewed_at, grade, answer, card_before, card_after)
     VALUES (@wordId, @sessionId, @reviewedAt, @grade, @answer, @cardBefore, @cardAfter)
@@ -145,6 +151,15 @@ export function createPracticeRepository({ database }) {
     };
   }
 
+  // Words started so far (first graded, still in rotation), by priority; every priority is present, zero when none.
+  function countIntroducedByPriority() {
+    const countRows = selectIntroducedCountsStatement.all();
+    return {
+      ...EMPTY_PRIORITY_COUNTS,
+      ...Object.fromEntries(countRows.map(countRow => [countRow.priority, countRow.word_count])),
+    };
+  }
+
   // Returns the new review log's id. A second log for the same session and word fails on the unique index.
   function createReviewLog({ wordId, sessionId, reviewedAt, grade, answer = null, cardBefore = null, cardAfter }) {
     const insertResult = insertReviewLogStatement.run({
@@ -187,6 +202,7 @@ export function createPracticeRepository({ database }) {
     listDueWordIds,
     countWordsDueBefore,
     countIntroducedOnByPriority,
+    countIntroducedByPriority,
     createReviewLog,
     findReviewLog,
     listWordIdsReviewedInSession,

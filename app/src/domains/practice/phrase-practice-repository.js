@@ -22,6 +22,11 @@ export function createPhrasePracticeRepository({ database }) {
     FROM phrases
     WHERE phrases.introduced_on = @calendarDate
   `).pluck();
+  const countIntroducedStatement = database.prepare(`
+    SELECT COUNT(*)
+    FROM phrases
+    WHERE phrases.introduced_on IS NOT NULL
+  `).pluck();
   const insertPhraseReviewLogStatement = database.prepare(`
     INSERT INTO phrase_review_logs (phrase_id, session_id, reviewed_at, grade, card_before, card_after)
     VALUES (@phraseId, @sessionId, @reviewedAt, @grade, @cardBefore, @cardAfter)
@@ -63,6 +68,11 @@ export function createPhrasePracticeRepository({ database }) {
     return countIntroducedOnStatement.get({ calendarDate });
   }
 
+  // Phrases started so far (first graded, still in rotation).
+  function countIntroduced() {
+    return countIntroducedStatement.get();
+  }
+
   // A second log for the same session and phrase fails on the unique index.
   function createPhraseReviewLog({ phraseId, sessionId, reviewedAt, grade, cardBefore = null, cardAfter }) {
     insertPhraseReviewLogStatement.run({ phraseId, sessionId, reviewedAt, grade, cardBefore, cardAfter });
@@ -81,6 +91,7 @@ export function createPhrasePracticeRepository({ database }) {
     findPracticePhraseById,
     updatePhraseSchedule,
     countIntroducedOn,
+    countIntroduced,
     createPhraseReviewLog,
     findPhraseReviewLog,
     listPhraseIdsReviewedInSession,

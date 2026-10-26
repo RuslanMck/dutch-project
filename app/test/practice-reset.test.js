@@ -27,7 +27,8 @@ function makeNames(prefix, count) {
 // 20 learning words (they get cards on the migration) and 15 new ones, plus 3 phrases; FSRS is switched on.
 function createMigratedContext() {
   const context = createTestContext({ clock: createFakeClock('2026-10-24T10:00:00+02:00') });
-  const toWordInputs = (names, extraFields) => names.map(dutchText => ({ nl: dutchText, uk: 'переклад', ...extraFields }));
+  const toWordInputs = (names, extraFields) => names
+    .map(dutchText => ({ nl: dutchText, uk: 'переклад', ...extraFields }));
   context.wordService.createWords(toWordInputs(makeNames('oud', 20), { section: '6.1', status: 'learning' }));
   context.wordService.createWords(toWordInputs(makeNames('nieuw', 15), { section: '6.1' }));
   for (const dutchText of ['Hoe gaat het?', 'Tot ziens', 'Dank je wel']) {
@@ -109,9 +110,9 @@ test('a reset clears today\'s extra new words', () => {
     context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
   }
   context.practiceService.addExtraNewWords({ count: 10 });
-  assert.equal(context.practiceSettings.readSettings().extraNewWords.count, 10);
+  assert.equal(context.practiceSettings.readSettings().newWordBlock.size, 20);
 
   context.practiceResetService.resetPractice({ isDryRun: false });
 
-  assert.equal(context.practiceSettings.readSettings().extraNewWords.count, 0);
+  assert.equal(context.practiceSettings.readSettings().newWordBlock, null);
 });

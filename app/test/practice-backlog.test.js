@@ -240,19 +240,20 @@ test('a second addExtraNewWords is refused until the first 10 are graded, then g
   assert.equal(batch.counts.new_today_remaining, 10);
 });
 
-test('the extra new words reset on the next calendar day', () => {
+test('extra words left unstarted carry over to the next day as the only new words', () => {
   const context = createPracticeContext();
   addPriorityMix(context, { p1Count: 16, p2Count: 6, p3Count: 4 });
   migrate(context);
   gradeAllNewWords(context, context.practiceService.getPracticeBatch({ sessionId: 's1' }), 's1');
   context.practiceService.addExtraNewWords({ count: 10 });
   assert.equal(context.practiceService.calculatePracticeStatistics().extra_new_words_today, 10);
+  const extraWordIds = context.practiceService.getPracticeBatch({ sessionId: 's2' }).new_words.map(word => word.id);
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
 
   assert.equal(context.practiceService.calculatePracticeStatistics().extra_new_words_today, 0);
   const nextDayBatch = context.practiceService.getPracticeBatch({ sessionId: 's3' });
-  assert.equal(nextDayBatch.new_words.length, 10);
+  assert.deepEqual(nextDayBatch.new_words.map(word => word.id), extraWordIds, 'the same unstarted extra words');
   assert.equal(nextDayBatch.counts.introduced_today, 0);
   assert.equal(nextDayBatch.counts.new_today_remaining, 10);
   assert.throws(() => context.practiceService.addExtraNewWords({ count: 10 }), ConflictError);
@@ -274,4 +275,52 @@ test('practice_stats reports the overdue words, the block and the extra new word
   const openStats = context.practiceService.calculatePracticeStatistics();
   assert.equal(openStats.overdue, 0);
   assert.equal(openStats.new_words_blocked, false);
+});
+
+test('a day left half done carries its leftovers over: the next day offers only them, the same words', () => {
+  const context = createPracticeContext();
+  addPriorityMix(context, { p1Count: 20, p2Count: 6, p3Count: 4 });
+  migrate(context);
+  const todayWords = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
+  for (const word of todayWords.slice(0, 4)) {
+    context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
+  }
+
+  context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
+  const nextDayBatch = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+
+  assert.deepEqual(nextDayBatch.new_words.map(word => word.id).sort(), todayWords.slice(4).map(word => word.id).sort());
+  assert.equal(nextDayBatch.counts.new_today_remaining, 6);
+  assert.throws(() => context.practiceService.addExtraNewWords({ count: 10 }), ConflictError);
+});
+
+test('a day with nothing done offers the same 10 words again, never more', () => {
+  const context = createPracticeContext();
+  addPriorityMix(context, { p1Count: 20, p2Count: 6, p3Count: 4 });
+  migrate(context);
+  const todayWordIds = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words.map(word => word.id);
+
+  context.clock.moveTo('2026-10-28T09:00:00+01:00');
+  const laterBatch = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+
+  assert.deepEqual(laterBatch.new_words.map(word => word.id), todayWordIds);
+  assert.equal(laterBatch.reviews.length, 0);
+});
+
+test('finishing the leftovers of an earlier day opens a fresh 10 the same day', () => {
+  const context = createPracticeContext();
+  addPriorityMix(context, { p1Count: 20, p2Count: 6, p3Count: 4 });
+  migrate(context);
+  const todayWords = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
+  context.practiceService.gradeWord({ wordId: todayWords[0].id, grade: 'good', sessionId: 's1' });
+
+  context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
+  const leftovers = context.practiceService.getPracticeBatch({ sessionId: 's2' }).new_words;
+  assert.equal(leftovers.length, 9);
+  for (const word of leftovers) context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's2' });
+  const afterLeftovers = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+
+  assert.equal(afterLeftovers.new_words.length, 10);
+  assert.equal(afterLeftovers.counts.new_today_remaining, 10);
+  assert.equal(afterLeftovers.new_words.filter(word => leftovers.some(leftover => leftover.id === word.id)).length, 0);
 });

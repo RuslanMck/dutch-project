@@ -1,8 +1,10 @@
-// Phrase practice business rules: the batch of phrase reviews and New phrases (held back while a phrase is overdue),
-// grading a phrase once per session and the phrase statistics. Phrases use the word scheduler and day boundary, with no
-// word errors and no priorities. Publishes 'phrases' after each grade.
+// Phrase practice business rules: the batch of phrase reviews and New phrases (held back while a phrase is overdue; an
+// unfinished intake block from an earlier day offers only its leftovers), grading a phrase once per session and the
+// phrase statistics. Phrases use the word scheduler and day boundary, with no word errors and no priorities. Publishes
+// 'phrases' after each grade.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { deriveLearningStatus, describeCardState, parseCard, serializeCard } from './fsrs-scheduling.js';
+import { mapToStoredBlock, resolveIntakeBlock } from './intake-block.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
@@ -67,6 +69,7 @@ export function createPhrasePracticeService({
     cardAfter.due = new Date(dueAt);
     const learningStatus = deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
     const cardAfterJson = serializeCard(cardAfter);
+    if (cardBefore === null) savePhraseBlockOnFirstStart({ settings, today });
     phrasePracticeRepository.updatePhraseSchedule(phraseId, {
       fsrsCard: cardAfterJson,
       dueAt,
@@ -113,19 +116,27 @@ export function createPhrasePracticeService({
     };
   }
 
-  // The New phrases offered today. Phrases overdue before today hold them back; isBlocked is true only when that holds
+  // The New phrases on offer: what is left of the intake block (5 a day; a block left unfinished on an earlier day
+  // offers only its leftovers). Phrases overdue before today hold them back; isBlocked is true only when that holds
   // back at least one phrase.
   function planNewPhrases({ settings, today, phrases, gradedPhraseIds }) {
     const todayStart = findStartOfDay(today, settings.timeZone);
     const overdueCount = phrases.filter(phrase => isDueBefore(phrase, todayStart)).length;
     const introducedTodayCount = phrasePracticeRepository.countIntroducedOn(today);
+    const block = resolveIntakeBlock({
+      storedBlock: settings.newPhraseBlock,
+      today,
+      perDayCount: settings.phraseNewPerDay,
+      introducedTotals: { phrases: phrasePracticeRepository.countIntroduced() },
+    });
     const newCandidates = phrases
       .filter(phrase => phrase.fsrs_card === null && !gradedPhraseIds.has(phrase.id))
       .sort(compareOldestFirst);
-    const allowanceCount = Math.max(0, settings.phraseNewPerDay - introducedTodayCount);
+    const allowanceCount = Math.max(0, block.size - block.introducedCount);
     const allowedPhrases = newCandidates.slice(0, allowanceCount);
     const isBlocked = overdueCount > 0 && allowedPhrases.length > 0;
     return {
+      block,
       overdueCount,
       introducedTodayCount,
       allowanceCount,
@@ -133,6 +144,17 @@ export function createPhrasePracticeService({
       isBlocked,
       offeredPhrases: isBlocked ? [] : allowedPhrases,
     };
+  }
+
+  // The first New phrase started in a fresh intake block opens it, so its leftovers stay on offer on later days.
+  function savePhraseBlockOnFirstStart({ settings, today }) {
+    const { block } = planNewPhrases({
+      settings,
+      today,
+      phrases: phrasePracticeRepository.listPracticePhrases(),
+      gradedPhraseIds: new Set(),
+    });
+    if (!block.isStored) practiceSettings.saveNewPhraseBlock(mapToStoredBlock(block));
   }
 
   function readActiveSettings() {

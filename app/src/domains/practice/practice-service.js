@@ -10,7 +10,7 @@ import {
   parseCard,
   serializeCard,
 } from './fsrs-scheduling.js';
-import { calculateNewWordAllowance } from './new-word-allocation.js';
+import { mapToStoredBlock } from './intake-block.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
@@ -57,24 +57,19 @@ export function createPracticeService({
     };
   }
 
-  // Adds `count` extra New words for today on top of the regular allowance. Refused while a word is overdue, and while
-  // today's New words are not all introduced yet. The extra count resets on the next calendar day.
+  // Adds `count` extra New words to today's intake block. Refused while a word is overdue, and while the block is not
+  // finished (its words are not all started). Extra words left unstarted carry over like any unfinished block.
   function addExtraNewWords({ count }) {
     const settings = readActiveSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
     const addResult = runInTransaction(() => {
       const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
       newWordPlanner.assertExtraNewWordsAllowed({ newWordPlan });
-      const extraNewWordCount = newWordPlanner.countExtraNewWordsOn(settings, today) + count;
-      practiceSettings.saveExtraNewWords({ calendarDate: today, count: extraNewWordCount });
-      const { effectiveNewPerDay } = calculateNewWordAllowance({
-        newPerDay: settings.newPerDay,
-        tierQuota: settings.tierQuota,
-        extraNewWordCount,
-      });
+      const extendedBlock = { ...newWordPlan.block, size: newWordPlan.block.size + count };
+      practiceSettings.saveNewWordBlock(mapToStoredBlock(extendedBlock));
       return {
-        extra_new_words_today: extraNewWordCount,
-        new_today_remaining: Math.max(0, effectiveNewPerDay - newWordPlan.introducedTodayCount),
+        extra_new_words_today: Math.max(0, extendedBlock.size - settings.newPerDay),
+        new_today_remaining: extendedBlock.size - extendedBlock.introducedCount,
       };
     });
     changeEventBus.publishChange('words');
@@ -106,6 +101,7 @@ export function createPracticeService({
     const learningStatus = deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
     const cardAfterJson = serializeCard(cardAfter);
     const wrongAnswer = mapBlankTextToNull(answer);
+    if (cardBefore === null) saveIntakeBlockOnFirstStart({ settings, today });
     practiceRepository.updateWordSchedule(wordId, {
       fsrsCard: cardAfterJson,
       dueAt,
@@ -175,13 +171,20 @@ export function createPracticeService({
       overdue: newWordPlan.overdueCount,
       introduced_today: newWordPlan.introducedTodayCount,
       new_words_blocked: newWordPlan.isBlocked,
-      extra_new_words_today: newWordPlanner.countExtraNewWordsOn(settings, today),
+      extra_new_words_today: newWordPlan.extraNewWordsToday,
       new_remaining_by_priority: newCounts,
       states: stateCounts,
       good_share_7_days: calculateGoodShareSince(today, SHORT_GOOD_SHARE_DAY_COUNT, settings.timeZone),
       good_share_30_days: calculateGoodShareSince(today, LONG_GOOD_SHARE_DAY_COUNT, settings.timeZone),
       phrases: phrasePracticeService.calculatePhraseStatistics(),
     };
+  }
+
+  // The first New word started in a fresh intake block opens it: the block is saved, so its leftovers stay on offer on
+  // later days until all its words are started.
+  function saveIntakeBlockOnFirstStart({ settings, today }) {
+    const { block } = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
+    if (!block.isStored) practiceSettings.saveNewWordBlock(mapToStoredBlock(block));
   }
 
   function readActiveSettings() {

@@ -353,3 +353,16 @@ day, so on skipped days the list grew even though the §10 gate held back new wo
 (no card, no due date, not introduced), clears today's extra new words and keeps review logs and word errors. After it
 the only way into rotation is the daily intake (10 words, 7/2/1 by priority, only while nothing is overdue; 5 phrases),
 so a skipped day can only bring back words that were actually started.
+
+## 12. Intake blocks: unfinished new words count as an unfinished day (26.10.2026)
+
+Ruslan's rule, made strict: new items come in blocks. The first new word started opens a block of `new_per_day` (10)
+and saves it as the setting `new_word_block` = `{ opened_on, size, introduced_at_open }` (`new_phrase_block` for
+phrases, size 5). A block stays open until all its items are started, across days: a day left half done offers only
+its leftovers on the following days (the same words), a day with nothing done offers the same items again, and a
+fresh block opens only once the open one is finished — the same day if the leftovers are finished then. A block counts
+only items started since it opened (`introduced_at_open` = items started before), so an earlier block's items never
+count against a new one. «ще 10» / `add_extra_new_words` adds to the size of a block finished today; extra words left
+unstarted carry over as leftovers. The backlog gate (§10) still holds new items back while anything is overdue. The
+setting `extra_new_words` from §10 is no longer read. `reset_practice` clears both blocks. Pure logic:
+`intake-block.js` (`resolveIntakeBlock`).
