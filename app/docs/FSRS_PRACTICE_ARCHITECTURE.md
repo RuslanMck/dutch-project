@@ -344,3 +344,12 @@ Ruslan's new rules; the decisions are settled.
   Слова shows whatever the batch returns.
 - **Table.** Remove the «Помилки» and «Статус» columns (and the error-sort toggle that lives in the Помилки header).
   Columns: Слово / Глава / Переклад / Наступне / Пріоритет / delete.
+
+## 11. Practice reset (26.10.2026)
+
+The migration (§4) put the 88 words that were "learning" before FSRS into rotation outside the new-word quota, 22 a
+day, so on skipped days the list grew even though the §10 gate held back new words. Ruslan asked for a clean start:
+`reset_practice` (`practice-reset-service.js`, MCP only, dry run by default) puts every word and phrase back to New
+(no card, no due date, not introduced), clears today's extra new words and keeps review logs and word errors. After it
+the only way into rotation is the daily intake (10 words, 7/2/1 by priority, only while nothing is overdue; 5 phrases),
+so a skipped day can only bring back words that were actually started.

@@ -8,6 +8,7 @@ import {
   migrateToFsrsInputSchema,
   practiceBatchToolInputSchema,
   previewPrioritiesInputSchema,
+  resetPracticeInputSchema,
   setCurrentChapterInputSchema,
   setWordPriorityInputSchema,
 } from '../../contracts/practice-contracts.js';
@@ -21,6 +22,7 @@ import { mapWordToCompactWord } from '../words/compact-word-mapping.js';
 export function registerPracticeTools({
   mcpServer,
   practiceService,
+  practiceResetService,
   phrasePracticeService,
   priorityService,
   wordService,
@@ -139,6 +141,16 @@ export function registerPracticeTools({
     inputSchema: migrateToFsrsInputSchema.shape,
     annotations: DESTRUCTIVE_TOOL_ANNOTATIONS,
   }, ({ dry_run: isDryRun }) => practiceService.migrateToFsrs({ isDryRun: isDryRun ?? true }));
+
+  registerJsonTool(mcpServer, 'reset_practice', {
+    title: 'Reset practice',
+    description: 'Start the practice over: every word and phrase goes back to New and today\'s extra new words are '
+      + 'cleared, so the next batch holds only the day\'s new words. Review history and error counts are kept. Use only '
+      + 'when the learner asks for a fresh start. The default dry run only reports the counts; run with dry_run false '
+      + 'after the learner agrees. Returns {dry_run, words_reset, phrases_reset}.',
+    inputSchema: resetPracticeInputSchema.shape,
+    annotations: DESTRUCTIVE_TOOL_ANNOTATIONS,
+  }, ({ dry_run: isDryRun }) => practiceResetService.resetPractice({ isDryRun: isDryRun ?? true }));
 
   registerJsonTool(mcpServer, 'practice_stats', {
     title: 'Practice statistics',

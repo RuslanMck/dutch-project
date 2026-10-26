@@ -15,6 +15,7 @@ import { createNewWordPlanner } from '../domains/practice/new-word-planning.js';
 import { createPhrasePracticeRepository } from '../domains/practice/phrase-practice-repository.js';
 import { createPhrasePracticeService } from '../domains/practice/phrase-practice-service.js';
 import { createPracticeRepository } from '../domains/practice/practice-repository.js';
+import { createPracticeResetService } from '../domains/practice/practice-reset-service.js';
 import { createPracticeService } from '../domains/practice/practice-service.js';
 import { createPracticeSettings } from '../domains/practice/practice-settings.js';
 import { createPriorityService } from '../domains/practice/priority-service.js';
@@ -57,8 +58,9 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
     desiredRetention: practiceSettings.readSettings().desiredRetention,
     isFuzzEnabled: isFsrsFuzzEnabled,
   });
+  const phrasePracticeRepository = createPhrasePracticeRepository({ database });
   const phrasePracticeService = createPhrasePracticeService({
-    phrasePracticeRepository: createPhrasePracticeRepository({ database }),
+    phrasePracticeRepository,
     practiceSettings,
     fsrsScheduler,
     ...sharedDependencies,
@@ -72,6 +74,12 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
     wordService,
     fsrsScheduler,
     phrasePracticeService,
+    ...sharedDependencies,
+  });
+  const practiceResetService = createPracticeResetService({
+    practiceRepository,
+    phrasePracticeRepository,
+    practiceSettings,
     ...sharedDependencies,
   });
   const ruleService = createRuleService({
@@ -117,6 +125,7 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
   return Object.freeze({
     wordService,
     practiceService,
+    practiceResetService,
     phrasePracticeService,
     priorityService,
     practiceSettings,

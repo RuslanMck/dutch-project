@@ -23,6 +23,7 @@ const EXPECTED_TOOLS = [
   'add_phrases', 'list_phrases', 'delete_phrase', 'add_text', 'list_texts', 'get_text',
   'get_practice_batch', 'grade_word', 'set_current_chapter', 'set_word_priority', 'import_frequency_list',
   'preview_priorities', 'migrate_to_fsrs', 'practice_stats', 'get_phrase_batch', 'grade_phrase', 'add_extra_new_words',
+  'reset_practice',
 ];
 
 const application = createApplication({

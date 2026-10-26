@@ -46,6 +46,8 @@ export const MCP_INSTRUCTIONS = [
   '      has words), ask "ще 10 нових слів?". On a yes, call add_extra_new_words (count 10 unless the learner says',
   '      otherwise), then get_practice_batch again with the same session_id. It is refused while words are overdue or',
   "      today's new words are not all used up yet.",
+  '   j) reset_practice starts the practice over (every word and phrase back to New; history kept). Only when the',
+  '      learner asks for a fresh start: dry run first, then dry_run false after the learner agrees.',
   '5. Phrase practice (FSRS): the learner also scores phrases in the web app (Картки, again / hard / good). Claude can',
   '   run a phrase session too: get_phrase_batch with a fresh session_id, show the uk line of each phrase, and grade',
   '   the first answer to each with grade_phrase ("again", "hard" or "good"). Only the first grade per phrase counts;',

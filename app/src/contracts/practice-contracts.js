@@ -110,6 +110,11 @@ export const previewPrioritiesQuerySchema = previewPrioritiesInputSchema.extend(
     .describe(PREVIEW_CHAPTER_DESCRIPTION),
 }).strict();
 
+export const resetPracticeInputSchema = z.object({
+  dry_run: z.boolean().optional()
+    .describe('default true: only report the counts and write nothing; false resets every word and phrase to New'),
+}).strict();
+
 export const migrateToFsrsInputSchema = z.object({
   dry_run: z.boolean().optional()
     .describe('default true: only report the counts and write nothing; false performs the one-time migration'),
