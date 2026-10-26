@@ -136,6 +136,27 @@ export function canOfferExtraNewWords({ newWordsBlocked, newRemainingByPriority 
   return newWordsBlocked !== true && newRemainingCount > 0;
 }
 
+// The struggling-words drill ("Важкі слова"): the front word leaves the queue when it is typed right (grade good);
+// any other answer sends it to the end. Returns a new queue; the one passed in is not changed.
+export function advanceDrillQueue(queue, grade) {
+  if (!queue.length) return [];
+  const [answeredWord, ...restOfQueue] = queue;
+  return grade === 'good' ? restOfQueue : [...restOfQueue, answeredWord];
+}
+
+// The button under the FSRS summary that starts the drill with this many words.
+export function formatStrugglingDrillButton(wordCount) {
+  return `Потренувати важкі слова (${wordCount})`;
+}
+
+// The end of the struggling-words drill: how many of the words it started with were right at the first check.
+export function buildStrugglingDrillEnd({ correctFirstTimeCount, totalCount }) {
+  return {
+    resultText: `Тренування завершено: правильно з першого разу ${correctFirstTimeCount} з ${totalCount}.`,
+    noteText: 'Це тренування не змінює розклад слів.',
+  };
+}
+
 // Ukrainian plural of "день" for a count of days: 1 день, 3 дні, 5 днів, 11 днів, 21 день.
 export function pluralizeDays(dayCount) {
   const lastTwoDigits = dayCount % 100;

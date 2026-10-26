@@ -320,7 +320,7 @@ test('overdue phrases hold back new phrases; grading the last overdue one unlock
     due: 1,
     overdue: 1,
     introduced_today: 0,
-    new_today_remaining: 5,
+    new_today_remaining: 1,
     new_remaining: 1,
     new_phrases_blocked: true,
   });

@@ -58,6 +58,11 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
     response.json(practiceService.calculatePracticeStatistics());
   });
 
+  // Read only: the drill grades nothing, so it writes nothing.
+  practiceRouter.get('/practice/struggling-words', (request, response) => {
+    response.json(practiceService.listStrugglingWords());
+  });
+
   practiceRouter.get('/practice/priorities/preview', (request, response) => {
     const previewInput = previewPrioritiesQuerySchema.parse(removeBlankQueryValues(request.query));
     response.json(priorityService.previewPriorities({ chapter: previewInput.chapter }));

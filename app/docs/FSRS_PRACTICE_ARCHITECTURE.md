@@ -18,7 +18,8 @@ Do not rename existing DB columns, REST/MCP fields or env vars. Do not touch `ar
 - Grades: `again` (wrong or "DNK"), `hard` (right word with a spelling slip, or a synonym; since §10 the article never affects the grade),
   `good` (fully right). `easy` is never used.
 - Only the first answer to a word in a practice session is graded. A second grade of the same word in the same
-  `session_id` is rejected with `ConflictError` and changes nothing.
+  `session_id` is rejected with `ConflictError` and changes nothing. A practice reset supersedes the earlier logs (§13.2),
+  so the session may grade the word once more after the reset; a third grade is still rejected.
 - A day is a calendar day in `Europe/Amsterdam` (setting `timezone`). "Due today" means `due_at` is before the
   start of tomorrow in that time zone. Due dates are aligned to the start of a calendar day: a grade is due on today
   + the interval in days (at least 1), at 00:00 in that time zone.
@@ -96,7 +97,7 @@ New domain folder `src/domains/practice/` (with `README.md`). Pure modules have 
 | `priority-calculation.js` | pure | `parseChapterNumber(sectionCode)` → integer or null. `calculatePriority({ priorityOverride, chapterNumber, frequencyRank, currentChapter })` → 1–3 (rules in §1). `compareQueueOrder(first, second)` for `{ priority, chapterNumber, frequencyRank, id }` (§1). `calculateFrequencyRank(dutchText, findRankByForm)`: lowercase, drop a leading `de `/`het `, strip punctuation `?!.,;:()"'…`; one token → its rank or null; several tokens → the largest (rarest) rank of the tokens, or null when any token is unranked. |
 | `new-word-allocation.js` | pure | `allocateNewWords({ candidatesByPriority, introducedTodayByPriority, newPerDay, tierQuota })` → ordered array of chosen candidates. Remaining = newPerDay − all introduced today. Each priority first gets min(its quota − introduced today in it, available). Leftover slots go to P1, then P2, then P3. Never more than remaining. Candidates in each list are already in queue order. Output order: P1 picks, then P2, then P3. |
 | `new-word-planning.js` | service (reads only) | `createNewWordPlanner({ practiceRepository })` → `{ planNewWords({ settings, today, gradedWordIds }), assertExtraNewWordsAllowed({ newWordPlan }), countExtraNewWordsOn(settings, calendarDate) }`. `planNewWords` returns `{ overdueCount, isBlocked, offeredCandidates, introducedTodayCount, newTodayRemainingCount, remainingByPriority }` (the backlog gate of §10.1 and the allowance with the extra words). |
-| `practice-repository.js` | SQL | Settings: `listSettings()` → `{ name: parsedJsonValue }`; `saveSetting(name, value)` (JSON.stringify, upsert). Cards: `listPracticeWords()` → all words with `id, nl, uk, article, kind, section_code, status, fsrs_card, due_at, introduced_on, frequency_rank, priority_override, priority, error_count` (from `v_words`); `findPracticeWordById(wordId)`; `updateWordSchedule(wordId, { fsrsCard, dueAt, introducedOn, learningStatus, updatedAt })`; `updateWordPriority(wordId, { priority, priorityOverride })` (priorityOverride undefined = leave as is); `updateWordFrequencyRank(wordId, frequencyRank)`; `listDueWordIds(beforeTimestamp)` ordered by `due_at` ascending; `countIntroducedOnByPriority(calendarDate)` → `{1: n, 2: n, 3: n}`; review logs: `createReviewLog({...})`, `findReviewLog(sessionId, wordId)`, `listWordIdsReviewedInSession(sessionId)`, `countFirstGradesSince(timestamp)` → `{ again, hard, good }`. |
+| `practice-repository.js` | SQL | Settings: `listSettings()` → `{ name: parsedJsonValue }`; `saveSetting(name, value)` (JSON.stringify, upsert). Cards: `listPracticeWords()` → all words with `id, nl, uk, article, kind, section_code, status, fsrs_card, due_at, introduced_on, frequency_rank, priority_override, priority, error_count` (from `v_words`); `findPracticeWordById(wordId)`; `updateWordSchedule(wordId, { fsrsCard, dueAt, introducedOn, learningStatus, updatedAt })`; `updateWordPriority(wordId, { priority, priorityOverride })` (priorityOverride undefined = leave as is); `updateWordFrequencyRank(wordId, frequencyRank)`; `listDueWordIds(beforeTimestamp)` ordered by `due_at` ascending; `countIntroducedOnByPriority(calendarDate)` → `{1: n, 2: n, 3: n}`; review logs: `createReviewLog({...})`, `findReviewLog(sessionId, wordId)`, `listWordIdsReviewedInSession(sessionId)` (both count only logs with `superseded_at` NULL), `markReviewLogsSuperseded(timestamp)` (reset, §13.2), `countFirstGradesSince(timestamp)` → `{ again, hard, good }`. |
 | `frequency-repository.js` | SQL | `replaceAllFrequencies(entries)` (delete all, insert), `upsertFrequencies(entries)`, `findRankByForm(wordForm)` → rank or null, `countFrequencies()`. |
 | `practice-settings.js` | service | `createPracticeSettings({ practiceRepository })` → `{ readSettings(), saveCurrentChapter(chapter), isFsrsActive(), markFsrsMigrated(timestamp) }`. `readSettings` returns camelCase `{ currentChapter, newPerDay, tierQuota: {1,2,3}, desiredRetention, learnedThresholdDays, timeZone, fsrsMigratedAt }`. |
 | `priority-service.js` | service | `createPriorityService({ practiceRepository, frequencyRepository, practiceSettings, runInTransaction, changeEventBus })`: `recalculatePriorities({ wordIds } = {})` (all words when no ids; writes `priority`), `assignNewWordRanking(wordIds)` (frequency rank + priority for just-added words; runs inside the caller's transaction, no event), `setWordPriority(wordId, priorityOrNull)`, `setCurrentChapter(chapter)` (save, recalc all, return preview), `previewPriorities({ chapter })` (no writes; `{ chapter, counts: {1,2,3}, unranked_count, examples: {1: [...], 2: [...], 3: [...]} }` over New words, 10 examples each in queue order `{ id, nl, uk, section, frequency_rank }`), `importFrequencyList(entries, { shouldReplaceExisting })` (writes table, re-ranks every word, recalculates priorities; returns `{ imported, words_ranked, words_unranked }`). Publishes `'words'`. |
@@ -312,7 +313,8 @@ Ruslan's new rules; the decisions are settled.
 - **Extra new words.** A setting `extra_new_words` = `{ "calendar_date": "YYYY-MM-DD", "count": n }` raises
   today's word quota: effective per day = `new_per_day` + (`count` when `calendar_date` is today, else 0). The
   tier quota scales with the number of blocks: blocks = ceil(effective / `new_per_day`), each tier quota × blocks
-  (20 → 14/4/2), then the usual redistribution.
+  (20 → 14/4/2), then the usual redistribution. *Superseded by §12 and §13: the setting `extra_new_words` is no longer
+  read; extra words are appended to the intake block (`new_word_block`), and the tier quota scales with the block size.*
 - `addExtraNewWords({ count })` (1–50; the contract default is 10): refuses with `ConflictError` while words are
   overdue or while today's New words, regular and extra, are not all introduced yet (`new_today_remaining > 0`), so
   a second call waits until the first extra words are graded; otherwise adds `count` to today's extra (resetting
@@ -366,3 +368,64 @@ count against a new one. «ще 10» / `add_extra_new_words` adds to the size of
 unstarted carry over as leftovers. The backlog gate (§10) still holds new items back while anything is overdue. The
 setting `extra_new_words` from §10 is no longer read. `reset_practice` clears both blocks. Pure logic:
 `intake-block.js` (`resolveIntakeBlock`).
+
+## 13. Struggling-words drill and pinned intake blocks (26.10.2026)
+
+### 13.1 Struggling-words drill (Ruslan's request)
+
+- **Which words:** every word in rotation (has a card) whose most recent graded answer (latest `review_logs` row for
+  the word) is `again` or `hard`. A word drops out once its next graded answer is `good`. Order: `error_count`
+  descending, then the latest review time descending, then id.
+- **No effect on the schedule:** the drill never grades, never writes `review_logs` or `word_errors`, never changes a
+  card or status. Only the next real practice (FSRS mode) changes a word.
+- **Backend:** `practiceService.listStrugglingWords()` → `{ words: [{ id, uk, nl, article, kind, state, priority,
+  error_count, last_grade, last_reviewed_on }], count }`. REST `GET /api/practice/struggling-words`; MCP tool
+  `get_struggling_words` (read-only; description: a follow-up drill that changes nothing — Claude quizzes the words
+  and does NOT call grade_word or log_word_error for them).
+- **Web, Practice tab:** a third mode «Важкі слова» in the mode select, and a button «Потренувати важкі слова (N)» in
+  the FSRS summary when N > 0 (it switches to that mode). The drill uses the same question UI and
+  `gradeTranslationAnswer` for feedback, posts nothing, puts wrong answers back at the end until typed right, and
+  ends with «Тренування завершено: правильно з першого разу X з N.» and the line «Це тренування не змінює розклад
+  слів.». With no struggling words: «Важких слів немає.». The mode "i" hint gains: «"Важкі слова" — тренування слів,
+  на які ви останнього разу відповіли неправильно або важко; нічого не змінює.»
+
+### 13.2 Review fixes for §11–§12
+
+- **Pinned blocks (fixes the per-priority baseline and the unpinned leftovers).** The intake block stores the ids of
+  the items it offered instead of counts: `new_word_block` = `{ opened_on, item_ids: [...], extra_count: n }`
+  (`new_phrase_block` the same; phrases get no extra words, so its `extra_count` stays 0). A block opens when its first
+  item is started: the items allocated at that moment (7/2/1 by priority for
+  words, oldest first for phrases, as today) are pinned. The block's leftovers are its pinned items still New (no
+  card); items deleted since count as done. The block is finished when it has no leftovers. While a block from an
+  earlier day is unfinished, the batch offers exactly its leftovers. A block finished today stays (no more new items
+  today except through extra words); a finished block from an earlier day gives way to a fresh allocation of the
+  day's count. Extra words allocate `count` more New words (scaled 7/2/1 per 10, excluding the block's items), append
+  their ids and add the number appended to `extra_count`; `extra_new_words_today` is `extra_count` while the block was
+  opened today, and 0 otherwise. Starting a New item that is not in the block does not change the block. A stored block
+  in the old `{ opened_on, size, introduced_at_open }` form (no `item_ids`) is read as finished. A stored block without
+  `extra_count` reads as 0 extra words. `introducedAtOpen` and `countIntroducedByPriority`/`countIntroduced` go away if
+  nothing else needs them.
+- **Session leftovers.** A leftover graded in the session is not offered again in that session. It still counts in
+  `new_today_remaining`, so extra words wait until a session starts it. A word set back to New (`set_word_status` /
+  `updateWordStatus('new')`) after a grade in session S is held back in S and offered again in a new session.
+- **Remaining count.** `new_today_remaining` is the block's leftovers still to start while a block is open. With no
+  block open it is the day's pick (the New words the batch would allocate), so with no New words left it is 0; then
+  `add_extra_new_words` appends nothing and saves nothing.
+- **Reset and sessions (migration 005).** A reset sets `superseded_at` (ms) on every review log that still counts, in
+  its transaction (`markReviewLogsSuperseded`, and `markPhraseReviewLogsSuperseded`); the logs stay as history. Session
+  look-ups (`listWordIdsReviewedInSession`, `findReviewLog`, and the phrase equivalents) count only logs whose
+  `superseded_at` is NULL, so a reset in the middle of a web session is a real fresh start. The one-grade rule is a
+  partial unique index: `unique_index_review_logs_on_session_id_and_word_id ON review_logs(session_id, word_id) WHERE
+  superseded_at IS NULL`, and the same for `phrase_review_logs`. A second grade of an item in a session is refused by
+  the index; after a reset one regrade is allowed, and a third is refused. (`practice_reset_at` is no longer written
+  or read.)
+- **Reset atomicity.** The reset reads the scheduled words and phrases inside its transaction.
+- **First-start cost.** Grading a New item returns at once when the stored block was opened today (one settings read).
+  Otherwise it plans the day (one read of the words) and pins the allocation only when no block is open; a block from
+  an earlier day that still has leftovers is kept as it is, and the check for leftovers is made by the planning, not
+  before it.
+- **One guard.** `practiceSettings.readActiveSettings()` throws the one `ConflictError('FSRS practice is not set up
+  yet: run migrate_to_fsrs')`; the three services use it.
+- **One dry-run schema.** `resetPracticeInputSchema` and `migrateToFsrsInputSchema` derive from one base schema.
+- **Allowance.** `calculateNewWordAllowance` takes the block size directly; §10's `extra_new_words` setting is marked
+  superseded by §12/§13.

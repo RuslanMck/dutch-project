@@ -99,7 +99,7 @@ test('overdue words hold back the new words: the reviews stay, no new word is of
   assert.deepEqual(batch.new_words, []);
   assert.equal(batch.counts.overdue, 1);
   assert.equal(batch.counts.new_words_blocked, true);
-  assert.equal(batch.counts.new_today_remaining, 10);
+  assert.equal(batch.counts.new_today_remaining, 2, 'the two New words of the day are held back, not used up');
   assert.deepEqual(batch.counts.new_remaining_by_priority, { 1: 2, 2: 0, 3: 0 });
   assert.equal(context.practiceService.getPracticeBatch({ sessionId: 's2' }).counts.overdue, 1);
 });

@@ -10,6 +10,7 @@ Numbered SQL files that build the SQLite schema. The runner applies them in name
 | `002_practice_attempts.sql` | Adds `practice_attempts`, one row per practice answer, right or wrong. |
 | `003-add-fsrs-practice.sql` | Adds the FSRS card, due date, introduction date, frequency rank and priority columns to `words`, plus `review_logs`, `practice_settings` (seeded defaults) and `word_frequencies`. |
 | `004-add-phrase-fsrs-practice.sql` | Adds the FSRS card, due date, introduction date and status to `phrases`, plus `phrase_review_logs` and the `phrase_new_per_day` setting (5). |
+| `005-allow-regrade-after-reset.sql` | Adds `superseded_at` to `review_logs` and `phrase_review_logs` (NULL = the log counts for its session; a practice reset sets it) and replaces the unique indexes on (session, item) with partial ones over the logs that still count (`WHERE superseded_at IS NULL`), so an item graded before a practice reset can be graded once more in the same session, and a third grade is still refused. |
 
 ## Conventions
 

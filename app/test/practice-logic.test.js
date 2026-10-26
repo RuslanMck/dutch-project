@@ -13,7 +13,13 @@ import {
   parseCard,
   serializeCard,
 } from '../src/domains/practice/fsrs-scheduling.js';
-import { resolveIntakeBlock } from '../src/domains/practice/intake-block.js';
+import {
+  countExtraItemsToday,
+  mapFromStoredBlock,
+  mapToStoredBlock,
+  openIntakeBlock,
+  resolveIntakeBlock,
+} from '../src/domains/practice/intake-block.js';
 import { allocateNewWords, calculateNewWordAllowance } from '../src/domains/practice/new-word-allocation.js';
 import {
   addDaysToCalendarDate,
@@ -360,102 +366,112 @@ test('allocateNewWords: never more words than candidates exist', () => {
   assert.deepEqual(selectedWords.map(word => word.id), [100]);
 });
 
-test('calculateNewWordAllowance: no extra words keeps 10 a day and 7, 2, 1', () => {
-  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, extraNewWordCount: 0 });
-  assert.deepEqual(allowance, { effectiveNewPerDay: 10, scaledTierQuota: { 1: 7, 2: 2, 3: 1 } });
+test('calculateNewWordAllowance: a block of 10 keeps 7, 2, 1', () => {
+  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, blockSize: 10 });
+  assert.deepEqual(allowance, { blockSize: 10, scaledTierQuota: { 1: 7, 2: 2, 3: 1 } });
 });
 
-test('calculateNewWordAllowance: each block of 10 scales the tier quota, so 10 extra gives 20 and 14, 4, 2', () => {
-  const allowance = calculateNewWordAllowance({
-    newPerDay: 10,
-    tierQuota: { 1: 7, 2: 2, 3: 1 },
-    extraNewWordCount: 10,
-  });
-  assert.deepEqual(allowance, { effectiveNewPerDay: 20, scaledTierQuota: { 1: 14, 2: 4, 3: 2 } });
+test('calculateNewWordAllowance: a block of 20 gives 14, 4, 2', () => {
+  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, blockSize: 20 });
+  assert.deepEqual(allowance.scaledTierQuota, { 1: 14, 2: 4, 3: 2 });
 });
 
-test('calculateNewWordAllowance: a partly used block still counts as a block (11 gives two blocks)', () => {
-  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, extraNewWordCount: 1 });
-  assert.deepEqual(allowance, { effectiveNewPerDay: 11, scaledTierQuota: { 1: 14, 2: 4, 3: 2 } });
-  const fourBlocks = calculateNewWordAllowance({
-    newPerDay: 10,
-    tierQuota: { 1: 7, 2: 2, 3: 1 },
-    extraNewWordCount: 21,
-  });
-  assert.deepEqual(fourBlocks, { effectiveNewPerDay: 31, scaledTierQuota: { 1: 28, 2: 8, 3: 4 } });
+test('calculateNewWordAllowance: each quota rounds down, so a block of 15 gives 10, 3, 1', () => {
+  const allowance = calculateNewWordAllowance({ newPerDay: 10, tierQuota: { 1: 7, 2: 2, 3: 1 }, blockSize: 15 });
+  assert.deepEqual(allowance.scaledTierQuota, { 1: 10, 2: 3, 3: 1 });
 });
 
-test('allocateNewWords with the scaled quota: 20 effective, 10 introduced 7, 2, 1, the next 10 split 7, 2, 1', () => {
-  const allowance = calculateNewWordAllowance({
+test('allocateNewWords with a block of 5: rounded quotas 3, 1, 0 and the spare slot goes to P1', () => {
+  const { scaledTierQuota } = calculateNewWordAllowance({
     newPerDay: 10,
     tierQuota: { 1: 7, 2: 2, 3: 1 },
-    extraNewWordCount: 10,
+    blockSize: 5,
   });
   const selectedWords = allocateNewWords({
     candidatesByPriority: { 1: createCandidates(1, 20), 2: createCandidates(2, 20), 3: createCandidates(3, 20) },
-    introducedTodayByPriority: { 1: 7, 2: 2, 3: 1 },
-    newPerDay: allowance.effectiveNewPerDay,
-    tierQuota: allowance.scaledTierQuota,
+    introducedTodayByPriority: { 1: 0, 2: 0, 3: 0 },
+    newPerDay: 5,
+    tierQuota: scaledTierQuota,
   });
-  assert.equal(selectedWords.length, 10);
+  assert.deepEqual(countByPriority(selectedWords), [4, 1, 0]);
+});
+
+test('allocateNewWords: a block of 10 after a block of 10 gives another 7, 2, 1', () => {
+  const selectedWords = allocateNewWords({
+    candidatesByPriority: { 1: createCandidates(1, 20), 2: createCandidates(2, 20), 3: createCandidates(3, 20) },
+    introducedTodayByPriority: { 1: 0, 2: 0, 3: 0 },
+    newPerDay: 10,
+    tierQuota: { 1: 7, 2: 2, 3: 1 },
+  });
   assert.deepEqual(countByPriority(selectedWords), [7, 2, 1]);
 });
 
-test('resolveIntakeBlock: no stored block opens a fresh block of the day count today, nothing started yet', () => {
-  const block = resolveIntakeBlock({
-    storedBlock: null,
-    today: '2026-10-26',
-    perDayCount: 10,
-    introducedTotals: { 1: 4, 2: 1, 3: 0 },
-  });
+test('resolveIntakeBlock: no stored block means no block is open, so the day count is allocated', () => {
+  const block = resolveIntakeBlock({ storedBlock: null, today: '2026-10-26', newItemIds: new Set([1, 2]) });
+  assert.equal(block.isFresh, true);
   assert.equal(block.openedOn, '2026-10-26');
-  assert.equal(block.size, 10);
-  assert.equal(block.introducedCount, 0);
-  assert.deepEqual(block.introducedAtOpen, { 1: 4, 2: 1, 3: 0 });
-  assert.equal(block.isStored, false);
+  assert.deepEqual(block.itemIds, []);
+  assert.deepEqual(block.leftoverIds, []);
 });
 
-test('resolveIntakeBlock: an unfinished block from an earlier day stays open with only its own started items', () => {
-  const storedBlock = { openedOn: '2026-10-25', size: 10, introducedAtOpen: { 1: 4, 2: 1, 3: 0 } };
-  const block = resolveIntakeBlock({
-    storedBlock,
-    today: '2026-10-26',
-    perDayCount: 10,
-    introducedTotals: { 1: 7, 2: 1, 3: 1 },
-  });
+test('resolveIntakeBlock: an unfinished block from an earlier day offers exactly its pinned items still New', () => {
+  const storedBlock = { openedOn: '2026-10-25', itemIds: [1, 2, 3, 4, 5] };
+  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([2, 4, 5, 9]) });
+  assert.equal(block.isFresh, false);
   assert.equal(block.openedOn, '2026-10-25');
-  assert.equal(block.introducedCount, 4);
-  assert.deepEqual(block.introducedByGroup, { 1: 3, 2: 0, 3: 1 });
-  assert.equal(block.isStored, true);
+  assert.deepEqual(block.leftoverIds, [2, 4, 5], 'the started item 1 and the unpinned 9 are not leftovers');
 });
 
-test('resolveIntakeBlock: a finished block from an earlier day gives way to a fresh block from zero', () => {
-  const storedBlock = { openedOn: '2026-10-25', size: 10, introducedAtOpen: { 1: 0, 2: 0, 3: 0 } };
-  const block = resolveIntakeBlock({
-    storedBlock,
-    today: '2026-10-26',
-    perDayCount: 10,
-    introducedTotals: { 1: 7, 2: 2, 3: 1 },
-  });
+test('resolveIntakeBlock: a pinned item that is no longer New (started or deleted) counts as done', () => {
+  const storedBlock = { openedOn: '2026-10-25', itemIds: [1, 2, 3] };
+  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([3]) });
+  assert.deepEqual(block.leftoverIds, [3]);
+  assert.equal(block.isFresh, false);
+});
+
+test('resolveIntakeBlock: a finished block from an earlier day gives way to a fresh allocation', () => {
+  const storedBlock = { openedOn: '2026-10-25', itemIds: [1, 2] };
+  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([7]) });
+  assert.equal(block.isFresh, true);
   assert.equal(block.openedOn, '2026-10-26');
-  assert.equal(block.introducedCount, 0, 'items of the earlier block never count against the new one');
-  assert.deepEqual(block.introducedAtOpen, { 1: 7, 2: 2, 3: 1 });
+  assert.deepEqual(block.itemIds, []);
 });
 
-test('resolveIntakeBlock: a block finished today stays, and a reset never gives a negative count', () => {
-  const finishedToday = resolveIntakeBlock({
-    storedBlock: { openedOn: '2026-10-26', size: 10, introducedAtOpen: { phrases: 0 } },
-    today: '2026-10-26',
-    perDayCount: 10,
-    introducedTotals: { phrases: 10 },
-  });
-  assert.equal(finishedToday.isStored, true);
-  assert.equal(finishedToday.size - finishedToday.introducedCount, 0);
-  const afterReset = resolveIntakeBlock({
-    storedBlock: { openedOn: '2026-10-26', size: 5, introducedAtOpen: { phrases: 3 } },
-    today: '2026-10-26',
-    perDayCount: 5,
-    introducedTotals: { phrases: 0 },
-  });
-  assert.equal(afterReset.introducedCount, 0);
+test('resolveIntakeBlock: a block opened today stays once finished, so no fresh block opens the same day', () => {
+  const storedBlock = { openedOn: '2026-10-26', itemIds: [1, 2, 3] };
+  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([8]) });
+  assert.equal(block.isFresh, false);
+  assert.deepEqual(block.itemIds, [1, 2, 3]);
+  assert.deepEqual(block.leftoverIds, []);
+});
+
+test('resolveIntakeBlock: the stored extra count passes through; a fresh block has none', () => {
+  const storedBlock = { openedOn: '2026-10-26', itemIds: [1, 2], extraCount: 10 };
+  const openBlock = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set() });
+  assert.equal(openBlock.extraCount, 10);
+  const freshBlock = resolveIntakeBlock({ storedBlock: null, today: '2026-10-26', newItemIds: new Set([1]) });
+  assert.equal(freshBlock.extraCount, 0);
+});
+
+test('mapFromStoredBlock: a block saved before items were pinned reads as finished, with no items or extras', () => {
+  const oldBlock = mapFromStoredBlock({ opened_on: '2026-10-25', size: 10, introduced_at_open: { 1: 4, 2: 0, 3: 0 } });
+  assert.deepEqual(oldBlock, { openedOn: '2026-10-25', itemIds: [], extraCount: 0 });
+  const block = resolveIntakeBlock({ storedBlock: oldBlock, today: '2026-10-26', newItemIds: new Set([1]) });
+  assert.equal(block.isFresh, true);
+  assert.equal(mapFromStoredBlock(null), null);
+});
+
+test('mapToStoredBlock and mapFromStoredBlock round-trip the pinned items and the extra count', () => {
+  const block = openIntakeBlock({ today: '2026-10-26', itemIds: [3, 1, 2], extraCount: 2 });
+  const saved = mapToStoredBlock(block);
+  assert.deepEqual(saved, { opened_on: '2026-10-26', item_ids: [3, 1, 2], extra_count: 2 });
+  assert.deepEqual(mapFromStoredBlock(saved), block);
+  const savedWithoutExtras = mapFromStoredBlock({ opened_on: '2026-10-26', item_ids: [3] });
+  assert.equal(savedWithoutExtras.extraCount, 0, 'saved without extra_count');
+});
+
+test('countExtraItemsToday: only a block opened today counts its extra new words', () => {
+  assert.equal(countExtraItemsToday({ block: { openedOn: '2026-10-26', extraCount: 10 }, today: '2026-10-26' }), 10);
+  assert.equal(countExtraItemsToday({ block: { openedOn: '2026-10-25', extraCount: 10 }, today: '2026-10-26' }), 0);
+  assert.equal(countExtraItemsToday({ block: { openedOn: '2026-10-26', extraCount: 0 }, today: '2026-10-26' }), 0);
 });

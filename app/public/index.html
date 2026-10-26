@@ -138,8 +138,9 @@
         <select id="practice-mode">
           <option value="fsrs">Переклад (FSRS)</option>
           <option value="art">Артикль</option>
+          <option value="struggling">Важкі слова</option>
         </select>
-        <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" змінює розклад повторень кожного слова. "Артикль" — це тренування, яке нічого не змінює.</p>
+        <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" змінює розклад повторень кожного слова. "Артикль" — це тренування, яке нічого не змінює. "Важкі слова" — тренування слів, на які ви останнього разу відповіли неправильно або важко; нічого не змінює.</p>
       </div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
       <form id="practice-form" class="row-form" autocomplete="off">
@@ -166,6 +167,14 @@
         <ul id="practice-summary-list" class="practice-summary__list"></ul>
         <button id="practice-extra-words-button" class="primary practice-summary__extra-button" type="button"
           hidden>Хочете ще 10 нових слів?</button>
+        <button id="practice-struggling-button" class="primary practice-summary__struggling-button" type="button"
+          hidden></button>
+      </section>
+      <section id="practice-drill-summary" class="practice-summary" aria-label="Підсумок тренування" hidden>
+        <p id="practice-drill-result" class="practice-summary__text" role="status"></p>
+        <p id="practice-drill-note" class="muted"></p>
+        <button id="practice-drill-again-button" class="primary practice-summary__struggling-button"
+          type="button">Потренувати ще раз</button>
       </section>
       <button id="practice-restart-button" class="primary practice-restart" type="button" hidden>Почати знову</button>
     </section>

@@ -277,7 +277,7 @@ test('phrase practice REST: batch, grade, repeat, unknown field, phrase list and
   const batchBody = await batch.json();
   assert.equal(batchBody.session_id, 'http-phrases');
   assert.ok(batchBody.new_phrases.some(phrase => phrase.id === phrasePracticeId));
-  assert.equal(batchBody.counts.new_today_remaining, 5);
+  assert.equal(batchBody.counts.new_today_remaining, batchBody.new_phrases.length, 'no block is open: what is offered');
   assert.equal((await fetch(`${base}/api/practice/phrases/batch?session_id=x&max_reviews=0`, { headers: BEARER }))
     .status, 400);
 
@@ -408,4 +408,46 @@ test('10 failed logins in 15 minutes give 429, even with the right password', as
   }
   const blocked = await login('correct horse');
   assert.equal(blocked.status, 429);
+});
+
+test('GET /api/practice/struggling-words: 409 before the migration, then the words to drill, read only', async () => {
+  const drillContext = createTestContext({ clock: { now: () => Date.parse('2026-10-24T12:00:00+02:00') } });
+  const drillApplication = createApplication({
+    configuration,
+    services: drillContext,
+    changeEventBus: drillContext.changeEventBus,
+    clock: drillContext.clock,
+  });
+  const drillServer = drillApplication.listen(0, '127.0.0.1');
+  await once(drillServer, 'listening');
+  try {
+    const drillBase = `http://127.0.0.1:${drillServer.address().port}`;
+    const getStrugglingWords = () => fetch(`${drillBase}/api/practice/struggling-words`, { headers: BEARER });
+    assert.equal((await getStrugglingWords()).status, 409);
+
+    const [kat, hond] = drillContext.wordService.createWords([
+      { nl: 'kat', uk: 'кіт', section: '6.1' },
+      { nl: 'hond', uk: 'собака', section: '6.1' },
+    ]).added.map(word => word.id);
+    drillContext.practiceService.migrateToFsrs({ isDryRun: false });
+    drillContext.practiceService.gradeWord({ wordId: kat, grade: 'again', answer: 'x', sessionId: 'http-drill' });
+    drillContext.practiceService.gradeWord({ wordId: hond, grade: 'good', sessionId: 'http-drill' });
+    const countRows = table => drillContext.database.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get();
+    const logsBefore = countRows('review_logs');
+    const errorsBefore = countRows('word_errors');
+
+    const response = await getStrugglingWords();
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body.words.map(word => word.id), [kat]);
+    assert.equal(body.count, 1);
+    assert.equal(body.words[0].last_grade, 'again');
+    assert.equal(body.words[0].error_count, 1);
+    await getStrugglingWords();
+    assert.equal(countRows('review_logs'), logsBefore);
+    assert.equal(countRows('word_errors'), errorsBefore);
+  } finally {
+    drillServer.closeAllConnections();
+    await new Promise(resolve => drillServer.close(resolve));
+  }
 });

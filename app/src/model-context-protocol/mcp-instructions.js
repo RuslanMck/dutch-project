@@ -58,5 +58,8 @@ export const MCP_INSTRUCTIONS = [
   '6. Chapters and priorities: set_current_chapter when the learner moves on in the textbook. It sets the priority',
   '   of new words (current and previous chapter first) and returns a preview. set_word_priority sets one word by',
   '   hand (1, 2 or 3; null clears it). preview_priorities shows which new words come next, changing nothing.',
+  '7. Difficult words: when the learner wants to drill the words they find hard, call get_struggling_words and quiz',
+  '   them as in step 4 (Ukrainian prompt, Dutch answer, explanation after each). Do NOT call grade_word or',
+  '   log_word_error for them: the drill changes nothing, the schedule moves only in real practice.',
   'Changes appear live in the web app.',
 ].join('\n');

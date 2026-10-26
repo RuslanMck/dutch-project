@@ -68,6 +68,10 @@ answer to each phrase with `grade_phrase` (`again`, `hard` or `good`), as for wo
 counts, there are at most 5 new phrases a day, oldest first, no new phrase while a phrase is overdue
 (`counts.new_phrases_blocked`), and phrases have no word errors.
 
+**Difficult words.** When I ask to drill the words I find hard, call `get_struggling_words`: it lists the words whose
+last answer was `again` or `hard`, most errors first. Quiz them as above, but do not call `grade_word` or
+`log_word_error` for them. The drill changes nothing; the schedule moves only in real practice.
+
 **Chapters and priorities.** When I tell you which chapter I am on, call `set_current_chapter`: new words of that
 chapter and the one before get priority 1, and the call returns a preview. `set_word_priority` sets one word's priority
 by hand (1, 2 or 3; `null` clears it). `preview_priorities` shows which new words come next without changing anything.

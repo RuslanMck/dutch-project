@@ -17,6 +17,9 @@ import {
   buildNextReviewLine,
   canOfferExtraNewWords,
   formatShortDate,
+  advanceDrillQueue,
+  formatStrugglingDrillButton,
+  buildStrugglingDrillEnd,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -317,6 +320,38 @@ test('formatShortDate: ISO date to day.month, empty without a date', () => {
   assert.equal(formatShortDate(null), '');
   assert.equal(formatShortDate(undefined), '');
   assert.equal(formatShortDate('25.10.2026'), '');
+});
+
+test('advanceDrillQueue: a word typed right leaves the front of the queue', () => {
+  assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'good'), ['b', 'c']);
+  assert.deepEqual(advanceDrillQueue(['a'], 'good'), []);
+});
+
+test('advanceDrillQueue: wrong, hard and "Не знаю" answers send the word to the end', () => {
+  assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'again'), ['b', 'c', 'a']);
+  assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'hard'), ['b', 'c', 'a']);
+  assert.deepEqual(advanceDrillQueue(['a'], 'again'), ['a']);
+});
+
+test('advanceDrillQueue: returns a new array and leaves the queue it was given unchanged', () => {
+  const queue = ['a', 'b'];
+  const next = advanceDrillQueue(queue, 'again');
+  assert.deepEqual(queue, ['a', 'b']);
+  assert.notEqual(next, queue);
+  assert.deepEqual(advanceDrillQueue([], 'good'), []);
+});
+
+test('formatStrugglingDrillButton: the button text carries the word count', () => {
+  assert.equal(formatStrugglingDrillButton(3), 'Потренувати важкі слова (3)');
+});
+
+test('buildStrugglingDrillEnd: first-try count out of all words, and the schedule note', () => {
+  assert.deepEqual(buildStrugglingDrillEnd({ correctFirstTimeCount: 1, totalCount: 3 }), {
+    resultText: 'Тренування завершено: правильно з першого разу 1 з 3.',
+    noteText: 'Це тренування не змінює розклад слів.',
+  });
+  assert.equal(buildStrugglingDrillEnd({ correctFirstTimeCount: 0, totalCount: 2 }).resultText,
+    'Тренування завершено: правильно з першого разу 0 з 2.');
 });
 
 test('canOfferExtraNewWords: only while the gate is open and New words remain today', () => {

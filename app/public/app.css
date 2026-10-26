@@ -375,9 +375,16 @@ table.words td.w {
   border-bottom: none;
 }
 
-.practice-summary__extra-button {
+.practice-summary__extra-button,
+.practice-summary__struggling-button {
   width: 100%;
   margin-top: 12px;
+}
+
+.practice-summary__text {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .practice-restart {

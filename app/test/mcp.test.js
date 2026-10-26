@@ -23,7 +23,7 @@ const EXPECTED_TOOLS = [
   'add_phrases', 'list_phrases', 'delete_phrase', 'add_text', 'list_texts', 'get_text',
   'get_practice_batch', 'grade_word', 'set_current_chapter', 'set_word_priority', 'import_frequency_list',
   'preview_priorities', 'migrate_to_fsrs', 'practice_stats', 'get_phrase_batch', 'grade_phrase', 'add_extra_new_words',
-  'reset_practice',
+  'reset_practice', 'get_struggling_words',
 ];
 
 const application = createApplication({
@@ -526,12 +526,43 @@ test('add_extra_new_words: listed, refused until the regular words are used up, 
     const nextBatch = await call(freshClient, 'get_practice_batch', { session_id: 'mcp-extra' });
     assert.equal(nextBatch.new_words.length, 2);
 
-    // Without any arguments the SDK applies the contract's default: 10 more, so 12 extra for today.
+    // Without any arguments the SDK applies the contract's default: 10 more, so 12 extra for today. Ten more New words
+    // are added first, because extra words are only the New words that exist.
     for (const word of nextBatch.new_words) {
       await call(freshClient, 'grade_word', { id: word.id, grade: 'good', session_id: 'mcp-extra' });
     }
+    await call(freshClient, 'add_words', {
+      words: Array.from({ length: 10 }, (_, index) => ({
+        nl: `extra woord ${index + 1}`,
+        uk: 'додаткове',
+        section: '6.1',
+      })),
+    });
     const defaulted = await freshClient.callTool({ name: 'add_extra_new_words' });
     assert.notEqual(defaulted.isError, true, defaulted.content?.[0]?.text);
     assert.deepEqual(JSON.parse(defaulted.content[0].text), { extra_new_words_today: 12, new_today_remaining: 10 });
+  });
+});
+
+test('get_struggling_words is read-only, lists the words to drill and changes no schedule or review log', async () => {
+  await withFreshMcpClient(async freshClient => {
+    const { tools } = await freshClient.listTools();
+    assert.equal(tools.find(tool => tool.name === 'get_struggling_words').annotations.readOnlyHint, true);
+
+    const added = await call(freshClient, 'add_words', {
+      words: [{ nl: 'kat', uk: 'кіт', section: '6.1' }, { nl: 'hond', uk: 'собака', section: '6.1' }],
+    });
+    const [kat, hond] = added.added.map(word => word.id);
+    await call(freshClient, 'migrate_to_fsrs', { dry_run: false });
+    await call(freshClient, 'grade_word', { id: kat, grade: 'again', answer: 'x', session_id: 'mcp-drill' });
+    await call(freshClient, 'grade_word', { id: hond, grade: 'good', session_id: 'mcp-drill' });
+    const statsBefore = await call(freshClient, 'practice_stats');
+
+    const drill = await call(freshClient, 'get_struggling_words');
+
+    assert.deepEqual(drill.words.map(word => word.id), [kat]);
+    assert.equal(drill.words[0].last_grade, 'again');
+    assert.equal(drill.count, 1);
+    assert.deepEqual(await call(freshClient, 'practice_stats'), statsBefore);
   });
 });

@@ -1,52 +1,53 @@
-// Plans the New words on offer: the backlog gate, the intake block (the day's 10, extra blocks on request, and the
-// leftovers of an unfinished block from an earlier day), the words offered by priority quota, and the refusal of extra
-// new words while the block is not finished. Reads the words through the practice repository and writes nothing.
+// Plans the New words on offer: the backlog gate, the intake block (its pinned words still New, or a fresh
+// allocation of the day's count when no block is open), the extra new words, and the refusal of extra words while
+// the block is not finished. Reads the words through the practice repository and writes nothing.
 import { ConflictError } from '../../errors/domain-errors.js';
-import { resolveIntakeBlock } from './intake-block.js';
+import { countExtraItemsToday, resolveIntakeBlock } from './intake-block.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
 import { findStartOfDay } from './practice-calendar.js';
 import { compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
 
 const PRIORITY_VALUES = Object.freeze([1, 2, 3]);
+const NO_INTRODUCTIONS_BY_PRIORITY = Object.freeze({ 1: 0, 2: 0, 3: 0 });
 
 export function createNewWordPlanner({ practiceRepository }) {
-  // The New words on offer, shared by the batch, the statistics, grading and addExtraNewWords. The backlog gate holds
-  // them back while any word is overdue (counted over all words, not only this session); isBlocked is true only when
-  // that actually holds back some words. Words started since the block opened count against it, so a block left
-  // unfinished on an earlier day offers only its leftovers, and a new block opens only once it is finished.
+  // The New words on offer, shared by the batch, the statistics, grading and addExtraNewWords.
+  // allocatedCandidates is the block's leftovers that gradedWordIds (graded in this session) do not hold back, or the
+  // day's pick when no block is open. offeredCandidates is what the batch returns: none while a word is overdue
+  // (counted over all words, not only this session), so isBlocked is true only when that holds back some words.
+  // newTodayRemainingCount counts what is still to be started: the block's leftovers, or the day's pick.
   function planNewWords({ settings, today, gradedWordIds }) {
     const todayStart = findStartOfDay(today, settings.timeZone);
     const overdueCount = practiceRepository.countWordsDueBefore(todayStart);
+    const newWordRows = listNewWordRows();
     const block = resolveIntakeBlock({
       storedBlock: settings.newWordBlock,
       today,
-      perDayCount: settings.newPerDay,
-      introducedTotals: practiceRepository.countIntroducedByPriority(),
+      newItemIds: new Set(newWordRows.map(word => word.id)),
     });
-    const { scaledTierQuota } = calculateNewWordAllowance({
-      newPerDay: settings.newPerDay,
-      tierQuota: settings.tierQuota,
-      extraNewWordCount: Math.max(0, block.size - settings.newPerDay),
-    });
-    const candidatesByPriority = groupNewWordCandidatesByPriority(gradedWordIds);
-    const allocatedCandidates = allocateNewWords({
-      candidatesByPriority,
-      introducedTodayByPriority: block.introducedByGroup,
-      newPerDay: block.size,
-      tierQuota: scaledTierQuota,
-    });
+    const candidatesByPriority = groupCandidatesByPriority(newWordRows, gradedWordIds);
+    const allocatedCandidates = block.isFresh
+      ? allocateBlockCandidates({ settings, candidatesByPriority, blockSize: settings.newPerDay })
+      : findLeftoverCandidates(newWordRows, block.leftoverIds).filter(candidate => !gradedWordIds.has(candidate.id));
     const isBlocked = overdueCount > 0 && allocatedCandidates.length > 0;
     const offeredCandidates = isBlocked ? [] : allocatedCandidates;
     return {
       block,
       overdueCount,
       isBlocked,
+      allocatedCandidates,
       offeredCandidates,
       introducedTodayCount: sumCounts(practiceRepository.countIntroducedOnByPriority(today)),
-      newTodayRemainingCount: Math.max(0, block.size - block.introducedCount),
-      extraNewWordsToday: block.openedOn === today ? Math.max(0, block.size - settings.newPerDay) : 0,
+      newTodayRemainingCount: block.isFresh ? allocatedCandidates.length : block.leftoverIds.length,
+      extraNewWordsToday: countExtraItemsToday({ block, today }),
       remainingByPriority: countRemainingCandidates(candidatesByPriority, offeredCandidates),
     };
+  }
+
+  // The ids of count extra New words, picked like a block of count (7, 2, 1 per 10) from the New words outside it.
+  function planExtraNewWordIds({ settings, count, blockWordIds }) {
+    const candidatesByPriority = groupCandidatesByPriority(listNewWordRows(), new Set(blockWordIds));
+    return allocateBlockCandidates({ settings, candidatesByPriority, blockSize: count }).map(candidate => candidate.id);
   }
 
   // Refused while a word is overdue, and while the intake block is not finished (its words are not all started), so
@@ -60,17 +61,42 @@ export function createNewWordPlanner({ practiceRepository }) {
     }
   }
 
-  function groupNewWordCandidatesByPriority(gradedWordIds) {
-    const candidates = practiceRepository.listPracticeWords()
-      .filter(word => word.fsrs_card === null && !gradedWordIds.has(word.id))
-      .map(mapToQueueCandidate)
-      .sort(compareQueueOrder);
-    const candidatesByPriority = { 1: [], 2: [], 3: [] };
-    for (const candidate of candidates) candidatesByPriority[candidate.priority].push(candidate);
-    return candidatesByPriority;
+  function listNewWordRows() {
+    return practiceRepository.listPracticeWords().filter(word => word.fsrs_card === null);
   }
 
-  return Object.freeze({ planNewWords, assertExtraNewWordsAllowed });
+  return Object.freeze({ planNewWords, planExtraNewWordIds, assertExtraNewWordsAllowed });
+}
+
+// The block's leftovers, in the order they were pinned.
+function findLeftoverCandidates(newWordRows, leftoverWordIds) {
+  const wordById = new Map(newWordRows.map(word => [word.id, word]));
+  return leftoverWordIds.map(wordId => mapToQueueCandidate(wordById.get(wordId)));
+}
+
+// Words in queue order, grouped by priority; excludedWordIds (graded in this session) are left out.
+function groupCandidatesByPriority(newWordRows, excludedWordIds) {
+  const candidates = newWordRows
+    .filter(word => !excludedWordIds.has(word.id))
+    .map(mapToQueueCandidate)
+    .sort(compareQueueOrder);
+  const candidatesByPriority = { 1: [], 2: [], 3: [] };
+  for (const candidate of candidates) candidatesByPriority[candidate.priority].push(candidate);
+  return candidatesByPriority;
+}
+
+function allocateBlockCandidates({ settings, candidatesByPriority, blockSize }) {
+  const { scaledTierQuota } = calculateNewWordAllowance({
+    newPerDay: settings.newPerDay,
+    tierQuota: settings.tierQuota,
+    blockSize,
+  });
+  return allocateNewWords({
+    candidatesByPriority,
+    introducedTodayByPriority: NO_INTRODUCTIONS_BY_PRIORITY,
+    newPerDay: blockSize,
+    tierQuota: scaledTierQuota,
+  });
 }
 
 function mapToQueueCandidate(wordRow) {

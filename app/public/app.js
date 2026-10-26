@@ -2,12 +2,15 @@
 // and keeps user input (form text, card index, practice question, open rules) across re-renders.
 import * as api from './api.js';
 import {
+  advanceDrillQueue,
   buildNextReviewLine,
+  buildStrugglingDrillEnd,
   canOfferExtraNewWords,
   checkAnswer,
   esc,
   formatDutchWithArticle,
   formatShortDate,
+  formatStrugglingDrillButton,
   gradeTranslationAnswer,
   normalise,
   renderRuleBody,
@@ -97,7 +100,11 @@ const ui = {
     dueTomorrow: null,
     newWordsBlocked: false,          // the latest batch held New words back for overdue reviews
     newRemainingByPriority: {},      // the latest batch: New words left after this batch, by priority
+    strugglingCount: null,           // words the struggling drill would ask, read when the summary shows
   },
+  // Struggling-words drill (mode 'struggling'). One object per run, see createStrugglingDrill. status: idle | loading |
+  // ready | done | empty | unconfigured | failed. Nothing about the drill is posted.
+  struggling: createStrugglingDrill('idle'),
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
 let memorySession = null;          // { sessionId, calendarDate } used when sessionStorage is blocked
@@ -548,9 +555,10 @@ function pickArticleQuestion(excludedWordId = null) {
 }
 
 // The word the Practice tab is asking about, or null when there is none (the trash button needs it).
+// The struggling-words drill has none: it is not a word the schedule is about.
 function findCurrentPracticeWord() {
   if (ui.practice.mode === 'art') return ui.practice.current?.word ?? null;
-  if (ui.fsrs.status !== 'ready' || !ui.fsrs.current) return null;
+  if (ui.practice.mode !== 'fsrs' || ui.fsrs.status !== 'ready' || !ui.fsrs.current) return null;
   return ui.fsrs.current.word;
 }
 
@@ -618,6 +626,7 @@ async function loadFsrsBatch(sessionId) {
     dueTomorrow: null,
     newWordsBlocked: false,
     newRemainingByPriority: {},
+    strugglingCount: null,
   });
   renderPractice();
   try {
@@ -707,6 +716,7 @@ function finishFsrsSession() {
   session.status = 'done';
   saveSession(createSessionId());
   loadDueTomorrow();
+  loadStrugglingCount();
   renderPractice();
 }
 
@@ -732,14 +742,18 @@ async function handleExtraNewWordsClick() {
   if (refused && !isContinued && ui.fsrs.status === 'done') notice(EXTRA_NEW_WORDS_REFUSED_MESSAGE);
 }
 
-// A deleted word leaves the practice at once, so the session never asks for it again. When it is the question on
-// screen, the answer typed for it is cleared: Enter must not grade the word that replaces it.
+// A deleted word leaves the practice at once, so no session or drill asks for it again. When it is the question on
+// screen (the FSRS session, the article drill or the struggling-words drill), the answer typed for it is cleared: Enter
+// must not grade the word that replaces it.
 function forgetDeletedWord(wordId) {
   const session = ui.fsrs;
+  const drill = ui.struggling;
   const practice = ui.practice;
-  const wasOnScreen = findCurrentPracticeWord()?.id === wordId;
+  const wasOnScreen = findCurrentPracticeWord()?.id === wordId || drill.current?.word.id === wordId;
   session.queue = session.queue.filter(word => word.id !== wordId);
   if (session.current?.word.id === wordId) showNextFsrsWord();
+  drill.queue = drill.queue.filter(word => word.id !== wordId);
+  if (drill.current?.word.id === wordId) showNextStrugglingWord();
   if (practice.mode === 'art' && practice.current?.word.id === wordId) pickArticleQuestion(wordId);
   if (wasOnScreen) $('practice-input').value = '';
   renderPractice();
@@ -760,7 +774,14 @@ async function loadDueTomorrow() {
 // Enter or the button: check the answer; once checked the button reads "Далі" and moves on.
 function submitPractice() {
   if (ui.practice.mode === 'fsrs') submitFsrsAnswer();
+  else if (ui.practice.mode === 'struggling') submitStrugglingAnswer();
   else submitArticleAnswer();
+}
+
+// «Не знаю» is shown in the FSRS mode and in the drill; each one reveals the answer its own way.
+function handlePracticeSkipClick() {
+  if (ui.practice.mode === 'struggling') revealStrugglingAnswer();
+  else revealFsrsAnswer();
 }
 
 function submitFsrsAnswer() {
@@ -882,12 +903,15 @@ function submitArticleAnswer() {
 }
 
 function renderPractice() {
-  const isFsrs = ui.practice.mode === 'fsrs';
-  $('practice-mode').value = ui.practice.mode;
+  const mode = ui.practice.mode;
+  const isFsrs = mode === 'fsrs';
+  $('practice-mode').value = mode;
   $('practice-progress-hint-button').hidden = !isFsrs;
   if (!isFsrs) setHintOpen($('practice-progress-hint-button'), false);
   $('practice-delete-button').hidden = !findCurrentPracticeWord();
+  $('practice-drill-summary').hidden = mode !== 'struggling' || ui.struggling.status !== 'done';
   if (isFsrs) renderFsrsPractice();
+  else if (mode === 'struggling') renderStrugglingPractice();
   else renderArticlePractice();
 }
 
@@ -962,6 +986,9 @@ function renderFsrsPractice() {
     newRemainingByPriority: session.newRemainingByPriority,
   });
   $('practice-restart-button').hidden = session.status !== 'done' && session.status !== 'failed';
+  const strugglingButton = $('practice-struggling-button');
+  strugglingButton.hidden = session.status !== 'done' || !session.strugglingCount;
+  if (session.strugglingCount) strugglingButton.textContent = formatStrugglingDrillButton(session.strugglingCount);
   setPracticeMessage(session.feedback);
   if (session.status === 'done') renderPracticeSummary();
 }
@@ -977,6 +1004,170 @@ function renderPracticeSummary() {
   ];
   $('practice-summary-list').innerHTML = items.map(([label, value]) =>
     `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
+}
+
+// The FSRS summary's count of the drill's words, read fresh each time the summary shows. A failed read leaves the
+// button hidden; the drill reports its own errors.
+async function loadStrugglingCount() {
+  const sessionId = ui.fsrs.sessionId;
+  ui.fsrs.strugglingCount = null;
+  try {
+    const listing = await api.getStrugglingWords();
+    if (ui.fsrs.sessionId === sessionId) ui.fsrs.strugglingCount = listing.count;
+  } catch { /* the button stays hidden */ }
+  renderPractice();
+}
+
+// The FSRS summary's button: the mode select moves to the drill and the drill starts.
+function handleStrugglingButtonClick() {
+  ui.practice.mode = 'struggling';
+  startStrugglingDrill();
+}
+
+// ---------- 3b · Важкі слова (struggling-words drill) ----------
+
+// One drill run. Each run has its own object, so a list that arrives late cannot change a newer run.
+function createStrugglingDrill(status) {
+  return {
+    status,
+    queue: [],                       // words still to answer; the front one is on screen
+    total: 0,                        // words the drill started with
+    correctFirstTimeCount: 0,        // words typed right at their first check
+    answeredWordIds: new Set(),      // words whose first check is done
+    current: null,                   // { word, checked, grade }
+    feedback: null,
+  };
+}
+
+// Reads the words whose latest graded answer was wrong or hard. Nothing is posted: the schedule does not change.
+async function startStrugglingDrill() {
+  const drill = createStrugglingDrill('loading');
+  ui.struggling = drill;
+  $('practice-input').value = '';
+  renderPractice();
+  let listing;
+  try {
+    listing = await api.getStrugglingWords();
+  } catch (error) {
+    if (ui.struggling !== drill) return;
+    if (error.status === 409) {
+      drill.status = 'unconfigured';
+    } else {
+      drill.status = 'failed';
+      notice(error.message || 'Помилка');
+    }
+    renderPractice();
+    return;
+  }
+  if (ui.struggling !== drill) return;
+  drill.queue = listing.words;
+  drill.total = listing.words.length;
+  if (drill.queue.length) {
+    drill.status = 'ready';
+    showNextStrugglingWord();
+  } else {
+    drill.status = 'empty';
+  }
+  renderPractice();
+}
+
+// Shows the front word of the queue; an empty queue ends the drill.
+function showNextStrugglingWord() {
+  const drill = ui.struggling;
+  drill.feedback = null;
+  if (drill.queue.length) {
+    drill.current = { word: drill.queue[0], checked: false, grade: null };
+    return;
+  }
+  drill.current = null;
+  drill.status = 'done';
+}
+
+// Enter or the button: check the typed answer; once checked the button reads "Далі" and moves on.
+function submitStrugglingAnswer() {
+  const drill = ui.struggling;
+  const input = $('practice-input');
+  if (drill.current?.checked) {
+    advanceStrugglingWord();
+    return;
+  }
+  if (!drill.current) return;
+  const result = gradeTranslationAnswer(drill.current.word, input.value);
+  if (!result.counted) {
+    input.focus();
+    return;
+  }
+  answerStrugglingWord(result);
+}
+
+// «Не знаю»: the right answer is shown; the word goes back to the end like a wrong answer. Nothing is posted.
+function revealStrugglingAnswer() {
+  const drill = ui.struggling;
+  if (!drill.current || drill.current.checked) return;
+  answerStrugglingWord(revealTranslationAnswer(drill.current.word));
+  $('practice-btn').focus();
+}
+
+// Checks the word on screen. Only its first check counts toward "правильно з першого разу".
+function answerStrugglingWord(result) {
+  const drill = ui.struggling;
+  const { word } = drill.current;
+  if (!drill.answeredWordIds.has(word.id)) {
+    drill.answeredWordIds.add(word.id);
+    if (result.grade === 'good') drill.correctFirstTimeCount += 1;
+  }
+  drill.current.checked = true;
+  drill.current.grade = result.grade;
+  drill.feedback = { text: result.message, ok: result.grade === 'good' };
+  renderPractice();
+}
+
+// "Далі": a word typed right leaves the queue; any other word comes back at the end, until it is typed right.
+function advanceStrugglingWord() {
+  const drill = ui.struggling;
+  drill.queue = advanceDrillQueue(drill.queue, drill.current.grade);
+  $('practice-input').value = '';
+  showNextStrugglingWord();
+  renderPractice();
+  $('practice-input').focus();
+}
+
+function renderStrugglingPractice() {
+  const drill = ui.struggling;
+  const current = drill.current;
+  const isReady = drill.status === 'ready' && !!current;
+  const questionByStatus = {
+    idle: '',
+    loading: 'Завантаження…',
+    ready: isReady ? current.word.uk : '',
+    done: '',
+    empty: 'Важких слів немає.',
+    unconfigured: 'Практика FSRS ще не налаштована',
+    failed: 'Не вдалося завантажити слова',
+  };
+  $('practice-q').textContent = questionByStatus[drill.status];
+  $('practice-form').hidden = !isReady;
+  $('practice-skip-button').hidden = !isReady || current.checked;
+  if (isReady) {
+    $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
+    $('practice-input').placeholder = 'нідерландською';
+  }
+  $('practice-progress').textContent = isReady ? `Залишилось: ${drill.queue.length}` : '';
+  $('practice-schedule').textContent = '';
+  $('practice-score').textContent = '';
+  $('practice-gate').hidden = true;
+  $('practice-summary').hidden = true;
+  $('practice-restart-button').hidden = true;
+  setPracticeMessage(drill.feedback);
+  if (drill.status === 'done') renderStrugglingEnd();
+}
+
+// The end of the drill: the first-check count and the note that the schedule did not change.
+function renderStrugglingEnd() {
+  const drill = ui.struggling;
+  const end = buildStrugglingDrillEnd({ correctFirstTimeCount: drill.correctFirstTimeCount, totalCount: drill.total });
+  $('practice-drill-result').textContent = end.resultText;
+  $('practice-drill-note').textContent = end.noteText;
 }
 
 // ---------- 4 · Правила ----------
@@ -1191,14 +1382,17 @@ function bindEvents() {
     ui.practice.mode = event.target.value;
     if (ui.practice.mode === 'art') pickArticleQuestion();
     $('practice-input').value = '';
-    ensureFsrsSession();
+    if (ui.practice.mode === 'struggling') startStrugglingDrill();
+    else ensureFsrsSession();
     renderPractice();
   });
   $('practice-form').addEventListener('submit', event => {
     event.preventDefault();
     submitPractice();
   });
-  $('practice-skip-button').addEventListener('click', revealFsrsAnswer);
+  $('practice-skip-button').addEventListener('click', handlePracticeSkipClick);
+  $('practice-struggling-button').addEventListener('click', handleStrugglingButtonClick);
+  $('practice-drill-again-button').addEventListener('click', () => startStrugglingDrill());
   $('practice-delete-button').addEventListener('click', () => {
     const word = findCurrentPracticeWord();
     if (word) askDeleteWord(word, () => deleteWordEverywhere(word.id));

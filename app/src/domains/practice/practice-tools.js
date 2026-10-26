@@ -163,4 +163,13 @@ export function registerPracticeTools({
       + 'new_phrases_blocked.',
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, () => practiceService.calculatePracticeStatistics());
+
+  registerJsonTool(mcpServer, 'get_struggling_words', {
+    title: 'Get struggling words',
+    description: 'Words to drill: the words whose latest graded answer was again or hard, most errors first. A '
+      + 'follow-up drill that changes nothing: quiz these words with the learner and do NOT call grade_word or '
+      + 'log_word_error for them; the schedule only changes in real practice. Returns {words, count}, each word {id, '
+      + 'uk, nl, article, kind, state, priority, error_count, last_grade, last_reviewed_on}.',
+    annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  }, () => practiceService.listStrugglingWords());
 }

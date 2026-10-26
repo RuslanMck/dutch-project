@@ -59,28 +59,47 @@ export function createPracticeRepository({ database }) {
     WHERE words.introduced_on = @calendarDate
     GROUP BY words.priority
   `);
-  const selectIntroducedCountsStatement = database.prepare(`
-    SELECT words.priority, COUNT(*) AS word_count
-    FROM words
-    WHERE words.introduced_on IS NOT NULL
-    GROUP BY words.priority
+  // Each word with a card whose latest review log is again or hard, with that log. recency_rank 1 is the latest log.
+  const selectStrugglingWordRowsStatement = database.prepare(`
+    SELECT v_words.id, v_words.nl, v_words.uk, v_words.article, v_words.kind, v_words.fsrs_card, v_words.priority,
+      v_words.error_count, latest_review_logs.grade AS last_grade,
+      latest_review_logs.reviewed_at AS last_reviewed_at
+    FROM v_words
+    JOIN (
+      SELECT review_logs.word_id, review_logs.grade, review_logs.reviewed_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY review_logs.word_id
+          ORDER BY review_logs.reviewed_at DESC, review_logs.id DESC
+        ) AS recency_rank
+      FROM review_logs
+    ) AS latest_review_logs
+      ON latest_review_logs.word_id = v_words.id AND latest_review_logs.recency_rank = 1
+    WHERE v_words.fsrs_card IS NOT NULL AND latest_review_logs.grade IN ('again', 'hard')
+    ORDER BY v_words.error_count DESC, latest_review_logs.reviewed_at DESC, v_words.id ASC
   `);
   const insertReviewLogStatement = database.prepare(`
     INSERT INTO review_logs (word_id, session_id, reviewed_at, grade, answer, card_before, card_after)
     VALUES (@wordId, @sessionId, @reviewedAt, @grade, @answer, @cardBefore, @cardAfter)
   `);
+  // Only logs that still count are looked up: a practice reset supersedes the logs before it.
   const selectReviewLogStatement = database.prepare(`
     SELECT review_logs.id, review_logs.word_id, review_logs.session_id, review_logs.reviewed_at,
       review_logs.grade, review_logs.answer, review_logs.card_before, review_logs.card_after
     FROM review_logs
     WHERE review_logs.session_id = @sessionId AND review_logs.word_id = @wordId
+      AND review_logs.superseded_at IS NULL
   `);
   const selectReviewedWordIdsStatement = database.prepare(`
     SELECT review_logs.word_id
     FROM review_logs
-    WHERE review_logs.session_id = @sessionId
+    WHERE review_logs.session_id = @sessionId AND review_logs.superseded_at IS NULL
     ORDER BY review_logs.word_id ASC
   `).pluck();
+  const updateReviewLogsSupersededStatement = database.prepare(`
+    UPDATE review_logs
+    SET superseded_at = @timestamp
+    WHERE review_logs.superseded_at IS NULL
+  `);
   const selectFirstGradeCountsStatement = database.prepare(`
     SELECT review_logs.grade, COUNT(*) AS grade_count
     FROM review_logs
@@ -105,6 +124,12 @@ export function createPracticeRepository({ database }) {
 
   function findPracticeWordById(wordId) {
     return selectPracticeWordByIdStatement.get({ wordId }) ?? null;
+  }
+
+  // The words in rotation whose latest graded answer was again or hard, most errors first, then the latest review
+  // first. Each row also carries last_grade and last_reviewed_at (ms).
+  function listStrugglingWordRows() {
+    return selectStrugglingWordRowsStatement.all();
   }
 
   // fsrsCard: the card as a JSON string (null = state New). dueAt and introducedOn are null for New words.
@@ -151,16 +176,7 @@ export function createPracticeRepository({ database }) {
     };
   }
 
-  // Words started so far (first graded, still in rotation), by priority; every priority is present, zero when none.
-  function countIntroducedByPriority() {
-    const countRows = selectIntroducedCountsStatement.all();
-    return {
-      ...EMPTY_PRIORITY_COUNTS,
-      ...Object.fromEntries(countRows.map(countRow => [countRow.priority, countRow.word_count])),
-    };
-  }
-
-  // Returns the new review log's id. A second log for the same session and word fails on the unique index.
+  // Returns the new review log's id.
   function createReviewLog({ wordId, sessionId, reviewedAt, grade, answer = null, cardBefore = null, cardAfter }) {
     const insertResult = insertReviewLogStatement.run({
       wordId,
@@ -174,12 +190,19 @@ export function createPracticeRepository({ database }) {
     return Number(insertResult.lastInsertRowid);
   }
 
-  function findReviewLog(sessionId, wordId) {
+  // The log that still counts for the word in the session, or null.
+  function findReviewLog({ sessionId, wordId }) {
     return selectReviewLogStatement.get({ sessionId, wordId }) ?? null;
   }
 
-  function listWordIdsReviewedInSession(sessionId) {
+  // Word ids graded in the session by logs that still count.
+  function listWordIdsReviewedInSession({ sessionId }) {
     return selectReviewedWordIdsStatement.all({ sessionId });
+  }
+
+  // timestamp: ms of a practice reset. Every log that still counts stops counting; the logs stay as history.
+  function markReviewLogsSuperseded(timestamp) {
+    updateReviewLogsSupersededStatement.run({ timestamp });
   }
 
   // Counts review logs (each one is a first grade) with reviewed_at >= timestamp. Every grade is present.
@@ -196,16 +219,17 @@ export function createPracticeRepository({ database }) {
     saveSetting,
     listPracticeWords,
     findPracticeWordById,
+    listStrugglingWordRows,
     updateWordSchedule,
     updateWordPriority,
     updateWordFrequencyRank,
     listDueWordIds,
     countWordsDueBefore,
     countIntroducedOnByPriority,
-    countIntroducedByPriority,
     createReviewLog,
     findReviewLog,
     listWordIdsReviewedInSession,
+    markReviewLogsSuperseded,
     countFirstGradesSince,
   });
 }

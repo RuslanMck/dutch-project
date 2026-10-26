@@ -1,6 +1,6 @@
-// Practice business rules: the batch of reviews and new words (with the backlog gate and the extra new words), grading
-// a word once per session, the one-time migration to FSRS and the practice statistics. Publishes 'words' after each
-// write.
+// Practice business rules: the batch of reviews and new words (with the backlog gate, the intake block and the
+// extra new words), grading a word once per session, the one-time migration to FSRS, the struggling words and the
+// practice statistics. Publishes 'words' after each write.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { mapBlankTextToNull } from '../blank-text.js';
 import {
@@ -10,13 +10,11 @@ import {
   parseCard,
   serializeCard,
 } from './fsrs-scheduling.js';
-import { mapToStoredBlock } from './intake-block.js';
+import { countExtraItemsToday, mapToStoredBlock, openIntakeBlock } from './intake-block.js';
+import { planMigration, summarizeMigration } from './migration-planning.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 
-const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
 const FSRS_ALREADY_SET_UP_MESSAGE = 'FSRS practice is already set up: migrate_to_fsrs has run';
-const LEARNING_MIGRATION_DAY_COUNT = 4;
-const LEARNED_MIGRATION_DAY_COUNT = 21;
 const SHORT_GOOD_SHARE_DAY_COUNT = 7;
 const LONG_GOOD_SHARE_DAY_COUNT = 30;
 const GOOD_SHARE_DECIMAL_PLACES = 3;
@@ -33,12 +31,12 @@ export function createPracticeService({
   changeEventBus,
   clock,
 }) {
-  // The words to practise now: reviews due before tomorrow (most overdue first) and the New words allowed today. New
-  // words wait while any word is overdue. Words already graded in this session are left out.
+  // The words to practise now: reviews due before tomorrow (most overdue first) and the New words on offer. New words
+  // wait while any word is overdue. Words already graded in this session are left out.
   function getPracticeBatch({ sessionId, maxReviews }) {
-    const settings = readActiveSettings();
+    const settings = practiceSettings.readActiveSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
-    const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession(sessionId));
+    const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
     const dueWordIds = listWordIdsDueToday(today, settings.timeZone).filter(wordId => !gradedWordIds.has(wordId));
     const reviewWordIds = maxReviews === undefined ? dueWordIds : dueWordIds.slice(0, maxReviews);
     const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds });
@@ -57,19 +55,29 @@ export function createPracticeService({
     };
   }
 
-  // Adds `count` extra New words to today's intake block. Refused while a word is overdue, and while the block is not
-  // finished (its words are not all started). Extra words left unstarted carry over like any unfinished block.
+  // Adds count extra New words to the intake block of today. Refused while a word is overdue, and while the block
+  // is not finished (its words are not all started). Extra words left unstarted carry over like any unfinished block.
   function addExtraNewWords({ count }) {
-    const settings = readActiveSettings();
+    const settings = practiceSettings.readActiveSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
     const addResult = runInTransaction(() => {
       const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
       newWordPlanner.assertExtraNewWordsAllowed({ newWordPlan });
-      const extendedBlock = { ...newWordPlan.block, size: newWordPlan.block.size + count };
-      practiceSettings.saveNewWordBlock(mapToStoredBlock(extendedBlock));
+      const extraWordIds = newWordPlanner.planExtraNewWordIds({
+        settings,
+        count,
+        blockWordIds: newWordPlan.block.itemIds,
+      });
+      const extendedBlock = openIntakeBlock({
+        today: newWordPlan.block.openedOn,
+        itemIds: [...newWordPlan.block.itemIds, ...extraWordIds],
+        extraCount: newWordPlan.block.extraCount + extraWordIds.length,
+      });
+      // Nothing to add (no New words are left): the block stays as it is.
+      if (extraWordIds.length > 0) practiceSettings.saveNewWordBlock(mapToStoredBlock(extendedBlock));
       return {
-        extra_new_words_today: Math.max(0, extendedBlock.size - settings.newPerDay),
-        new_today_remaining: extendedBlock.size - extendedBlock.introducedCount,
+        extra_new_words_today: countExtraItemsToday({ block: extendedBlock, today }),
+        new_today_remaining: extraWordIds.length,
       };
     });
     changeEventBus.publishChange('words');
@@ -78,7 +86,7 @@ export function createPracticeService({
 
   // Grades a word's first answer in a session. Again and hard are logged as word errors. Returns the word's new state.
   function gradeWord({ wordId, grade, answer, sessionId }) {
-    const settings = readActiveSettings();
+    const settings = practiceSettings.readActiveSettings();
     const gradeResult = runInTransaction(() => gradeWordInTransaction({ settings, wordId, grade, answer, sessionId }));
     changeEventBus.publishChange('words');
     return gradeResult;
@@ -86,7 +94,8 @@ export function createPracticeService({
 
   function gradeWordInTransaction({ settings, wordId, grade, answer, sessionId }) {
     const word = getPracticeWordRowOrThrow(wordId);
-    if (practiceRepository.findReviewLog(sessionId, wordId)) {
+    const gradedLog = practiceRepository.findReviewLog({ sessionId, wordId });
+    if (gradedLog) {
       throw new ConflictError(`word ${wordId} was already graded in session ${sessionId}`);
     }
     const timestamp = clock.now();
@@ -148,6 +157,19 @@ export function createPracticeService({
     return summarizeMigration(plan, { isDryRun: false });
   }
 
+  // The words in rotation whose latest graded answer was again or hard, most errors first. Read only: nothing is graded
+  // or written, so the learner can drill them without changing the schedule.
+  function listStrugglingWords() {
+    const settings = practiceSettings.readActiveSettings();
+    const words = practiceRepository.listStrugglingWordRows().map(wordRow => ({
+      ...mapToPracticeWord(wordRow),
+      error_count: wordRow.error_count,
+      last_grade: wordRow.last_grade,
+      last_reviewed_on: formatCalendarDateInTimeZone(wordRow.last_reviewed_at, settings.timeZone),
+    }));
+    return { words, count: words.length };
+  }
+
   // Due counts, overdue words, introductions, New words per priority, words per state and the good share of the last 7
   // and 30 days. The phrases' own counts are added under phrases.
   function calculatePracticeStatistics() {
@@ -180,16 +202,19 @@ export function createPracticeService({
     };
   }
 
-  // The first New word started in a fresh intake block opens it: the block is saved, so its leftovers stay on offer on
-  // later days until all its words are started.
+  // The first New word started, when no intake block is open, pins the day's allocation as the block: its
+  // leftovers stay on offer on later days until all are started. A block opened today is open already, so nothing
+  // is planned; a block from an earlier day is planned, and kept when it still has leftovers.
   function saveIntakeBlockOnFirstStart({ settings, today }) {
-    const { block } = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
-    if (!block.isStored) practiceSettings.saveNewWordBlock(mapToStoredBlock(block));
-  }
-
-  function readActiveSettings() {
-    if (!practiceSettings.isFsrsActive()) throw new ConflictError(FSRS_NOT_SET_UP_MESSAGE);
-    return practiceSettings.readSettings();
+    if (settings.newWordBlock?.openedOn === today) return;
+    const { block, allocatedCandidates } = newWordPlanner.planNewWords({
+      settings,
+      today,
+      gradedWordIds: new Set(),
+    });
+    if (!block.isFresh) return;
+    const pinnedBlock = openIntakeBlock({ today, itemIds: allocatedCandidates.map(candidate => candidate.id) });
+    practiceSettings.saveNewWordBlock(mapToStoredBlock(pinnedBlock));
   }
 
   // Word ids due before the start of tomorrow, overdue ones included: the words due today, most overdue first.
@@ -219,6 +244,7 @@ export function createPracticeService({
     addExtraNewWords,
     gradeWord,
     migrateToFsrs,
+    listStrugglingWords,
     calculatePracticeStatistics,
   });
 }
@@ -232,56 +258,6 @@ function mapToPracticeWord(wordRow) {
     kind: wordRow.kind,
     state: describeCardState(parseCard(wordRow.fsrs_card)),
     priority: wordRow.priority,
-  };
-}
-
-// Learning words are spread over the next four days, most errors first; learned words are due in 21 days; new words
-// stay new. Returns the assignments the real run would write.
-function planMigration(wordRows, { settings, today }) {
-  const learningRows = wordRows
-    .filter(word => word.status === 'learning')
-    .sort((first, second) => second.error_count - first.error_count || first.id - second.id);
-  const learnedRows = wordRows.filter(word => word.status === 'learned');
-  const learningAssignments = learningRows.map((word, index) => {
-    const dayOffset = Math.floor((index * LEARNING_MIGRATION_DAY_COUNT) / learningRows.length);
-    const calendarDate = addDaysToCalendarDate(today, dayOffset);
-    return buildAssignment({ word, group: 'learning', calendarDate, settings });
-  });
-  const learnedDate = addDaysToCalendarDate(today, LEARNED_MIGRATION_DAY_COUNT);
-  const learnedAssignments = learnedRows.map(word => buildAssignment({
-    word,
-    group: 'learned',
-    calendarDate: learnedDate,
-    settings,
-  }));
-  const learningDueByDay = {};
-  for (let dayOffset = 0; dayOffset < LEARNING_MIGRATION_DAY_COUNT; dayOffset += 1) {
-    learningDueByDay[addDaysToCalendarDate(today, dayOffset)] = 0;
-  }
-  for (const assignment of learningAssignments) {
-    learningDueByDay[assignment.calendarDate] += 1;
-  }
-  return {
-    learningAssignments,
-    learnedAssignments,
-    newWordCount: wordRows.filter(word => word.status === 'new').length,
-    learningDueByDay,
-    learnedDueOn: learnedDate,
-  };
-}
-
-function buildAssignment({ word, group, calendarDate, settings }) {
-  return { word, group, calendarDate, dueAt: findStartOfDay(calendarDate, settings.timeZone) };
-}
-
-function summarizeMigration(plan, { isDryRun }) {
-  return {
-    dry_run: isDryRun,
-    learning: plan.learningAssignments.length,
-    learned: plan.learnedAssignments.length,
-    new: plan.newWordCount,
-    learning_due_by_day: plan.learningDueByDay,
-    learned_due_on: plan.learnedDueOn,
   };
 }
 
