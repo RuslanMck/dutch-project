@@ -152,6 +152,12 @@
       <p id="practice-schedule" class="muted practice-schedule"></p>
       <div class="practice-meta">
         <p id="practice-progress" class="muted practice-meta__progress"></p>
+        <button id="practice-shuffle-button" class="icon-button shuffle-button" type="button"
+          aria-label="Перемішувати слова" aria-pressed="true">
+          <svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+          </svg>
+        </button>
         <button id="practice-progress-hint-button" class="hint-button" type="button" aria-expanded="false"
           aria-controls="practice-progress-hint" aria-label="Пояснення до залишку" data-hint-button>i</button>
         <button id="practice-delete-button" class="icon-button" type="button" aria-label="Видалити слово" hidden>
@@ -161,7 +167,7 @@
         </button>
       </div>
       <p id="practice-gate" class="hint" role="status" hidden>Нові слова з'являться, коли ви повторите всі прострочені слова.</p>
-      <p id="practice-progress-hint" class="hint" hidden>Скільки слів сесії ще не вивчено. Слово повертається в кінець черги, доки ви не назвете його правильно потрібну кількість разів — її показує рядок «Повторень до вивчення» під відповіддю.</p>
+      <p id="practice-progress-hint" class="hint" hidden>Скільки слів сесії ще не вивчено. Одночасно вчимо 5 слів: слово повертається серед них, доки ви не назвете його правильно потрібну кількість разів — її показує рядок «Повторень до вивчення» під відповіддю. Вивчене слово звільняє місце для наступного. Кнопка зі стрілками вмикає й вимикає перемішування.</p>
       <p id="practice-score" class="muted"></p>
       <section id="practice-summary" class="practice-summary" aria-label="Підсумок сесії" hidden>
         <ul id="practice-summary-list" class="practice-summary__list"></ul>

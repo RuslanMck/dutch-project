@@ -380,10 +380,11 @@ test('the deck line says the right answers still needed, a word learned just now
 
 test('advanceWindowedQueue: a word not yet learned comes back after the other four active words, not the waiting ones', () => {
   const queue = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
-  const latest = () => 0.999;
-  assert.deepEqual(advanceWindowedQueue(queue, false, 5, latest), ['b', 'c', 'd', 'e', 'a', 'f', 'g']);
+  const linear = { isShuffled: false };
+  assert.deepEqual(advanceWindowedQueue(queue, false, linear), ['b', 'c', 'd', 'e', 'a', 'f', 'g']);
+  assert.deepEqual(advanceWindowedQueue(['a', 'b'], false, linear), ['b', 'a']);
+  assert.deepEqual(advanceWindowedQueue(['a'], false, linear), ['a']);
   assert.deepEqual(advanceWindowedQueue(['a', 'b'], false), ['b', 'a']);
-  assert.deepEqual(advanceWindowedQueue(['a'], false), ['a']);
 });
 
 test('advanceWindowedQueue: a learned word leaves, so the first waiting word joins the active five', () => {
@@ -393,7 +394,7 @@ test('advanceWindowedQueue: a learned word leaves, so the first waiting word joi
 test('advanceWindowedQueue: only five words rotate until one is learned', () => {
   let queue = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9'];
   const shown = [];
-  for (let step = 0; step < 10; step += 1) {
+  for (let step = 0; step < 30; step += 1) {
     shown.push(queue[0]);
     queue = advanceWindowedQueue(queue, false);
   }
@@ -403,13 +404,13 @@ test('advanceWindowedQueue: only five words rotate until one is learned', () => 
 });
 
 test('formatQueueProgress: names the five active words only while others wait', () => {
-  assert.equal(formatQueueProgress(9), 'Залишилось: 9 · зараз вчимо 5');
+  assert.equal(formatQueueProgress(9), 'Залишилось: 9 · вчимо 5');
   assert.equal(formatQueueProgress(5), 'Залишилось: 5');
 });
 
 test('advanceWindowedQueue: shuffle mode puts the word at a random place among the active words, never first', () => {
   const queue = ['a', 'b', 'c', 'd', 'e', 'f'];
-  assert.deepEqual(advanceWindowedQueue(queue, false, 5, () => 0), ['b', 'a', 'c', 'd', 'e', 'f']);
+  assert.deepEqual(advanceWindowedQueue(queue, false, { random: () => 0 }), ['b', 'a', 'c', 'd', 'e', 'f']);
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const next = advanceWindowedQueue(queue, false);
     const position = next.indexOf('a');

@@ -657,6 +657,10 @@ details.rule > summary::-webkit-details-marker {
   stroke-linejoin: round;
 }
 
+.shuffle-button[aria-pressed="true"] {
+  color: var(--accent);
+}
+
 /* delete confirmation dialog */
 .dialog {
   width: min(360px, calc(100vw - 32px));

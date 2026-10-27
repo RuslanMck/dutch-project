@@ -139,16 +139,16 @@ export function canOfferExtraNewWords({ newWordsBlocked, newRemainingByPriority 
 // Practice rotates among the first ACTIVE_WINDOW_SIZE words of the queue only; the rest wait their turn.
 export const ACTIVE_WINDOW_SIZE = 5;
 
-// The front word leaves the queue when isDone; otherwise it goes to a random place in the active window, after at
-// least one other active word, and a waiting word takes a learned word's place. Returns a new queue; the one passed
-// in is not changed.
-export function advanceWindowedQueue(queue, isDone, windowSize = ACTIVE_WINDOW_SIZE, random = Math.random) {
+// The front word leaves the queue when isDone; otherwise it goes back into the active window, and a waiting word
+// takes a learned word's place. In shuffle mode it goes to a random place after at least one other active word; without
+// it, to the back of the window. Returns a new queue; the one passed in is not changed.
+export function advanceWindowedQueue(queue, isDone,
+  { isShuffled = true, windowSize = ACTIVE_WINDOW_SIZE, random = Math.random } = {}) {
   if (!queue.length) return [];
   const [answeredWord, ...restOfQueue] = queue;
   if (isDone) return restOfQueue;
-  // Shuffle mode: a random place among the other active words, never right away again while others are active.
   const lastInsertAt = Math.min(windowSize - 1, restOfQueue.length);
-  const firstInsertAt = Math.min(1, lastInsertAt);
+  const firstInsertAt = isShuffled ? Math.min(1, lastInsertAt) : lastInsertAt;
   const insertAt = firstInsertAt + Math.floor(random() * (lastInsertAt - firstInsertAt + 1));
   return [...restOfQueue.slice(0, insertAt), answeredWord, ...restOfQueue.slice(insertAt)];
 }
@@ -166,13 +166,13 @@ export function shuffle(items, random = Math.random) {
 // The progress line of a windowed queue: how many words are left, and how many of them rotate now when some wait.
 export function formatQueueProgress(queueLength, windowSize = ACTIVE_WINDOW_SIZE) {
   const leftText = `Залишилось: ${queueLength}`;
-  return queueLength > windowSize ? `${leftText} · зараз вчимо ${windowSize}` : leftText;
+  return queueLength > windowSize ? `${leftText} · вчимо ${windowSize}` : leftText;
 }
 
 // The struggling-words drill ("Важкі слова"): the front word leaves the queue when it is typed right (grade good);
-// any other answer sends it to a random place in the active window.
-export function advanceDrillQueue(queue, grade) {
-  return advanceWindowedQueue(queue, grade === 'good');
+// any other answer sends it back into the active window (advanceWindowedQueue, same options).
+export function advanceDrillQueue(queue, grade, options) {
+  return advanceWindowedQueue(queue, grade === 'good', options);
 }
 
 // The button under the FSRS summary that starts the drill with this many words.

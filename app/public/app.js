@@ -59,6 +59,7 @@ const state = { words: [], topics: [], rules: [], patterns: [], phrases: [], tex
 
 const ui = {
   tab: 'table',
+  isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
   armed: null,                       // { kind: 'phrase', id }: the phrase row waiting for a second click on delete
   table: { q: '', topic: '' },
   // Cards: 'words' shows today's practice batch without grades; 'phrases' grades like the practice does.
@@ -277,7 +278,7 @@ async function loadCardWords(sessionId) {
   renderCards();
   try {
     const batch = await api.getPracticeBatch(sessionId);
-    words.deck = [...shuffle(batch.reviews), ...shuffle(batch.new_words)];
+    words.deck = [...orderWords(batch.reviews), ...orderWords(batch.new_words)];
     words.status = 'ready';
   } catch (error) {
     if (error.status === 409) {
@@ -309,7 +310,7 @@ async function loadCardPhrases(sessionId) {
   renderCards();
   try {
     const batch = await api.getPhraseBatch(sessionId);
-    phrases.queue = [...shuffle(batch.reviews), ...shuffle(batch.new_phrases)];
+    phrases.queue = [...orderWords(batch.reviews), ...orderWords(batch.new_phrases)];
     phrases.status = 'ready';
   } catch (error) {
     if (error.status === 409) {
@@ -634,7 +635,7 @@ async function loadFsrsBatch(sessionId) {
   renderPractice();
   try {
     const batch = await api.getPracticeBatch(sessionId);
-    session.queue = [...shuffle(batch.reviews), ...shuffle(batch.new_words)];
+    session.queue = [...orderWords(batch.reviews), ...orderWords(batch.new_words)];
     session.status = 'ready';
     rememberFsrsBatchCounts(batch);
     showNextFsrsWord();
@@ -701,7 +702,7 @@ async function refillFsrsQueue(continueMessage = '') {
     finishFsrsSession();
     return false;
   }
-  session.queue.push(...shuffle(newWords));
+  session.queue.push(...orderWords(newWords));
   session.status = 'ready';
   // The session continues, so its id stays the stored one (finishing replaced it).
   saveSession(sessionId);
@@ -865,7 +866,7 @@ async function advanceFsrsWord() {
   await current.post;
   if (session.current !== current) return;
   const isStillInSession = current.schedule ? current.schedule.deck.in_deck : current.grade !== 'good';
-  session.queue = advanceWindowedQueue(session.queue, !isStillInSession);
+  session.queue = advanceWindowedQueue(session.queue, !isStillInSession, { isShuffled: ui.isShuffleOn });
   $('practice-input').value = '';
   showNextFsrsWord();
   renderPractice();
@@ -1058,7 +1059,7 @@ async function startStrugglingDrill() {
     return;
   }
   if (ui.struggling !== drill) return;
-  drill.queue = shuffle(listing.words);
+  drill.queue = orderWords(listing.words);
   drill.total = listing.words.length;
   if (drill.queue.length) {
     drill.status = 'ready';
@@ -1124,7 +1125,7 @@ function answerStrugglingWord(result) {
 // typed right.
 function advanceStrugglingWord() {
   const drill = ui.struggling;
-  drill.queue = advanceDrillQueue(drill.queue, drill.current.grade);
+  drill.queue = advanceDrillQueue(drill.queue, drill.current.grade, { isShuffled: ui.isShuffleOn });
   $('practice-input').value = '';
   showNextStrugglingWord();
   renderPractice();
@@ -1397,6 +1398,7 @@ function bindEvents() {
     if (word) askDeleteWord(word, () => deleteWordEverywhere(word.id));
   });
   $('practice-restart-button').addEventListener('click', restartFsrsSession);
+  $('practice-shuffle-button').addEventListener('click', toggleShuffle);
   $('practice-extra-words-button').addEventListener('click', handleExtraNewWordsClick);
 
   // Правила
@@ -1448,8 +1450,34 @@ function bindEvents() {
 
 // ---------- start ----------
 
+// Shuffle mode puts a batch in random order; without it, the server's order stays.
+function orderWords(words) {
+  return ui.isShuffleOn ? shuffle(words) : words;
+}
+
+function renderShuffleButton() {
+  const button = $('practice-shuffle-button');
+  button.setAttribute('aria-pressed', String(ui.isShuffleOn));
+  button.title = ui.isShuffleOn ? 'Перемішування увімкнено' : 'Перемішування вимкнено';
+}
+
+// Turning shuffle on mixes the words still waiting behind the one on screen; turning it off keeps the order as it is.
+function toggleShuffle() {
+  ui.isShuffleOn = !ui.isShuffleOn;
+  try { localStorage.setItem('shuffle', ui.isShuffleOn ? 'on' : 'off'); } catch { /* storage unavailable */ }
+  if (ui.isShuffleOn) {
+    for (const holder of [ui.fsrs, ui.struggling]) {
+      if (holder?.queue?.length > 1) holder.queue = [holder.queue[0], ...shuffle(holder.queue.slice(1))];
+    }
+  }
+  renderShuffleButton();
+  notice(ui.isShuffleOn ? 'Перемішування увімкнено' : 'Перемішування вимкнено');
+}
+
 function init() {
+  try { ui.isShuffleOn = localStorage.getItem('shuffle') !== 'off'; } catch { /* storage unavailable */ }
   bindEvents();
+  renderShuffleButton();
   let saved = 'table';
   try { saved = localStorage.getItem('tab') || 'table'; } catch { /* storage unavailable */ }
   showTab(saved);
