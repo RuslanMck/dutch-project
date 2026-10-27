@@ -121,7 +121,7 @@ test('a started word whose priority changes keeps the block: its leftovers and c
   assert.equal(nextDayBatch.counts.new_today_remaining, 6);
 });
 
-test('grading a New word outside the block keeps the block, but the word takes a deck slot', () => {
+test('grading a New word outside the block keeps the block and its leftovers', () => {
   const context = createPracticeContext();
   const originalIds = addWords(context, '6.1', makeNames('oud', 10));
   migrate(context);
@@ -132,12 +132,12 @@ test('grading a New word outside the block keeps the block, but the word takes a
   context.practiceService.gradeWord({ wordId: outsideId, grade: 'again', answer: 'x', sessionId: 's1' });
 
   const batch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
-  assert.deepEqual(batch.new_words.map(word => word.id), originalIds.slice(4, 9), '5 words in the deck leave 5 slots');
-  assert.equal(batch.counts.new_today_remaining, 5);
+  assert.deepEqual(batch.new_words.map(word => word.id), originalIds.slice(4));
+  assert.equal(batch.counts.new_today_remaining, 6);
   assert.equal(context.practiceSettings.readSettings().newWordBlock.itemIds.length, 10);
 });
 
-test('a deleted leftover counts as done; once all leftovers are done a fresh block fills the free deck slots', () => {
+test('a deleted leftover counts as done; once all leftovers are learned a fresh block of 10 opens', () => {
   const context = createPracticeContext();
   addWords(context, '6.1', makeNames('oud', 25));
   migrate(context);
@@ -152,10 +152,13 @@ test('a deleted leftover counts as done; once all leftovers are done a fresh blo
   assert.equal(leftovers.some(word => word.id === deletedWordId), false);
 
   gradeGood(context, leftovers.map(word => word.id), 's2');
+  assert.equal(context.practiceService.getPracticeBatch({ sessionId: 's2' }).new_words.length, 0,
+    'the 9 started words are not learned yet');
+  gradeGood(context, [blockWords[0].id, ...leftovers.map(word => word.id)], 's2');
   const afterLeftovers = context.practiceService.getPracticeBatch({ sessionId: 's2' });
 
-  assert.equal(afterLeftovers.new_words.length, 1, 'the 9 started words are in the deck, so 1 slot is free');
-  assert.equal(afterLeftovers.counts.new_today_remaining, 1);
+  assert.equal(afterLeftovers.new_words.length, 10, 'all learned: the next session starts');
+  assert.equal(afterLeftovers.counts.new_today_remaining, 10);
   const blockWordIds = blockWords.map(word => word.id);
   assert.equal(afterLeftovers.new_words.some(word => blockWordIds.includes(word.id)), false);
 });
@@ -180,9 +183,10 @@ test('a block opened today that is finished gives no new words; extra words appe
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
   const carriedOver = context.practiceService.getPracticeBatch({ sessionId: 's3' });
-  assert.deepEqual(carriedOver.new_words, [], 'the 10 words in the deck fill it, so the unstarted extras wait');
-  assert.equal(carriedOver.counts.new_today_remaining, 0);
-  assert.equal(carriedOver.counts.deck_free_slots, 0);
+  assert.deepEqual(carriedOver.new_words.map(word => word.id), block.itemIds.slice(10),
+    'the extras stay in the session');
+  assert.equal(carriedOver.counts.new_today_remaining, 10);
+  assert.equal(carriedOver.reviews.length, 10, 'with the 10 words not learned yet');
   assert.equal(context.practiceService.calculatePracticeStatistics().extra_new_words_today, 0);
 });
 
@@ -204,7 +208,7 @@ test('a block saved in the old format (no item_ids) reads as finished: an earlie
   assert.equal(batch.counts.new_words_blocked, false);
 });
 
-test('a block saved in the old format and opened today is finished for the day: no new words until tomorrow', () => {
+test('an old-format block opened today is finished; with no session words left, 10 new words come', () => {
   const context = createPracticeContext();
   addWords(context, '6.1', makeNames('oud', 12));
   migrate(context);
@@ -216,8 +220,8 @@ test('a block saved in the old format and opened today is finished for the day: 
 
   const batch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
 
-  assert.deepEqual(batch.new_words, []);
-  assert.equal(batch.counts.new_today_remaining, 0);
+  assert.equal(batch.new_words.length, 10);
+  assert.equal(batch.counts.new_today_remaining, 10);
 });
 
 test('phrases: the leftovers are the pinned phrases, and a phrase added later waits outside the block', () => {

@@ -43,28 +43,29 @@ article hints in exercises. I mark words I don't know with "DNK". Don't give ans
 **Word practice (FSRS).** When I ask to practise words, run a session on the spaced-repetition schedule. Call
 `get_practice_batch` with a new `session_id` (today's date plus a random suffix, e.g. `2026-10-24-k3x9`) and use that
 same `session_id` for every `grade_word` call of the session. Give the words in blocks of 10: the Ukrainian text only,
-with no hints. Grade every answer, repeats too: `again` for a wrong answer or "DNK"; `hard` for the right
-word with a spelling slip, or a correct Dutch synonym that is not the dictionary word (explain the difference); `good`
-for a fully right answer. The article is optional: a missing or wrong `de` or `het` does not lower the grade, but I
-still want the right article shown. After each block show my answer, the right one (with the article) and a short
-explanation for every mistake, and for each word how many times are left (`deck.times_left`, e.g. "ще 2 рази") or that
-it is learned (`deck.has_learned`). Words graded `again` or `hard` come back at the end until I get them right; grade
-those repeats with `grade_word` too (they return `is_repeat: true`). `grade_word` logs the error itself, so do not call
-`log_word_error` for practice answers. Finish with a summary: the counts of `again`, `hard` and `good`, how many new
-words got their first answer in this session, the words learned in it, and the number due tomorrow (`due_tomorrow`
+with no hints. Grade every answer, repeats too: `again` for a wrong answer or "DNK"; `hard` for the right word with a
+spelling slip, or a correct Dutch synonym that is not the dictionary word (explain the difference); `good` for a fully
+right answer. The article is optional: a missing or wrong `de` or `het` does not lower the grade, but I still want the
+right article shown. After each block show my answer, the right one (with the article) and a short explanation for
+every mistake, and for each word "повторень до вивчення: N" (`deck.times_left`) or that it is learned
+(`deck.has_learned`). A word comes back at the end of the queue until it is learned (`deck.in_deck` false); grade
+those repeats with `grade_word` too (they return `is_repeat: true`). `grade_word` logs the error itself, so do not
+call `log_word_error` for practice answers. Finish with a summary: the counts of `again`, `hard` and `good`, how many
+new words got their first answer in this session, the words learned in it, and the number due tomorrow (`due_tomorrow`
 from `practice_stats`).
 
-**Learning deck.** A word I am learning stays in the deck, and comes back every day, until I answer it right 2 times
-in a row; each `again` or `hard` adds one more right answer it needs, up to 6, and starts the run over. Every answer
-counts, repeats too. Then it is learned and follows its spaced-repetition schedule. A learned word I get wrong goes
-back into the deck. The deck holds 10 words: new words fill only its free slots (`counts.deck_free_slots`), so words I
-keep missing hold new ones back.
+**Learning deck (the session).** A session is the words I am learning: it lasts, across days, until every one is
+learned; closing the app or waiting a day keeps the progress. A new word needs 2 right answers in the session; each
+`again` or `hard` adds one more, up to 6, and keeps the right answers already given. Every answer counts, repeats too.
+Then the word is learned and follows its spaced-repetition schedule. A review I answer right is done for the session;
+one I get wrong joins it and needs 3. The next 10 new words come as soon as all the session's new words are learned,
+the same day too.
 
-**Backlog and extra words.** New words come only into free deck slots, in blocks: words offered but not started stay
-my only new words on later days until all of them are started, so skipped days never add more. New words also wait
-while any word is overdue. When `counts.new_words_blocked` is true, say so in one line and carry on with the reviews;
-once the overdue words are graded, call `get_practice_batch` again with the same `session_id` to get the new words.
-Today's words are done when `get_practice_batch` with the same `session_id` returns no new words,
+**Backlog and extra words.** New words come 10 at a time, when the session's new words are learned: words offered but
+not started stay my only new words on later days until all of them are started, so skipped days never add more. New
+words also wait while any word is overdue. When `counts.new_words_blocked` is true, say so in one line and carry on
+with the reviews; once the overdue words are graded, call `get_practice_batch` again with the same `session_id` to get
+the new words. Today's words are done when `get_practice_batch` with the same `session_id` returns no new words,
 `counts.new_words_blocked` is false, `counts.overdue` is 0 and `counts.new_remaining_by_priority` still has words.
 Then ask me "ще 10 нових слів?". On a yes, call `add_extra_new_words` (`count` 10 unless I say otherwise), then
 `get_practice_batch` again with the same `session_id`. It is refused while words are overdue or today's new words are

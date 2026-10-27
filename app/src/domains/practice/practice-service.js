@@ -35,14 +35,17 @@ export function createPracticeService({
   changeEventBus,
   clock,
 }) {
-  // The words to practise now: reviews due before tomorrow (most overdue first) and the New words on offer. New words
-  // wait while any word is overdue. Words already graded in this session are left out.
+  // The words to practise now: the learning deck's words (the current session: each stays until it is learned, across
+  // days and session ids), then reviews due before tomorrow outside the deck (most overdue first), then the New words
+  // on offer. New words wait while any review is overdue. Due reviews already graded in this session are left out.
   function getPracticeBatch({ sessionId, maxReviews }) {
     const settings = practiceSettings.readActiveSettings();
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
+    const deckWordIds = practiceRepository.listDeckWordIds();
     const dueWordIds = listWordIdsDueToday(today, settings.timeZone).filter(wordId => !gradedWordIds.has(wordId));
-    const reviewWordIds = maxReviews === undefined ? dueWordIds : dueWordIds.slice(0, maxReviews);
+    const sessionWordIds = [...deckWordIds, ...dueWordIds];
+    const reviewWordIds = maxReviews === undefined ? sessionWordIds : sessionWordIds.slice(0, maxReviews);
     const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds });
     return {
       session_id: sessionId,
@@ -50,6 +53,7 @@ export function createPracticeService({
       new_words: newWordPlan.offeredCandidates.map(candidate => mapToPracticeWord(candidate.word)),
       counts: {
         due: dueWordIds.length,
+        deck_words: deckWordIds.length,
         overdue: newWordPlan.overdueCount,
         introduced_today: newWordPlan.introducedTodayCount,
         new_today_remaining: newWordPlan.newTodayRemainingCount,
@@ -202,20 +206,20 @@ export function createPracticeService({
     };
   }
 
-  // Rebuilds every word's deck position from the review logs that still count (first answers only: repeats were not
-  // stored before the deck existed). A dry run reports the positions and writes nothing. Words left in the deck come
-  // back on the day after their last answer at the latest; learned words keep their FSRS due date.
-  // Returns { dry_run, deck_size, words }.
+  // Rebuilds every word's deck position from the answers that still count (the first answers in review_logs and the
+  // repeats in deck_answers; repeats before the deck existed were not stored). A dry run reports the positions and
+  // writes nothing. Words left in the deck come back on the day after their last answer at the latest; learned words
+  // keep their FSRS due date. Returns { dry_run, deck_size, words }.
   function rebuildLearningDeck({ isDryRun = true } = {}) {
     const settings = practiceSettings.readActiveSettings();
     const timestamp = clock.now();
     const summary = runInTransaction(() => {
       const answersByWordId = new Map();
       const lastAnsweredAtByWordId = new Map();
-      for (const reviewLog of practiceRepository.listCountingReviewLogs()) {
-        if (!answersByWordId.has(reviewLog.word_id)) answersByWordId.set(reviewLog.word_id, []);
-        answersByWordId.get(reviewLog.word_id).push({ grade: reviewLog.grade, isFirstAnswerEver: reviewLog.was_new });
-        lastAnsweredAtByWordId.set(reviewLog.word_id, reviewLog.reviewed_at);
+      for (const answer of practiceRepository.listCountingAnswers()) {
+        if (!answersByWordId.has(answer.word_id)) answersByWordId.set(answer.word_id, []);
+        answersByWordId.get(answer.word_id).push({ grade: answer.grade, isFirstAnswerEver: answer.was_new });
+        lastAnsweredAtByWordId.set(answer.word_id, answer.answered_at);
       }
       const words = [];
       for (const [wordId, answers] of answersByWordId) {
@@ -315,17 +319,15 @@ export function createPracticeService({
     };
   }
 
-  // The first New word started, when no intake block is open, pins the day's allocation as the block: its
-  // leftovers stay on offer on later days until all are started. A block opened today is open already, so nothing
-  // is planned; a block from an earlier day is planned, and kept when it still has leftovers.
+  // The first New word started in a fresh allocation (a new session) pins that allocation as the block: its leftovers
+  // stay on offer, on later days too, until all are started.
   function saveIntakeBlockOnFirstStart({ settings, today }) {
-    if (settings.newWordBlock?.openedOn === today) return;
-    const { block, allocatedCandidates } = newWordPlanner.planNewWords({
+    const { isFreshAllocation, allocatedCandidates } = newWordPlanner.planNewWords({
       settings,
       today,
       gradedWordIds: new Set(),
     });
-    if (!block.isFresh) return;
+    if (!isFreshAllocation) return;
     const pinnedBlock = openIntakeBlock({ today, itemIds: allocatedCandidates.map(candidate => candidate.id) });
     practiceSettings.saveNewWordBlock(mapToStoredBlock(pinnedBlock));
   }

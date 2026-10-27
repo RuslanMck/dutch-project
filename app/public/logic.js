@@ -185,21 +185,12 @@ export function buildNextReviewLine({ intervalDays, status, errorCount }) {
   return `${reviewText} · ${formatLearningStatus(status)} · помилок: ${errorCount ?? 0}`;
 }
 
-const timesPluralRules = new Intl.PluralRules('uk-UA');
-const TIMES_WORDS = Object.freeze({ one: 'раз', few: 'рази', many: 'разів', other: 'рази' });
-
-// "1 раз", "2 рази", "5 разів".
-export function formatTimesCount(count) {
-  return `${count} ${TIMES_WORDS[timesPluralRules.select(count)]}`;
-}
-
-// The line under the practice message, from a grade_word result: the times left in the learning deck, the word
-// learned just now, or (outside the deck) the next review.
-export function buildDeckLine({ deck, intervalDays, status, errorCount }) {
-  const errorText = `помилок: ${errorCount ?? 0}`;
-  if (deck?.has_learned) return `Вивчено ✓ — наступне повторення: ${formatDaysAway(intervalDays)} · ${errorText}`;
-  if (deck?.in_deck) return `Ще ${formatTimesCount(deck.times_left)} правильно поспіль до вивчення · ${errorText}`;
-  return buildNextReviewLine({ intervalDays, status, errorCount });
+// The line under the practice message, from a grade_word result: the right answers the word still needs in this
+// session, the word learned just now (0 left), or a review answered right (it leaves the session).
+export function buildDeckLine({ deck, intervalDays }) {
+  if (deck?.has_learned) return `Вивчено ✓ — наступне повторення: ${formatDaysAway(intervalDays)}`;
+  if (deck?.in_deck) return `Повторень до вивчення: ${deck.times_left}`;
+  return `Повторено ✓ — наступне повторення: ${formatDaysAway(intervalDays)}`;
 }
 
 // "2026-10-25" -> "25.10" for the words table. Empty when there is no date (a new word has no next review).

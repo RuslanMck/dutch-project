@@ -362,14 +362,12 @@ test('canOfferExtraNewWords: only while the gate is open and New words remain to
   assert.equal(canOfferExtraNewWords({ newWordsBlocked: undefined, newRemainingByPriority: undefined }), false);
 });
 
-test('the deck line says the times left, a word learned just now, or the next review', async () => {
-  const { buildDeckLine, formatTimesCount } = await import('../public/logic.js');
-  assert.deepEqual([1, 2, 5].map(formatTimesCount), ['1 раз', '2 рази', '5 разів']);
-  const inDeck = { in_deck: true, required_correct: 4, correct_streak: 0, times_left: 4, has_learned: false };
-  assert.equal(buildDeckLine({ deck: inDeck, intervalDays: 1, status: 'learning', errorCount: 2 }),
-    'Ще 4 рази правильно поспіль до вивчення · помилок: 2');
-  const learned = { in_deck: false, required_correct: null, correct_streak: 0, times_left: 0, has_learned: true };
-  assert.match(buildDeckLine({ deck: learned, intervalDays: 6, status: 'learning', errorCount: 0 }), /^Вивчено ✓ — наступне повторення: /);
-  const outside = { in_deck: false, required_correct: null, correct_streak: 0, times_left: 0, has_learned: false };
-  assert.match(buildDeckLine({ deck: outside, intervalDays: 30, status: 'learned', errorCount: 1 }), /^Наступне повторення: /);
+test('the deck line says the right answers still needed, a word learned just now, or a review answered right', async () => {
+  const { buildDeckLine } = await import('../public/logic.js');
+  const inDeck = { in_deck: true, required_correct: 4, correct_count: 1, times_left: 3, has_learned: false };
+  assert.equal(buildDeckLine({ deck: inDeck, intervalDays: 1 }), 'Повторень до вивчення: 3');
+  const learned = { in_deck: false, required_correct: null, correct_count: 0, times_left: 0, has_learned: true };
+  assert.match(buildDeckLine({ deck: learned, intervalDays: 6 }), /^Вивчено ✓ — наступне повторення: /);
+  const outside = { in_deck: false, required_correct: null, correct_count: 0, times_left: 0, has_learned: false };
+  assert.match(buildDeckLine({ deck: outside, intervalDays: 30 }), /^Повторено ✓ — наступне повторення: /);
 });

@@ -250,13 +250,13 @@ test('a second answer in one session is a repeat: FSRS and the review log stay, 
   const [wordId] = addWords(context, '6.1', ['goed']);
   migrate(context);
   const first = context.practiceService.gradeWord({ wordId, grade: 'good', sessionId: 's1' });
-  assert.deepEqual(first.deck, { in_deck: true, required_correct: 2, correct_streak: 1, times_left: 1, has_learned: false });
+  assert.deepEqual(first.deck, { in_deck: true, required_correct: 2, correct_count: 1, times_left: 1, has_learned: false });
   const rowBefore = readWordRow(context, wordId);
 
   const repeat = context.practiceService.gradeWord({ wordId, grade: 'again', answer: 'x', sessionId: 's1' });
 
   assert.equal(repeat.is_repeat, true);
-  assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_streak: 0, times_left: 3, has_learned: false });
+  assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_count: 1, times_left: 2, has_learned: false });
   const rowAfter = readWordRow(context, wordId);
   assert.equal(rowAfter.due_at, rowBefore.due_at);
   assert.equal(rowAfter.fsrs_card, rowBefore.fsrs_card);
@@ -388,7 +388,8 @@ test('a grade at 00:30 on the 25-hour day 2026-10-25 is due on 2026-10-26, at th
   assert.equal(result.interval_days, 1);
   assert.equal(result.next_due_on, '2026-10-26');
   assert.equal(readWordRow(context, wordId).due_at, findStartOfDay('2026-10-26', TIME_ZONE));
-  assert.deepEqual(context.practiceService.getPracticeBatch({ sessionId: 's2' }).reviews, []);
+  const nextBatch = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+  assert.deepEqual(nextBatch.reviews.map(word => word.id), [wordId], 'not learned yet: it stays in the session');
 });
 
 test('a new word graded good at 20:00 on 2026-10-24 has its FSRS due on 2026-10-27, but the deck brings it back on 2026-10-25', () => {
@@ -418,7 +419,7 @@ test('practice_stats counts due words, introductions, states and the good share'
   assert.equal(stats.due_today, 1);
   assert.equal(stats.due_tomorrow, 2, 'both new words are in the learning deck, so both are due tomorrow');
   assert.equal(stats.deck_size, 2);
-  assert.equal(stats.deck_free_slots, 8);
+  assert.equal(stats.deck_free_slots, 0, 'the session\'s new words are not learned yet');
   assert.equal(stats.introduced_today, 2, 'migrated words count as introduced the day before');
   assert.deepEqual(stats.new_remaining_by_priority, { 1: 0, 2: 0, 3: 0 });
   assert.equal(stats.states.new, 0);

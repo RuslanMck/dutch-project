@@ -189,7 +189,7 @@ test('a dry run supersedes no review log; a real reset supersedes every log that
   assert.equal(countRows(context, 'SELECT COUNT(*) FROM phrase_review_logs'), 1, 'the phrase log stays as history');
 });
 
-test('the database refuses a second log for a word in a session while the first one still counts; a second answer is a repeat', () => {
+test('the database refuses a second log for a word in a session while the first counts; a second answer is a repeat', () => {
   const context = createMigratedContext();
   const [word] = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
   context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });

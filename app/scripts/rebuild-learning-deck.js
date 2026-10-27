@@ -24,7 +24,7 @@ const { practiceService } = createDomainServices({
 const summary = practiceService.rebuildLearningDeck({ isDryRun });
 for (const word of summary.words) {
   const position = word.in_deck
-    ? `in deck, ${word.times_left} left (${word.correct_streak}/${word.required_correct})`
+    ? `in deck, ${word.times_left} left (${word.correct_count}/${word.required_correct})`
     : 'learned';
   console.log(`${word.nl}: ${word.grades.join(' ')} → ${position}`);
 }

@@ -276,7 +276,8 @@ export function createWordService({
       dueAt: null,
       introducedOn: null,
       deckRequiredCorrect: null,
-      deckCorrectStreak: 0,
+      deckCorrectCount: 0,
+      deckEnteredByLapse: 0,
     };
   }
 

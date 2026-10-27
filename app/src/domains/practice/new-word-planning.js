@@ -1,7 +1,7 @@
-// Plans the New words on offer: the backlog gate, the learning deck's free slots (the day's count plus today's extra
-// words, minus the words in the deck), the intake block (its pinned words still New, or a fresh allocation of the free
-// slots when no block is open), and the refusal of extra words while the block is not finished. Reads the words through
-// the practice repository and writes nothing.
+// Plans the New words on offer: the backlog gate, the intake block (its pinned words still New, or a fresh
+// allocation of new_per_day words when the session's new words are over: no leftovers and none of them left in the
+// learning deck, on any day; lapses in the deck do not count), the extra new words, and the refusal of extra words
+// while the block is not finished. Reads the words through the practice repository and writes nothing.
 import { ConflictError } from '../../errors/domain-errors.js';
 import { countExtraItemsToday, resolveIntakeBlock } from './intake-block.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
@@ -17,7 +17,7 @@ export function createNewWordPlanner({ practiceRepository }) {
   // day's pick when no block is open. offeredCandidates is what the batch returns: none while a word is overdue
   // (counted over all words, not only this session), so isBlocked is true only when that holds back some words.
   // newTodayRemainingCount counts what is still to be started: the block's leftovers, or the day's pick.
-  // A word in the deck holds a slot until it is learned, so words missed yesterday leave fewer slots for new ones.
+  // A session's words stay until all are learned; only then does a fresh allocation start the next session.
   function planNewWords({ settings, today, gradedWordIds }) {
     const todayStart = findStartOfDay(today, settings.timeZone);
     const overdueCount = practiceRepository.countWordsDueBefore(todayStart);
@@ -29,13 +29,11 @@ export function createNewWordPlanner({ practiceRepository }) {
     });
     const deckSize = practiceRepository.countDeckWords();
     const extraNewWordsToday = countExtraItemsToday({ block, today });
-    const deckFreeSlotCount = Math.max(0, settings.newPerDay + extraNewWordsToday - deckSize);
+    const isFreshAllocation = block.leftoverIds.length === 0 && practiceRepository.countDeckWordsEnteredAsNew() === 0;
     const candidatesByPriority = groupCandidatesByPriority(newWordRows, gradedWordIds);
-    const allocatedCandidates = block.isFresh
-      ? allocateBlockCandidates({ settings, candidatesByPriority, blockSize: deckFreeSlotCount })
-      : findLeftoverCandidates(newWordRows, block.leftoverIds)
-        .filter(candidate => !gradedWordIds.has(candidate.id))
-        .slice(0, deckFreeSlotCount);
+    const allocatedCandidates = isFreshAllocation
+      ? allocateBlockCandidates({ settings, candidatesByPriority, blockSize: settings.newPerDay })
+      : findLeftoverCandidates(newWordRows, block.leftoverIds).filter(candidate => !gradedWordIds.has(candidate.id));
     const isBlocked = overdueCount > 0 && allocatedCandidates.length > 0;
     const offeredCandidates = isBlocked ? [] : allocatedCandidates;
     return {
@@ -45,12 +43,11 @@ export function createNewWordPlanner({ practiceRepository }) {
       allocatedCandidates,
       offeredCandidates,
       introducedTodayCount: sumCounts(practiceRepository.countIntroducedOnByPriority(today)),
-      newTodayRemainingCount: block.isFresh
-        ? allocatedCandidates.length
-        : Math.min(block.leftoverIds.length, deckFreeSlotCount),
+      newTodayRemainingCount: isFreshAllocation ? allocatedCandidates.length : block.leftoverIds.length,
       extraNewWordsToday,
+      isFreshAllocation,
       deckSize,
-      deckFreeSlotCount,
+      deckFreeSlotCount: isFreshAllocation ? settings.newPerDay : 0,
       remainingByPriority: countRemainingCandidates(candidatesByPriority, offeredCandidates),
     };
   }

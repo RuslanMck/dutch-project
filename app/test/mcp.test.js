@@ -351,10 +351,10 @@ test('grade_word round trip over HTTP: refused before the migration, graded once
     assert.equal(graded.state, 'review');
     assert.match(graded.next_due_on, /^\d{4}-\d{2}-\d{2}$/);
 
-    assert.deepEqual(graded.deck, { in_deck: true, required_correct: 2, correct_streak: 1, times_left: 1, has_learned: false });
+    assert.deepEqual(graded.deck, { in_deck: true, required_correct: 2, correct_count: 1, times_left: 1, has_learned: false });
     const repeat = await call(practiceClient, 'grade_word', { ...gradeArguments, grade: 'again' });
     assert.equal(repeat.is_repeat, true);
-    assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_streak: 0, times_left: 3, has_learned: false });
+    assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_count: 1, times_left: 2, has_learned: false });
 
     const stats = await call(practiceClient, 'practice_stats');
     assert.equal(stats.introduced_today, 1);

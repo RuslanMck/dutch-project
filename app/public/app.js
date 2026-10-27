@@ -46,7 +46,7 @@ const FSRS_LOAD_STATUSES = ['idle', 'failed', 'unconfigured'];
 // The summary's "Хочете ще 10 нових слів?" asks for this many extra New words.
 const EXTRA_NEW_WORD_COUNT = 10;
 // Shown when the queue ran out and the batch, asked again, brought New words.
-const QUEUE_REFILLED_MESSAGE = 'Повторення завершено — далі нові слова дня.';
+const QUEUE_REFILLED_MESSAGE = 'Усі слова сесії вивчено — далі нові слова.';
 // Shown when the server refuses extra New words and the batch brings none.
 const EXTRA_NEW_WORDS_REFUSED_MESSAGE = 'Зараз додати нові слова не можна.';
 
@@ -824,7 +824,8 @@ function answerFsrsWord(result, answer) {
     session.tally[result.grade] += 1;
     if (word.state === 'new') session.introducedCount += 1;
   }
-  trackPendingPost(session.pendingGradePosts, postFsrsGrade(current, answer));
+  current.post = postFsrsGrade(current, answer);
+  trackPendingPost(session.pendingGradePosts, current.post);
   renderPractice();
 }
 
@@ -836,10 +837,9 @@ async function postFsrsGrade(current, answer) {
   const { word, grade } = current;
   try {
     const schedule = await api.gradePracticeWord({ word_id: word.id, grade, answer, session_id: sessionId });
-    if (session.current === current) {
-      current.schedule = schedule;
-      renderPractice();
-    }
+    current.schedule = schedule;
+    word.deck = schedule.deck;
+    if (session.current === current) renderPractice();
   } catch (error) {
     // A new batch replaces the answered set and the tally, so only the batch that posted is rolled back.
     if (!current.repeat && session.answered === answered) {
@@ -852,12 +852,19 @@ async function postFsrsGrade(current, answer) {
   }
 }
 
-// "Далі": a word answered 'good' leaves the queue; any other word comes back at the end, until it is right.
-function advanceFsrsWord() {
+// "Далі": a word still in the learning deck comes back at the end of the queue; a word learned, or a review answered
+// right, leaves the session. The server's answer decides, so the grade is awaited first.
+async function advanceFsrsWord() {
   const session = ui.fsrs;
-  const { word, grade } = session.current;
+  const current = session.current;
+  if (current.isAdvancing) return;
+  current.isAdvancing = true;
+  await current.post;
+  if (session.current !== current) return;
+  const { word, grade } = current;
+  const isStillInSession = current.schedule ? current.schedule.deck.in_deck : grade !== 'good';
   session.queue.shift();
-  if (grade !== 'good') session.queue.push(word);
+  if (isStillInSession) session.queue.push(word);
   $('practice-input').value = '';
   showNextFsrsWord();
   renderPractice();
@@ -937,17 +944,12 @@ function renderArticlePractice() {
   $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
 }
 
-// The line under the practice message, from the grade response: the times left in the learning deck, the word
-// learned, or the next review.
+// The line under the practice message, from the grade response: the right answers still needed in the session, the
+// word learned, or a review answered right.
 function formatScheduleLine(current) {
   if (!current?.checked || !current.schedule) return '';
   const { schedule } = current;
-  return buildDeckLine({
-    deck: schedule.deck,
-    intervalDays: schedule.interval_days,
-    status: schedule.status,
-    errorCount: schedule.word?.error_count,
-  });
+  return buildDeckLine({ deck: schedule.deck, intervalDays: schedule.interval_days });
 }
 
 function renderFsrsPractice() {

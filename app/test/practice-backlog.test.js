@@ -149,7 +149,7 @@ test('grading the last overdue word unlocks the new words of the day in the same
   const unlocked = context.practiceService.getPracticeBatch({ sessionId: 's1' });
   assert.equal(unlocked.counts.overdue, 0);
   assert.equal(unlocked.counts.new_words_blocked, false);
-  assert.deepEqual(unlocked.reviews, []);
+  assert.deepEqual(unlocked.reviews.map(word => word.id), [secondOverdueId], 'the lapse joins the session');
   assert.deepEqual(unlocked.new_words.map(word => word.id), newWordIds);
 });
 
@@ -240,7 +240,7 @@ test('a second addExtraNewWords is refused until the first 10 are graded, then g
   assert.equal(batch.counts.new_today_remaining, 10);
 });
 
-test('extra words left unstarted wait while the deck is full, and come once the deck words are learned', () => {
+test('extra words left unstarted stay in the session the next day, with the words not learned yet', () => {
   const context = createPracticeContext();
   addPriorityMix(context, { p1Count: 16, p2Count: 6, p3Count: 4 });
   migrate(context);
@@ -253,19 +253,10 @@ test('extra words left unstarted wait while the deck is full, and come once the 
 
   assert.equal(context.practiceService.calculatePracticeStatistics().extra_new_words_today, 0);
   const nextDayBatch = context.practiceService.getPracticeBatch({ sessionId: 's3' });
-  assert.deepEqual(nextDayBatch.new_words, [], 'the 10 words started yesterday fill the deck');
-  assert.equal(nextDayBatch.reviews.length, 10, 'the deck words come back every day');
+  assert.deepEqual(nextDayBatch.new_words.map(word => word.id), extraWordIds, 'the same unstarted extra words');
+  assert.equal(nextDayBatch.reviews.length, 10, 'the 10 words started yesterday are not learned yet');
   assert.equal(nextDayBatch.counts.introduced_today, 0);
-  assert.equal(nextDayBatch.counts.new_today_remaining, 0);
-
-  // Right a second time in a row: each deck word is learned and frees its slot for the unstarted extra words.
-  for (const word of nextDayBatch.reviews) {
-    context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's3' });
-  }
-  const afterLearning = context.practiceService.getPracticeBatch({ sessionId: 's3' });
-  assert.deepEqual(afterLearning.new_words.map(word => word.id), extraWordIds, 'the same unstarted extra words');
-  assert.equal(afterLearning.counts.deck_size, 0);
-  assert.equal(afterLearning.counts.new_today_remaining, 10);
+  assert.equal(nextDayBatch.counts.new_today_remaining, 10);
   assert.throws(() => context.practiceService.addExtraNewWords({ count: 10 }), ConflictError);
 });
 
@@ -317,7 +308,7 @@ test('a day with nothing done offers the same 10 words again, never more', () =>
   assert.equal(laterBatch.reviews.length, 0);
 });
 
-test('finishing the leftovers of an earlier day opens a fresh block only for the free deck slots', () => {
+test('finishing the leftovers opens a fresh block only once all the session\'s words are learned', () => {
   const context = createPracticeContext();
   addPriorityMix(context, { p1Count: 20, p2Count: 6, p3Count: 4 });
   migrate(context);
@@ -331,10 +322,11 @@ test('finishing the leftovers of an earlier day opens a fresh block only for the
   const afterLeftovers = context.practiceService.getPracticeBatch({ sessionId: 's2' });
   assert.equal(afterLeftovers.new_words.length, 0, 'the 10 started words fill the deck');
 
-  // The word from yesterday, right again today, is learned: one slot opens for one fresh word.
   context.practiceService.gradeWord({ wordId: todayWords[0].id, grade: 'good', sessionId: 's2' });
+  assert.equal(context.practiceService.getPracticeBatch({ sessionId: 's2' }).new_words.length, 0, '9 not learned yet');
+  for (const word of leftovers) context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's2' });
   const afterLearning = context.practiceService.getPracticeBatch({ sessionId: 's2' });
-  assert.equal(afterLearning.new_words.length, 1);
-  assert.equal(afterLearning.counts.new_today_remaining, 1);
+  assert.equal(afterLearning.new_words.length, 10);
+  assert.equal(afterLearning.counts.new_today_remaining, 10);
   assert.equal(afterLearning.new_words.filter(word => leftovers.some(leftover => leftover.id === word.id)).length, 0);
 });

@@ -7,7 +7,7 @@ const PRACTICE_WORD_SELECT = `
   SELECT v_words.id, v_words.nl, v_words.uk, v_words.article, v_words.kind, v_words.section_code,
     v_words.status, v_words.fsrs_card, v_words.due_at, v_words.introduced_on, v_words.frequency_rank,
     v_words.priority_override, v_words.priority, v_words.error_count, v_words.deck_required_correct,
-    v_words.deck_correct_streak
+    v_words.deck_correct_count, v_words.deck_entered_by_lapse
   FROM v_words
 `;
 
@@ -31,13 +31,14 @@ export function createPracticeRepository({ database }) {
   `);
   const updateWordDeckStatement = database.prepare(`
     UPDATE words
-    SET deck_required_correct = @requiredCorrect, deck_correct_streak = @correctStreak, due_at = @dueAt,
+    SET deck_required_correct = @requiredCorrect, deck_correct_count = @correctCount,
+      deck_entered_by_lapse = @isLapse, due_at = @dueAt,
       status = @learningStatus, updated_at = @updatedAt
     WHERE words.id = @wordId
   `);
   const clearDeckStatement = database.prepare(`
     UPDATE words
-    SET deck_required_correct = NULL, deck_correct_streak = 0
+    SET deck_required_correct = NULL, deck_correct_count = 0, deck_entered_by_lapse = 0
     WHERE words.deck_required_correct IS NOT NULL
   `);
   const countDeckWordsStatement = database.prepare(`
@@ -45,23 +46,33 @@ export function createPracticeRepository({ database }) {
     FROM words
     WHERE words.deck_required_correct IS NOT NULL
   `).pluck();
+  const countDeckWordsEnteredAsNewStatement = database.prepare(`
+    SELECT COUNT(*)
+    FROM words
+    WHERE words.deck_required_correct IS NOT NULL AND words.deck_entered_by_lapse = 0
+  `).pluck();
   const insertDeckAnswerStatement = database.prepare(`
     INSERT INTO deck_answers (word_id, session_id, answered_at, grade, is_first_in_session, required_correct_after,
-      correct_streak_after)
-    VALUES (@wordId, @sessionId, @answeredAt, @grade, @isFirstInSession, @requiredCorrectAfter, @correctStreakAfter)
+      correct_count_after)
+    VALUES (@wordId, @sessionId, @answeredAt, @grade, @isFirstInSession, @requiredCorrectAfter, @correctCountAfter)
   `);
   const updateDeckAnswersSupersededStatement = database.prepare(`
     UPDATE deck_answers
     SET superseded_at = @timestamp
     WHERE deck_answers.superseded_at IS NULL
   `);
-  // The review logs that still count, oldest first, with whether the word was New before each: the deck rebuild
-  // replays them.
-  const selectCountingReviewLogsStatement = database.prepare(`
-    SELECT review_logs.word_id, review_logs.grade, review_logs.reviewed_at, review_logs.card_before IS NULL AS was_new
+  // Every answer that still counts, oldest first: the first answers from review_logs (with whether the word was New
+  // before it) and the repeats from deck_answers. The deck rebuild replays them.
+  const selectCountingAnswersStatement = database.prepare(`
+    SELECT review_logs.word_id, review_logs.grade, review_logs.reviewed_at AS answered_at,
+      review_logs.card_before IS NULL AS was_new
     FROM review_logs
     WHERE review_logs.superseded_at IS NULL
-    ORDER BY review_logs.reviewed_at ASC, review_logs.id ASC
+    UNION ALL
+    SELECT deck_answers.word_id, deck_answers.grade, deck_answers.answered_at, 0 AS was_new
+    FROM deck_answers
+    WHERE deck_answers.superseded_at IS NULL AND deck_answers.is_first_in_session = 0
+    ORDER BY answered_at ASC
   `);
   const updateWordPriorityStatement = database.prepare(`
     UPDATE words
@@ -78,16 +89,29 @@ export function createPracticeRepository({ database }) {
     SET frequency_rank = @frequencyRank
     WHERE words.id = @wordId
   `);
+  // Due reviews: words outside the learning deck. The deck's words are in the session whatever their due time.
   const selectDueWordIdsStatement = database.prepare(`
     SELECT words.id
     FROM words
-    WHERE words.due_at < @beforeTimestamp
+    WHERE words.due_at < @beforeTimestamp AND words.deck_required_correct IS NULL
     ORDER BY words.due_at ASC, words.id ASC
   `).pluck();
   const countWordsDueBeforeStatement = database.prepare(`
     SELECT COUNT(*)
     FROM words
-    WHERE words.due_at < @beforeTimestamp
+    WHERE words.due_at < @beforeTimestamp AND words.deck_required_correct IS NULL
+  `).pluck();
+  // The words of the current session, the ones that entered the deck first coming first.
+  const selectDeckWordIdsStatement = database.prepare(`
+    SELECT words.id
+    FROM words
+    LEFT JOIN (
+      SELECT deck_answers.word_id, MIN(deck_answers.id) AS first_answer_id
+      FROM deck_answers
+      GROUP BY deck_answers.word_id
+    ) AS first_deck_answers ON first_deck_answers.word_id = words.id
+    WHERE words.deck_required_correct IS NOT NULL
+    ORDER BY first_deck_answers.first_answer_id ASC, words.id ASC
   `).pluck();
   const selectIntroducedOnCountsStatement = database.prepare(`
     SELECT words.priority, COUNT(*) AS word_count
@@ -181,13 +205,14 @@ export function createPracticeRepository({ database }) {
   }
 
   // priorityOverride undefined leaves the override as it is; null clears it.
-  // deckPosition: { requiredCorrect, correctStreak } or null (out of the deck). dueAt and learningStatus are written
+  // deckPosition: { requiredCorrect, correctCount } or null (out of the deck). dueAt and learningStatus are written
   // with it, because the deck decides when a word comes back.
   function updateWordDeck(wordId, { deckPosition, dueAt, learningStatus, updatedAt }) {
     updateWordDeckStatement.run({
       wordId,
       requiredCorrect: deckPosition?.requiredCorrect ?? null,
-      correctStreak: deckPosition?.correctStreak ?? 0,
+      correctCount: deckPosition?.correctCount ?? 0,
+      isLapse: deckPosition?.isLapse ? 1 : 0,
       dueAt,
       learningStatus,
       updatedAt,
@@ -202,6 +227,11 @@ export function createPracticeRepository({ database }) {
     return countDeckWordsStatement.get();
   }
 
+  // The deck's words that entered as New words: the session's new words not learned yet.
+  function countDeckWordsEnteredAsNew() {
+    return countDeckWordsEnteredAsNewStatement.get();
+  }
+
   // deckPositionAfter: the position after the answer, or null.
   function createDeckAnswer({ wordId, sessionId, answeredAt, grade, isFirstInSession, deckPositionAfter }) {
     insertDeckAnswerStatement.run({
@@ -211,7 +241,7 @@ export function createPracticeRepository({ database }) {
       grade,
       isFirstInSession: isFirstInSession ? 1 : 0,
       requiredCorrectAfter: deckPositionAfter?.requiredCorrect ?? null,
-      correctStreakAfter: deckPositionAfter?.correctStreak ?? 0,
+      correctCountAfter: deckPositionAfter?.correctCount ?? 0,
     });
   }
 
@@ -219,9 +249,12 @@ export function createPracticeRepository({ database }) {
     updateDeckAnswersSupersededStatement.run({ timestamp });
   }
 
-  function listCountingReviewLogs() {
-    return selectCountingReviewLogsStatement.all()
-      .map(reviewLog => ({ ...reviewLog, was_new: reviewLog.was_new === 1 }));
+  function listCountingAnswers() {
+    return selectCountingAnswersStatement.all().map(answer => ({ ...answer, was_new: answer.was_new === 1 }));
+  }
+
+  function listDeckWordIds() {
+    return selectDeckWordIdsStatement.all();
   }
 
   function updateWordPriority(wordId, { priority, priorityOverride }) {
@@ -303,9 +336,11 @@ export function createPracticeRepository({ database }) {
     updateWordDeck,
     clearDeck,
     countDeckWords,
+    countDeckWordsEnteredAsNew,
     createDeckAnswer,
     markDeckAnswersSuperseded,
-    listCountingReviewLogs,
+    listCountingAnswers,
+    listDeckWordIds,
     updateWordPriority,
     updateWordFrequencyRank,
     listDueWordIds,

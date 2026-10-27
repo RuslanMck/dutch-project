@@ -451,3 +451,20 @@ started, not once they were learned. His rules, with his answers to the open que
   «Ще N рази правильно поспіль до вивчення» or «Вивчено ✓» under each answer. «Залишилось» stays the session queue.
 - Migration 006 adds the columns and `deck_answers`; `scripts/rebuild-learning-deck.js --apply` replays the review logs
   that still count once (repeats before the deck were not stored, so only first answers replay).
+
+## 15. The deck is the session (27.10.2026)
+
+Ruslan corrected §14: the right answers belong to the session, not to days. His answers: right answers count in total
+(a mistake adds one required answer but keeps the ones given), the next 10 new words come at once when a session is
+finished, and reviews join the session.
+
+- A session is the learning deck: its words stay, across days and session ids, until each is learned. The batch
+  returns them first (`listDeckWordIds`), then the due reviews outside the deck, then the new words. Due and overdue
+  counts leave deck words out.
+- A word needs `required_correct` right answers in total (`deck_correct_count`, migration 007 renames the streak).
+- The web practice puts a word back at the end of the queue while `grade_word` says `deck.in_deck`, so it is asked
+  until learned; «Залишилось» is the session's words not learned yet. The line under an answer is «Повторень до
+  вивчення: N», «Вивчено ✓ — наступне повторення …» at 0, or «Повторено ✓ …» for a review answered right.
+- New words: a fresh allocation of `new_per_day` opens when the block has no leftovers and no word that entered the deck
+  as New is left (`deck_entered_by_lapse` = 0), on any day, so a finished session starts the next one at once. Lapses
+  do not hold it back. There is no daily limit beyond that.

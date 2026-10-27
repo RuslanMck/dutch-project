@@ -29,13 +29,14 @@ export function registerPracticeTools({
 }) {
   registerJsonTool(mcpServer, 'get_practice_batch', {
     title: 'Get practice batch',
-    description: 'Words to practise now for one session: reviews that are due (most overdue first; the learning '
-      + 'deck\'s words come back every day) and new words, as many as the deck has free slots (10 minus the '
-      + 'words in the deck, split by priority). New words wait while any word is overdue: '
-      + 'counts.new_words_blocked is true then, and they come back once the overdue words are graded. Show '
-      + 'each word by its uk and ask for the Dutch; grade every answer with grade_word, repeats too. Returns '
-      + '{session_id, reviews, new_words, counts (with deck_size and deck_free_slots)}, each word {id, uk, '
-      + 'nl, article, kind, state, priority, deck {in_deck, required_correct, correct_streak, times_left}}.',
+    description: 'Words to practise now: the session\'s words first (the learning deck: each stays, across days, until '
+      + 'it is learned), then reviews due outside it (most overdue first), then new words. The next 10 new '
+      + 'words come only once every new word of the session is learned; then at once, on any day. New words '
+      + 'also wait while any review is overdue: counts.new_words_blocked is true then. Show each word by its '
+      + 'uk and ask for the Dutch; grade every answer with grade_word, repeats too, and ask a word again '
+      + 'until grade_word says it is no longer in the deck. Returns {session_id, reviews, new_words, counts '
+      + '(with deck_size)}, each word {id, uk, nl, article, kind, state, priority, deck {in_deck, '
+      + 'required_correct, correct_count, times_left}}.',
     inputSchema: practiceBatchToolInputSchema.shape,
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, ({ session_id: sessionId, max_reviews: maxReviews }) => practiceService.getPracticeBatch({
@@ -46,13 +47,15 @@ export function registerPracticeTools({
   registerJsonTool(mcpServer, 'grade_word', {
     title: 'Grade word',
     description: 'Record an answer to a word. Grades: "good" fully right; the article is optional, so a missing or '
-      + 'wrong de/het still counts as good (say what the right article is). "hard" right word with a spelling slip, or '
-      + 'a correct Dutch synonym; "again" wrong or not known. The first answer per word per session schedules its '
-      + 'FSRS review and, for again and hard, logs a word error. Every answer, repeats in the session too, moves the '
-      + 'word in the learning deck: a word stays in the deck, and comes back every day, until it is answered good '
-      + 'required_correct times in a row (2, plus 1 for each again or hard, up to 6); then it is learned. Returns '
-      + '{word, grade, is_repeat, state, status, interval_days, next_due_on, deck {in_deck, required_correct, '
-      + 'correct_streak, times_left, has_learned}}: tell the learner the times left (or that the word is learned).',
+      + 'wrong de/het still counts as good (say what the right article is). "hard" right word with a spelling'
+      + ' slip, or a correct Dutch synonym; "again" wrong or not known. The first answer per word per session'
+      + ' schedules its FSRS review and, for again and hard, logs a word error. Every answer, repeats too, '
+      + 'moves the word in the learning deck: a word needs required_correct right answers in total (2, plus 1'
+      + ' for each again or hard, up to 6); a mistake keeps the right answers given. Then it is learned and '
+      + 'leaves the session. A review answered right is done; answered wrong it joins the session with 3 to '
+      + 'go. Returns {word, grade, is_repeat, state, status, interval_days, next_due_on, deck {in_deck, '
+      + 'required_correct, correct_count, times_left, has_learned}}: tell the learner "повторень до вивчення:'
+      + ' times_left", or that the word is learned.',
     inputSchema: gradeWordToolInputSchema.shape,
   }, ({ id, grade, answer, session_id: sessionId }) => practiceService.gradeWord({
     wordId: id,

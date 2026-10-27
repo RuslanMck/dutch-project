@@ -26,5 +26,5 @@ export function mapWordToCompactWord(word) {
 // How many more right answers in a row a word in the learning deck needs; 0 outside the deck.
 function countDeckTimesLeft(word) {
   if (word.deck_required_correct === null || word.deck_required_correct === undefined) return 0;
-  return word.deck_required_correct - (word.deck_correct_streak ?? 0);
+  return word.deck_required_correct - (word.deck_correct_count ?? 0);
 }
