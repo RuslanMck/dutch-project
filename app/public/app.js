@@ -5,6 +5,7 @@ import {
   advanceDrillQueue,
   advanceWindowedQueue,
   formatQueueProgress,
+  shuffle,
   buildDeckLine,
   buildStrugglingDrillEnd,
   canOfferExtraNewWords,
@@ -276,7 +277,7 @@ async function loadCardWords(sessionId) {
   renderCards();
   try {
     const batch = await api.getPracticeBatch(sessionId);
-    words.deck = [...batch.reviews, ...batch.new_words];
+    words.deck = [...shuffle(batch.reviews), ...shuffle(batch.new_words)];
     words.status = 'ready';
   } catch (error) {
     if (error.status === 409) {
@@ -308,7 +309,7 @@ async function loadCardPhrases(sessionId) {
   renderCards();
   try {
     const batch = await api.getPhraseBatch(sessionId);
-    phrases.queue = [...batch.reviews, ...batch.new_phrases];
+    phrases.queue = [...shuffle(batch.reviews), ...shuffle(batch.new_phrases)];
     phrases.status = 'ready';
   } catch (error) {
     if (error.status === 409) {
@@ -633,7 +634,7 @@ async function loadFsrsBatch(sessionId) {
   renderPractice();
   try {
     const batch = await api.getPracticeBatch(sessionId);
-    session.queue = [...batch.reviews, ...batch.new_words];
+    session.queue = [...shuffle(batch.reviews), ...shuffle(batch.new_words)];
     session.status = 'ready';
     rememberFsrsBatchCounts(batch);
     showNextFsrsWord();
@@ -700,7 +701,7 @@ async function refillFsrsQueue(continueMessage = '') {
     finishFsrsSession();
     return false;
   }
-  session.queue.push(...newWords);
+  session.queue.push(...shuffle(newWords));
   session.status = 'ready';
   // The session continues, so its id stays the stored one (finishing replaced it).
   saveSession(sessionId);
@@ -854,7 +855,7 @@ async function postFsrsGrade(current, answer) {
   }
 }
 
-// "Далі": a word still in the learning deck comes back after the other active words (advanceWindowedQueue); a word learned, or a review answered
+// "Далі": a word still in the learning deck comes back later among the active words (advanceWindowedQueue); a word learned, or a review answered
 // right, leaves the session. The server's answer decides, so the grade is awaited first.
 async function advanceFsrsWord() {
   const session = ui.fsrs;
@@ -1057,7 +1058,7 @@ async function startStrugglingDrill() {
     return;
   }
   if (ui.struggling !== drill) return;
-  drill.queue = listing.words;
+  drill.queue = shuffle(listing.words);
   drill.total = listing.words.length;
   if (drill.queue.length) {
     drill.status = 'ready';
@@ -1119,7 +1120,7 @@ function answerStrugglingWord(result) {
   renderPractice();
 }
 
-// "Далі": a word typed right leaves the queue; any other word comes back after the other active words, until it is
+// "Далі": a word typed right leaves the queue; any other word comes back later among the active words, until it is
 // typed right.
 function advanceStrugglingWord() {
   const drill = ui.struggling;

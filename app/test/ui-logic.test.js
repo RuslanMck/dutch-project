@@ -20,6 +20,7 @@ import {
   advanceDrillQueue,
   advanceWindowedQueue,
   formatQueueProgress,
+  shuffle,
   formatStrugglingDrillButton,
   buildStrugglingDrillEnd,
 } from '../public/logic.js';
@@ -329,9 +330,12 @@ test('advanceDrillQueue: a word typed right leaves the front of the queue', () =
   assert.deepEqual(advanceDrillQueue(['a'], 'good'), []);
 });
 
-test('advanceDrillQueue: wrong, hard and "Не знаю" answers send the word to the end of a short queue', () => {
-  assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'again'), ['b', 'c', 'a']);
-  assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'hard'), ['b', 'c', 'a']);
+test('advanceDrillQueue: wrong, hard and "Не знаю" answers send the word back into the queue, not first', () => {
+  for (const grade of ['again', 'hard']) {
+    const next = advanceDrillQueue(['a', 'b', 'c'], grade);
+    assert.equal(next[0], 'b');
+    assert.deepEqual([...next].sort(), ['a', 'b', 'c']);
+  }
   assert.deepEqual(advanceDrillQueue(['a'], 'again'), ['a']);
 });
 
@@ -376,7 +380,8 @@ test('the deck line says the right answers still needed, a word learned just now
 
 test('advanceWindowedQueue: a word not yet learned comes back after the other four active words, not the waiting ones', () => {
   const queue = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
-  assert.deepEqual(advanceWindowedQueue(queue, false), ['b', 'c', 'd', 'e', 'a', 'f', 'g']);
+  const latest = () => 0.999;
+  assert.deepEqual(advanceWindowedQueue(queue, false, 5, latest), ['b', 'c', 'd', 'e', 'a', 'f', 'g']);
   assert.deepEqual(advanceWindowedQueue(['a', 'b'], false), ['b', 'a']);
   assert.deepEqual(advanceWindowedQueue(['a'], false), ['a']);
 });
@@ -400,4 +405,24 @@ test('advanceWindowedQueue: only five words rotate until one is learned', () => 
 test('formatQueueProgress: names the five active words only while others wait', () => {
   assert.equal(formatQueueProgress(9), 'Залишилось: 9 · зараз вчимо 5');
   assert.equal(formatQueueProgress(5), 'Залишилось: 5');
+});
+
+test('advanceWindowedQueue: shuffle mode puts the word at a random place among the active words, never first', () => {
+  const queue = ['a', 'b', 'c', 'd', 'e', 'f'];
+  assert.deepEqual(advanceWindowedQueue(queue, false, 5, () => 0), ['b', 'a', 'c', 'd', 'e', 'f']);
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const next = advanceWindowedQueue(queue, false);
+    const position = next.indexOf('a');
+    assert.ok(position >= 1 && position <= 4);
+    assert.deepEqual(next.slice(5), ['f']);
+  }
+});
+
+test('shuffle: keeps every item, returns a new array', () => {
+  const items = [1, 2, 3, 4, 5];
+  const shuffled = shuffle(items);
+  assert.notEqual(shuffled, items);
+  assert.deepEqual([...shuffled].sort(), items);
+  assert.deepEqual(items, [1, 2, 3, 4, 5]);
+  assert.deepEqual(shuffle([]), []);
 });
