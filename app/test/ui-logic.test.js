@@ -23,6 +23,10 @@ import {
   formatDuration,
   pluralize,
   buildRoundSummaryView,
+  buildActivityTiles,
+  buildChartView,
+  buildStreakTiles,
+  formatActivityRange,
   shuffle,
   formatStrugglingDrillButton,
   buildStrugglingDrillEnd,
@@ -468,4 +472,49 @@ test('buildRoundSummaryView: totals, the hardest word, the paused span only when
   const smooth = buildRoundSummaryView({ ...round, hardest_word_id: null, finished_at: 300_000 });
   assert.equal(smooth.stats.length, 4);
   assert.equal(smooth.hardestText, 'Жодної помилки — чудово!');
+});
+
+test('buildActivityTiles: values and the comparison with the period before; none for all time', () => {
+  const totals = {
+    answers: 40, word_answers: 30, phrase_answers: 10, mistakes: 8, accuracy: 0.8, active_seconds: 900,
+    days_practised: 3, new_words: 10, learned_words: 7,
+  };
+  const activity = {
+    period: 'week', totals, previous_totals: { ...totals, answers: 30, accuracy: 0.85, active_seconds: 900 },
+  };
+  const tiles = buildActivityTiles(activity);
+  assert.deepEqual(tiles[0], { label: 'Відповідей', value: '40', delta: '+10 · попередні 7 днів: 30' });
+  assert.equal(tiles[1].value, '80%');
+  assert.equal(tiles[1].delta, '−5 п.п. · попередні 7 днів: 85%');
+  assert.equal(tiles[2].delta, '= · попередні 7 днів: 15 хв');
+  assert.equal(buildActivityTiles({ ...activity, period: 'all', previous_totals: null })[0].delta, null);
+  assert.equal(tiles[3].label, 'Днів з практикою');
+  assert.ok(!buildActivityTiles({ ...activity, period: 'day' }).some(tile => tile.label === 'Днів з практикою'));
+});
+
+test('buildChartView: heights against the tallest bar, weekday labels for a week, sparse hour labels', () => {
+  const week = buildChartView({
+    unit: 'day',
+    buckets: [
+      { key: '2026-10-26', answers: 10, mistakes: 2, active_seconds: 300 },
+      { key: '2026-10-27', answers: 5, mistakes: 0, active_seconds: 60 },
+    ],
+  }, 'week');
+  assert.deepEqual(week.bars.map(bar => [bar.heightPercent, bar.label]), [[100, 'пн'], [50, 'вт']]);
+  assert.equal(week.bars[0].detail, '26.10.2026: 10 відповідей · 2 помилки · 5 хв');
+  const day = buildChartView({
+    unit: 'hour',
+    buckets: Array.from({ length: 24 }, (_, hour) => ({ key: String(hour), answers: 0, mistakes: 0, active_seconds: 0 })),
+  }, 'day');
+  assert.deepEqual(day.bars.filter(bar => bar.label).map(bar => bar.label), ['0:00', '6:00', '12:00', '18:00']);
+  assert.equal(day.isEmpty, true);
+});
+
+test('formatActivityRange and buildStreakTiles', () => {
+  assert.equal(formatActivityRange({ period: 'day', from_date: '2026-10-27', to_date: '2026-10-27' }),
+    'Сьогодні: 27.10.2026');
+  assert.equal(formatActivityRange({ period: 'week', from_date: '2026-10-21', to_date: '2026-10-27' }),
+    'Останні 7 днів: 21.10.2026 – 27.10.2026');
+  assert.deepEqual(buildStreakTiles({ current: 3, longest: 5, is_today_practised: false }).map(tile => tile.value),
+    ['3 дні', '5 днів']);
 });

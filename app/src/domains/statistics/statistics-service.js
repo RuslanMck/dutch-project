@@ -3,6 +3,7 @@
 import { LEARNING_STATUS_VALUES } from '../../contracts/shared-contracts.js';
 import { describeCardState, parseCard } from '../practice/fsrs-scheduling.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from '../practice/practice-calendar.js';
+import { findLearnedMoments, summarizeLearningActivity } from './learning-activity.js';
 
 export function createStatisticsService({ statisticsRepository, practiceSettings, clock }) {
   function calculateStatistics() {
@@ -42,5 +43,23 @@ export function createStatisticsService({ statisticsRepository, practiceSettings
     return fsrsCounts;
   }
 
-  return Object.freeze({ calculateStatistics });
+  // The learning activity of the period (see learning-activity.js), in the practice time zone.
+  function calculateActivity({ period }) {
+    const { timeZone } = practiceSettings.readSettings();
+    const answers = [
+      ...statisticsRepository.listWordAnswers().map(answer => ({ ...answer, kind: 'word' })),
+      ...statisticsRepository.listPhraseAnswers().map(answer => ({ ...answer, kind: 'phrase' })),
+    ];
+    return summarizeLearningActivity({
+      period,
+      now: clock.now(),
+      timeZone,
+      answers,
+      startedWords: statisticsRepository.listStartedWords().map(event => ({ word_id: event.word_id, at: event.at })),
+      learnedWords: findLearnedMoments(statisticsRepository.listCountingDeckAnswers()),
+      wordsById: new Map(statisticsRepository.listWordNames().map(word => [word.id, word])),
+    });
+  }
+
+  return Object.freeze({ calculateStatistics, calculateActivity });
 }

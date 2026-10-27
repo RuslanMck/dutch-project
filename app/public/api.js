@@ -49,6 +49,8 @@ export const gradePracticePhrase = body => request('POST', '/api/practice/phrase
 export const addExtraNewWords = body => request('POST', '/api/practice/extra-new-words', body);
 export const getStrugglingWords = () => request('GET', '/api/practice/struggling-words');
 export const getRoundSummary = () => request('GET', '/api/practice/round-summary');
+export const getStats = () => request('GET', '/api/stats');
+export const getActivity = period => request('GET', `/api/stats/activity?period=${enc(period)}`);
 
 // Calls onChange(collection) for every live change. 'all' means refetch everything.
 // Uses SSE; while the stream is down (error or not yet open) it polls every 5 s.

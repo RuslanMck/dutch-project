@@ -330,3 +330,196 @@ export function buildRoundSummaryView(round) {
 function formatDutch(word) {
   return word.article ? `${word.article} ${word.nl}` : word.nl;
 }
+
+// ---------- statistics page ----------
+
+export const TAB_TITLES = Object.freeze({
+  practice: 'Практика',
+  cards: 'Картки',
+  phrases: 'Фрази',
+  table: 'Таблиця',
+  rules: 'Правила',
+  texts: 'Тексти',
+  stats: 'Статистика',
+});
+
+const PERIOD_RANGE_PREFIX = Object.freeze({
+  day: 'Сьогодні',
+  week: 'Останні 7 днів',
+  month: 'Останні 30 днів',
+  year: 'Останні 12 місяців',
+  all: 'Увесь час',
+});
+const PREVIOUS_PERIOD_NAME = Object.freeze({
+  day: 'учора',
+  week: 'попередні 7 днів',
+  month: 'попередні 30 днів',
+  year: 'попередні 12 місяців',
+});
+const MONTH_SHORT_NAMES = ['січ.', 'лют.', 'бер.', 'квіт.', 'трав.', 'черв.', 'лип.', 'серп.', 'вер.', 'жовт.', 'лист.',
+  'груд.'];
+const WEEKDAY_SHORT_NAMES = ['нд', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+const DAY_WORDS = ['день', 'дні', 'днів'];
+const ANSWER_WORDS = ['відповідь', 'відповіді', 'відповідей'];
+
+// '27.10.2026' from '2026-10-27'.
+export function formatCalendarDate(calendarDate) {
+  const [year, month, day] = calendarDate.split('-');
+  return `${day}.${month}.${year}`;
+}
+
+export function formatPercent(share) {
+  return share === null ? '—' : `${Math.round(share * 100)}%`;
+}
+
+// The line under the period buttons: what the numbers cover.
+export function formatActivityRange(activity) {
+  const prefix = PERIOD_RANGE_PREFIX[activity.period];
+  if (activity.from_date === activity.to_date) return `${prefix}: ${formatCalendarDate(activity.to_date)}`;
+  return `${prefix}: ${formatCalendarDate(activity.from_date)} – ${formatCalendarDate(activity.to_date)}`;
+}
+
+// "+10 · учора: 30", "−5 п.п. · попередні 7 днів: 85%", "= · учора: 30"; null when there is nothing to compare with.
+// formatDifference formats the difference, formatPrevious the earlier value.
+function formatDelta(current, previous, period, { formatDifference = String, formatPrevious = String } = {}) {
+  if (previous === null || previous === undefined || current === null) return null;
+  const difference = current - previous;
+  const changeText = difference === 0 ? '=' : `${difference > 0 ? '+' : '−'}${formatDifference(Math.abs(difference))}`;
+  return `${changeText} · ${PREVIOUS_PERIOD_NAME[period]}: ${formatPrevious(previous)}`;
+}
+
+// The tiles of the period: value, label and the comparison with the period before (none for all time).
+export function buildActivityTiles(activity) {
+  const { totals, period } = activity;
+  const previous = activity.previous_totals;
+  const accuracyPoints = share => (share === null ? null : Math.round(share * 100));
+  const tiles = [
+    {
+      label: 'Відповідей',
+      value: String(totals.answers),
+      delta: formatDelta(totals.answers, previous?.answers, period),
+    },
+    {
+      label: 'Правильно',
+      value: formatPercent(totals.accuracy),
+      delta: formatDelta(accuracyPoints(totals.accuracy), accuracyPoints(previous?.accuracy ?? null), period, {
+        formatDifference: points => `${points} п.п.`,
+        formatPrevious: points => `${points}%`,
+      }),
+    },
+    {
+      label: 'Час навчання',
+      value: formatDuration(totals.active_seconds),
+      delta: formatDelta(totals.active_seconds, previous?.active_seconds, period, {
+        formatDifference: formatDuration,
+        formatPrevious: formatDuration,
+      }),
+    },
+    {
+      label: 'Нових слів почато',
+      value: String(totals.new_words),
+      delta: formatDelta(totals.new_words, previous?.new_words, period),
+    },
+    {
+      label: 'Слів вивчено',
+      value: String(totals.learned_words),
+      delta: formatDelta(totals.learned_words, previous?.learned_words, period),
+    },
+    {
+      label: 'Помилок',
+      value: String(totals.mistakes),
+      delta: formatDelta(totals.mistakes, previous?.mistakes, period),
+    },
+    {
+      label: 'Фраз повторено',
+      value: String(totals.phrase_answers),
+      delta: formatDelta(totals.phrase_answers, previous?.phrase_answers, period),
+    },
+  ];
+  // A single day is practised or not, so its count of days says nothing.
+  if (period !== 'day') {
+    tiles.splice(3, 0, {
+      label: 'Днів з практикою',
+      value: String(totals.days_practised),
+      delta: formatDelta(totals.days_practised, previous?.days_practised, period),
+    });
+  }
+  return tiles;
+}
+
+const CHART_TITLES = Object.freeze({
+  hour: 'Відповіді за годинами',
+  day: 'Відповіді за днями',
+  month: 'Відповіді за місяцями',
+});
+
+// The bars of the chart: height as a share of the tallest bar, a sparse axis label (so labels never collide), and the
+// detail line a tap shows.
+export function buildChartView(chart, period) {
+  const maximum = Math.max(1, ...chart.buckets.map(bucket => bucket.answers));
+  const labelEvery = chooseLabelStep(chart.unit, chart.buckets.length);
+  const bars = chart.buckets.map((bucket, index) => {
+    const name = formatBucketName(bucket.key, chart.unit);
+    const isLabelled = index % labelEvery === 0;
+    return {
+      key: bucket.key,
+      heightPercent: Math.round((bucket.answers / maximum) * 100),
+      label: isLabelled ? formatBucketLabel(bucket.key, chart.unit, period) : '',
+      detail: `${name}: ${bucket.answers} ${pluralize(bucket.answers, ANSWER_WORDS)} · ${bucket.mistakes} `
+        + `${pluralize(bucket.mistakes, ['помилка', 'помилки', 'помилок'])} · ${formatDuration(bucket.active_seconds)}`,
+    };
+  });
+  return { title: CHART_TITLES[chart.unit], bars, isEmpty: chart.buckets.every(bucket => bucket.answers === 0) };
+}
+
+function chooseLabelStep(unit, count) {
+  if (unit === 'hour') return 6;
+  if (unit === 'day') return count <= 7 ? 1 : 7;
+  return count <= 12 ? (count <= 6 ? 1 : 3) : Math.ceil(count / 4);
+}
+
+// Week bars are named by weekday; month-long ones by date; hours and months as they are.
+function formatBucketLabel(key, unit, period) {
+  if (unit === 'hour') return `${key}:00`;
+  if (unit === 'month') return MONTH_SHORT_NAMES[Number(key.split('-')[1]) - 1];
+  const [year, month, day] = key.split('-').map(Number);
+  if (period === 'week') return WEEKDAY_SHORT_NAMES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${day}.${String(month).padStart(2, '0')}`;
+}
+
+function formatBucketName(key, unit) {
+  if (unit === 'hour') return `${key}:00–${key}:59`;
+  if (unit === 'day') return formatCalendarDate(key);
+  const [year, month] = key.split('-').map(Number);
+  return `${MONTH_SHORT_NAMES[month - 1]} ${year}`;
+}
+
+export function buildStreakTiles(streak) {
+  return [
+    {
+      label: 'Зараз',
+      value: `${streak.current} ${pluralize(streak.current, DAY_WORDS)}`,
+      delta: streak.is_today_practised ? 'сьогодні вже є ✓' : 'сьогодні ще ні',
+    },
+    { label: 'Найдовша', value: `${streak.longest} ${pluralize(streak.longest, DAY_WORDS)}`, delta: null },
+  ];
+}
+
+export function formatHardestWord(word) {
+  const dutch = word.article ? `${word.article} ${word.nl}` : word.nl;
+  return `${dutch} — ${word.uk}: ${word.mistakes} ${pluralize(word.mistakes, ['помилка', 'помилки', 'помилок'])} `
+    + `з ${word.answers}`;
+}
+
+// The vocabulary right now, from GET /api/stats. A word counts as learned for good once its next review is 21+ days
+// away (learned_threshold_days), so a word learned in a session today is still being repeated.
+export function buildOverviewTiles(stats) {
+  return [
+    { label: 'Усього слів', value: String(stats.words.total), delta: null },
+    { label: 'Запам’ятовано надовго', value: String(stats.words.learned), delta: 'повтор через 21+ днів' },
+    { label: 'Ще повторюю', value: String(stats.words.learning), delta: null },
+    { label: 'Ще не почато', value: String(stats.words.new), delta: null },
+    { label: 'Фраз', value: String(stats.phrases), delta: null },
+    { label: 'Повторити сьогодні', value: String(stats.fsrs.due_today), delta: null },
+  ];
+}

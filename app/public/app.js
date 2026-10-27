@@ -6,6 +6,13 @@ import {
   advanceWindowedQueue,
   formatQueueProgress,
   buildRoundSummaryView,
+  TAB_TITLES,
+  buildActivityTiles,
+  buildChartView,
+  buildOverviewTiles,
+  buildStreakTiles,
+  formatActivityRange,
+  formatHardestWord,
   shuffle,
   buildDeckLine,
   buildStrugglingDrillEnd,
@@ -21,7 +28,7 @@ import {
   revealTranslationAnswer,
 } from './logic.js';
 
-const TABS = ['table', 'cards', 'practice', 'rules', 'phrases', 'texts'];
+const TABS = ['table', 'cards', 'practice', 'rules', 'phrases', 'texts', 'stats'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -61,6 +68,8 @@ const state = { words: [], topics: [], rules: [], patterns: [], phrases: [], tex
 const ui = {
   tab: 'table',
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
+  // Statistics page: the chosen period, its activity and the vocabulary counts, and the bar tapped in the chart.
+  stats: { period: 'week', status: 'idle', activity: null, overview: null, selectedBarKey: null },
   armed: null,                       // { kind: 'phrase', id }: the phrase row waiting for a second click on delete
   table: { q: '', topic: '' },
   // Cards: 'words' shows today's practice batch without grades; 'phrases' grades like the practice does.
@@ -180,6 +189,7 @@ const RENDER = {
   rules: renderRules,
   phrases: renderPhrases,
   texts: renderTexts,
+  stats: renderStats,
 };
 
 function render() {
@@ -192,11 +202,119 @@ function showTab(name) {
   try { localStorage.setItem('tab', ui.tab); } catch { /* storage unavailable */ }
   for (const t of TABS) {
     $(`tab-${t}`).hidden = t !== ui.tab;
-    document.querySelector(`.tabs [data-tab="${t}"]`).setAttribute('aria-selected', String(t === ui.tab));
+    const link = document.querySelector(`.tabs [data-tab="${t}"]`);
+    if (t === ui.tab) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   }
+  $('page-title').textContent = TAB_TITLES[ui.tab];
+  document.title = `${TAB_TITLES[ui.tab]} · Dutch матеріали`;
+  setDrawerOpen(false);
   if (ui.tab === 'practice') ensureFsrsSession();
   if (ui.tab === 'cards') ensureCardsBatch();
+  if (ui.tab === 'stats') loadStats();
   render();
+}
+
+// ---------- navigation drawer ----------
+
+function setDrawerOpen(isOpen) {
+  const wasOpen = !$('nav-drawer').hidden;
+  $('nav-drawer').hidden = !isOpen;
+  $('nav-backdrop').hidden = !isOpen;
+  $('menu-open-button').setAttribute('aria-expanded', String(isOpen));
+  if (isOpen) document.querySelector('.tabs [aria-current="page"]')?.focus();
+  else if (wasOpen) $('menu-open-button').focus();
+}
+
+// ---------- statistics ----------
+
+// The period's activity and the vocabulary counts, fetched each time the page or the period changes. A reply for
+// a period no longer chosen is dropped.
+async function loadStats() {
+  const stats = ui.stats;
+  const period = stats.period;
+  stats.status = stats.activity ? 'refreshing' : 'loading';
+  renderStats();
+  try {
+    const [activity, overview] = await Promise.all([api.getActivity(period), api.getStats()]);
+    if (ui.stats.period !== period) return;
+    Object.assign(stats, { activity, overview, status: 'ready' });
+  } catch (error) {
+    if (ui.stats.period !== period) return;
+    stats.status = 'failed';
+    notice(error.message || 'Не вдалося завантажити статистику');
+  }
+  stats.selectedBarKey = null;
+  renderStats();
+}
+
+function renderTiles(tiles) {
+  return tiles.map(tile => `
+    <div class="stat-tile">
+      <span class="stat-tile__label">${esc(tile.label)}</span>
+      <span class="stat-tile__value">${esc(tile.value)}</span>
+      ${tile.delta ? `<span class="stat-tile__delta">${esc(tile.delta)}</span>` : ''}
+    </div>`).join('');
+}
+
+function renderStats() {
+  const stats = ui.stats;
+  for (const button of document.querySelectorAll('#stats-periods [data-period]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.period === stats.period));
+  }
+  const messageByStatus = { loading: 'Завантаження…', failed: 'Не вдалося завантажити статистику' };
+  $('stats-message').textContent = messageByStatus[stats.status] ?? '';
+  const hasData = !!stats.activity && stats.status !== 'loading' && stats.status !== 'failed';
+  $('stats-content').hidden = !hasData;
+  if (!hasData) {
+    $('stats-range').textContent = '';
+    return;
+  }
+  const { activity, overview } = stats;
+  $('stats-range').textContent = formatActivityRange(activity);
+  $('stats-tiles').innerHTML = renderTiles(buildActivityTiles(activity));
+
+  const chartView = buildChartView(activity.chart, activity.period);
+  $('stats-chart-title').textContent = chartView.title;
+  $('stats-chart').innerHTML = chartView.bars.map(bar => `
+    <button type="button" class="bar-chart__column" data-bar-key="${esc(bar.key)}"
+      aria-pressed="${String(bar.key === stats.selectedBarKey)}" aria-label="${esc(bar.detail)}">
+      <span class="bar-chart__bar" style="height: ${bar.heightPercent}%"></span>
+      ${bar.label ? `<span class="bar-chart__label" aria-hidden="true">${esc(bar.label)}</span>` : ''}
+    </button>`).join('');
+  const selectedBar = chartView.bars.find(bar => bar.key === stats.selectedBarKey);
+  $('stats-chart-detail').textContent = selectedBar?.detail
+    ?? (chartView.isEmpty ? 'За цей період відповідей немає.' : 'Торкніться стовпчика, щоб побачити деталі.');
+
+  $('stats-streak').innerHTML = renderTiles(buildStreakTiles(activity.streak));
+  $('stats-hardest').innerHTML = activity.hardest_words.length
+    ? activity.hardest_words.map(word => `<li>${esc(formatHardestWord(word))}</li>`).join('')
+    : '<li class="muted">Помилок за період немає.</li>';
+  $('stats-overview').innerHTML = renderTiles(buildOverviewTiles(overview));
+}
+
+function handleStatsPeriodClick(event) {
+  const button = event.target.closest('button[data-period]');
+  if (!button || button.dataset.period === ui.stats.period) return;
+  ui.stats.period = button.dataset.period;
+  try { localStorage.setItem('statsPeriod', ui.stats.period); } catch { /* storage unavailable */ }
+  loadStats();
+}
+
+// A bar shows its numbers under the chart on tap or hover; a second tap hides them. Only the pressed state and the
+// detail line change, so the chart is not rebuilt under the pointer.
+function handleChartBarSelect(event, { isToggle }) {
+  const column = event.target.closest('[data-bar-key]');
+  if (!column) return;
+  const key = column.dataset.barKey;
+  if (!isToggle && ui.stats.selectedBarKey === key) return;
+  ui.stats.selectedBarKey = isToggle && ui.stats.selectedBarKey === key ? null : key;
+  for (const otherColumn of $('stats-chart').querySelectorAll('[data-bar-key]')) {
+    otherColumn.setAttribute('aria-pressed', String(otherColumn.dataset.barKey === ui.stats.selectedBarKey));
+  }
+  $('stats-chart-detail').textContent = ui.stats.selectedBarKey === null
+    ? 'Торкніться стовпчика, щоб побачити деталі.'
+    : column.getAttribute('aria-label');
 }
 
 // ---------- delete confirmation (one dialog for every word) ----------
@@ -1341,6 +1459,20 @@ function bindEvents() {
     const button = event.target.closest('button[data-tab]');
     if (button) showTab(button.dataset.tab);
   });
+  $('menu-open-button').addEventListener('click', () => setDrawerOpen(true));
+  $('menu-close-button').addEventListener('click', () => setDrawerOpen(false));
+  $('nav-backdrop').addEventListener('click', () => setDrawerOpen(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !$('nav-drawer').hidden) setDrawerOpen(false);
+  });
+  $('stats-periods').addEventListener('click', handleStatsPeriodClick);
+  // A mouse already selected the bar on hover, so its click keeps it; a tap toggles it.
+  $('stats-chart').addEventListener('click', event => {
+    handleChartBarSelect(event, { isToggle: event.pointerType !== 'mouse' });
+  });
+  $('stats-chart').addEventListener('pointerover', event => {
+    if (event.pointerType === 'mouse') handleChartBarSelect(event, { isToggle: false });
+  });
 
   // "i" buttons open and close the text block they control.
   document.querySelectorAll('[data-hint-button]').forEach(button => {
@@ -1533,6 +1665,10 @@ function toggleShuffle() {
 
 function init() {
   try { ui.isShuffleOn = localStorage.getItem('shuffle') !== 'off'; } catch { /* storage unavailable */ }
+  try {
+    const savedPeriod = localStorage.getItem('statsPeriod');
+    if (['day', 'week', 'month', 'year', 'all'].includes(savedPeriod)) ui.stats.period = savedPeriod;
+  } catch { /* storage unavailable */ }
   bindEvents();
   renderShuffleButton();
   let saved = 'table';

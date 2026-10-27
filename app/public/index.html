@@ -17,19 +17,37 @@
 <div class="app">
 
   <header class="top">
-    <h1>Dutch матеріали</h1>
-    <form method="post" action="/auth/logout">
-      <button class="ghost" type="submit">Вийти</button>
-    </form>
+    <button id="menu-open-button" class="icon-button menu-button" type="button" aria-label="Відкрити меню"
+      aria-controls="nav-drawer" aria-expanded="false">
+      <svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+    <h1 id="page-title">Dutch матеріали</h1>
   </header>
 
-  <nav class="tabs" role="tablist" aria-label="Розділи">
-    <button type="button" role="tab" data-tab="table" aria-selected="false">Таблиця</button>
-    <button type="button" role="tab" data-tab="cards" aria-selected="false">Картки</button>
-    <button type="button" role="tab" data-tab="practice" aria-selected="false">Практика</button>
-    <button type="button" role="tab" data-tab="rules" aria-selected="false">Правила</button>
-    <button type="button" role="tab" data-tab="phrases" aria-selected="false">Фрази</button>
-    <button type="button" role="tab" data-tab="texts" aria-selected="false">Тексти</button>
+  <div id="nav-backdrop" class="drawer-backdrop" hidden></div>
+  <nav id="nav-drawer" class="drawer" aria-label="Розділи" hidden>
+    <div class="drawer__header">
+      <span class="drawer__brand">Dutch матеріали</span>
+      <button id="menu-close-button" class="icon-button" type="button" aria-label="Закрити меню">
+        <svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="tabs drawer__links">
+      <button type="button" class="drawer__link" data-tab="practice">Практика</button>
+      <button type="button" class="drawer__link" data-tab="cards">Картки</button>
+      <button type="button" class="drawer__link" data-tab="phrases">Фрази</button>
+      <button type="button" class="drawer__link" data-tab="table">Таблиця</button>
+      <button type="button" class="drawer__link" data-tab="rules">Правила</button>
+      <button type="button" class="drawer__link" data-tab="texts">Тексти</button>
+      <button type="button" class="drawer__link" data-tab="stats">Статистика</button>
+    </div>
+    <form class="drawer__footer" method="post" action="/auth/logout">
+      <button class="ghost" type="submit">Вийти</button>
+    </form>
   </nav>
 
   <div id="notice" class="notice" role="alert" hidden></div>
@@ -191,6 +209,39 @@
           слова</button>
       </section>
       <button id="practice-restart-button" class="primary practice-restart" type="button" hidden>Почати знову</button>
+    </section>
+
+    <!-- Статистика -->
+    <section id="tab-stats" class="tab" data-tab="stats" aria-labelledby="page-title" hidden>
+      <div id="stats-periods" class="segmented" role="group" aria-label="Період">
+        <button type="button" data-period="day" aria-pressed="false">День</button>
+        <button type="button" data-period="week" aria-pressed="true">Тиждень</button>
+        <button type="button" data-period="month" aria-pressed="false">Місяць</button>
+        <button type="button" data-period="year" aria-pressed="false">Рік</button>
+        <button type="button" data-period="all" aria-pressed="false" aria-label="Увесь час">Усе</button>
+      </div>
+      <p id="stats-range" class="muted stats-range"></p>
+      <p id="stats-message" class="muted" role="status"></p>
+      <div id="stats-content" hidden>
+        <div id="stats-tiles" class="stat-tiles"></div>
+        <section class="stats-card" aria-labelledby="stats-chart-title">
+          <h2 id="stats-chart-title" class="stats-card__title"></h2>
+          <div id="stats-chart" class="bar-chart"></div>
+          <p id="stats-chart-detail" class="muted bar-chart__detail" aria-live="polite"></p>
+        </section>
+        <section class="stats-card" aria-labelledby="stats-streak-title">
+          <h2 id="stats-streak-title" class="stats-card__title">Серія днів поспіль</h2>
+          <div id="stats-streak" class="stat-tiles stat-tiles--two"></div>
+        </section>
+        <section class="stats-card" aria-labelledby="stats-hardest-title">
+          <h2 id="stats-hardest-title" class="stats-card__title">Найважчі слова за період</h2>
+          <ol id="stats-hardest" class="stats-hardest"></ol>
+        </section>
+        <section class="stats-card" aria-labelledby="stats-overview-title">
+          <h2 id="stats-overview-title" class="stats-card__title">Словник зараз</h2>
+          <div id="stats-overview" class="stat-tiles"></div>
+        </section>
+      </div>
     </section>
 
     <!-- 4 · Правила -->

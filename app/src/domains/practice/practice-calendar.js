@@ -28,6 +28,13 @@ export function addDaysToCalendarDate(calendarDate, dayCount) {
   return shiftedDate.toISOString().slice(0, 10);
 }
 
+// The hour (0–23) the time zone shows at the instant.
+export function findHourInTimeZone(timestamp, timeZone) {
+  const partFormatter = findOrCreateFormatter(partFormatterByTimeZone, timeZone, createPartFormatter);
+  const hourPart = partFormatter.formatToParts(new Date(timestamp)).find(part => part.type === 'hour');
+  return Number(hourPart.value) % 24;
+}
+
 function parseCalendarDate(calendarDate) {
   return calendarDate.split('-').map(Number);
 }
