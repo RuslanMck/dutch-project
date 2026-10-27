@@ -54,6 +54,11 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
     response.json(practiceService.addExtraNewWords({ count: extraInput.count }));
   });
 
+  // Read only: the summary of the current round of new words.
+  practiceRouter.get('/practice/round-summary', (request, response) => {
+    response.json(practiceService.getRoundSummary());
+  });
+
   practiceRouter.get('/practice/stats', (request, response) => {
     response.json(practiceService.calculatePracticeStatistics());
   });

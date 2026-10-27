@@ -15,6 +15,7 @@ import { countExtraItemsToday, mapToStoredBlock, openIntakeBlock } from './intak
 import { applyAnswerToDeck, describeDeckPosition, readDeckPosition, replayDeckAnswers } from './learning-deck.js';
 import { planMigration, summarizeMigration } from './migration-planning.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
+import { summarizeRound } from './round-summary.js';
 
 const FSRS_ALREADY_SET_UP_MESSAGE = 'FSRS practice is already set up: migrate_to_fsrs has run';
 const SHORT_GOOD_SHARE_DAY_COUNT = 7;
@@ -285,6 +286,18 @@ export function createPracticeService({
     return { words, count: words.length };
   }
 
+  // The current round: the words of the intake block (the session's new words, extra ones too), each with its answers
+  // and mistakes, and the time from the first answer to the last. Null when no block was pinned or nothing was answered.
+  function getRoundSummary() {
+    const settings = practiceSettings.readActiveSettings();
+    const block = settings.newWordBlock;
+    if (!block || !block.itemIds.length) return { round: null };
+    const words = block.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId)).filter(Boolean)
+      .map(wordRow => ({ ...mapToPracticeWord(wordRow), in_deck: wordRow.deck_required_correct !== null }));
+    const answers = practiceRepository.listDeckAnswersForWords(words.map(word => word.id));
+    return { round: summarizeRound({ words, answers }) };
+  }
+
   // Due counts, overdue words, introductions, New words per priority, words per state and the good share of the last 7
   // and 30 days. The phrases' own counts are added under phrases.
   function calculatePracticeStatistics() {
@@ -367,6 +380,7 @@ export function createPracticeService({
     migrateToFsrs,
     rebuildLearningDeck,
     listStrugglingWords,
+    getRoundSummary,
     calculatePracticeStatistics,
   });
 }

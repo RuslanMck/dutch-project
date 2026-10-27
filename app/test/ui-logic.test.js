@@ -20,6 +20,9 @@ import {
   advanceDrillQueue,
   advanceWindowedQueue,
   formatQueueProgress,
+  formatDuration,
+  pluralize,
+  buildRoundSummaryView,
   shuffle,
   formatStrugglingDrillButton,
   buildStrugglingDrillEnd,
@@ -426,4 +429,43 @@ test('shuffle: keeps every item, returns a new array', () => {
   assert.deepEqual([...shuffled].sort(), items);
   assert.deepEqual(items, [1, 2, 3, 4, 5]);
   assert.deepEqual(shuffle([]), []);
+});
+
+test('formatDuration: seconds, minutes with seconds, hours with minutes', () => {
+  assert.equal(formatDuration(45), '45 с');
+  assert.equal(formatDuration(750), '12 хв 30 с');
+  assert.equal(formatDuration(600), '10 хв');
+  assert.equal(formatDuration(3900), '1 год 5 хв');
+});
+
+test('pluralize: 1 помилка, 3 помилки, 5 і 11 помилок', () => {
+  const forms = ['помилка', 'помилки', 'помилок'];
+  assert.deepEqual([1, 3, 5, 11, 21].map(count => pluralize(count, forms)),
+    ['помилка', 'помилки', 'помилок', 'помилок', 'помилка']);
+});
+
+test('buildRoundSummaryView: totals, the hardest word, the paused span only when there were pauses', () => {
+  const round = {
+    words: [
+      { id: 1, nl: 'laten', uk: 'залишати', article: null, answer_count: 5, mistake_count: 3, difficulty: 'hard' },
+      { id: 2, nl: 'kat', uk: 'кіт', article: 'de', answer_count: 2, mistake_count: 0, difficulty: 'easy' },
+    ],
+    total_count: 2, learned_count: 2, answer_count: 7, mistake_count: 3, hardest_word_id: 1,
+    started_at: 0, finished_at: 3_600_000, active_seconds: 300,
+  };
+  const view = buildRoundSummaryView(round);
+  assert.deepEqual(view.stats, [
+    ['Вивчено слів', '2 з 2'],
+    ['Час навчання', '5 хв'],
+    ['Від початку до кінця, з перервами', '1 год'],
+    ['Відповідей', '7'],
+    ['Помилок', '3'],
+  ]);
+  assert.equal(view.hardestText, 'Найважче слово: laten — залишати (3 помилки)');
+  assert.deepEqual(view.words[1], {
+    dutch: 'de kat', ukrainian: 'кіт', difficulty: 'easy', difficultyLabel: 'легко', detail: 'відповідей: 2 · 0 помилок',
+  });
+  const smooth = buildRoundSummaryView({ ...round, hardest_word_id: null, finished_at: 300_000 });
+  assert.equal(smooth.stats.length, 4);
+  assert.equal(smooth.hardestText, 'Жодної помилки — чудово!');
 });

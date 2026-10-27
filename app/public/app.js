@@ -5,6 +5,7 @@ import {
   advanceDrillQueue,
   advanceWindowedQueue,
   formatQueueProgress,
+  buildRoundSummaryView,
   shuffle,
   buildDeckLine,
   buildStrugglingDrillEnd,
@@ -630,6 +631,7 @@ async function loadFsrsBatch(sessionId) {
     dueTomorrow: null,
     newWordsBlocked: false,
     newRemainingByPriority: {},
+    round: null,
     strugglingCount: null,
   });
   renderPractice();
@@ -666,7 +668,49 @@ function showNextFsrsWord() {
     return;
   }
   session.current = null;
+  showRoundSummaryOrRefill();
+}
+
+// The queue ran out. When it held the last words of the round of new words, the congratulation screen shows first and
+// its button asks for the next words; otherwise the batch is asked again at once.
+async function showRoundSummaryOrRefill() {
+  const session = ui.fsrs;
+  const sessionId = session.sessionId;
+  session.status = 'loading';
+  renderPractice();
+  await Promise.allSettled([...session.pendingGradePosts]);
+  if (ui.fsrs.sessionId !== sessionId) return;
+  let round = null;
+  try {
+    round = (await api.getRoundSummary()).round;
+  } catch { /* no summary: the session goes on */ }
+  if (ui.fsrs.sessionId !== sessionId) return;
+  if (round?.is_complete && round.words.some(word => session.answered.has(word.id))) {
+    session.round = round;
+    session.status = 'round-done';
+    renderPractice();
+    return;
+  }
   refillFsrsQueue(QUEUE_REFILLED_MESSAGE);
+}
+
+function handleRoundNextClick() {
+  ui.fsrs.round = null;
+  refillFsrsQueue();
+}
+
+function renderRoundSummary() {
+  const view = buildRoundSummaryView(ui.fsrs.round);
+  $('practice-round-title').textContent = view.title;
+  $('practice-round-stats').innerHTML = view.stats.map(([label, value]) =>
+    `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
+  $('practice-round-hardest').textContent = view.hardestText;
+  $('practice-round-words').innerHTML = view.words.map(word => `
+    <li class="practice-round__word">
+      <span><strong>${esc(word.dutch)}</strong> — ${esc(word.ukrainian)}</span>
+      <span class="difficulty-badge difficulty-badge--${esc(word.difficulty)}">${esc(word.difficultyLabel)}</span>
+      <span class="muted practice-round__word-detail">${esc(word.detail)}</span>
+    </li>`).join('');
 }
 
 // Asks the batch again with the same session id. New words that came back continue the session, with continueMessage
@@ -941,6 +985,9 @@ function renderArticlePractice() {
   $('practice-progress').textContent = '';
   $('practice-gate').hidden = true;
   $('practice-summary').hidden = true;
+  $('practice-round').hidden = true;
+  $('practice-q').hidden = false;
+  $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
   setPracticeMessage(practice.feedback);
   $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
@@ -964,6 +1011,7 @@ function renderFsrsPractice() {
     loading: 'Завантаження…',
     ready: isReady ? current.word.uk : '',
     done: answeredCount ? 'Сесію завершено' : 'На сьогодні слів немає',
+    'round-done': '',
     unconfigured: 'Практика FSRS ще не налаштована',
     failed: 'Не вдалося завантажити слова',
   };
@@ -990,6 +1038,11 @@ function renderFsrsPractice() {
   if (session.strugglingCount) strugglingButton.textContent = formatStrugglingDrillButton(session.strugglingCount);
   setPracticeMessage(session.feedback);
   if (session.status === 'done') renderPracticeSummary();
+  const isRoundDone = session.status === 'round-done';
+  $('practice-round').hidden = !isRoundDone;
+  $('practice-q').hidden = isRoundDone;
+  $('practice-meta').hidden = isRoundDone;
+  if (isRoundDone) renderRoundSummary();
 }
 
 function renderPracticeSummary() {
@@ -1157,6 +1210,9 @@ function renderStrugglingPractice() {
   $('practice-score').textContent = '';
   $('practice-gate').hidden = true;
   $('practice-summary').hidden = true;
+  $('practice-round').hidden = true;
+  $('practice-q').hidden = false;
+  $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
   setPracticeMessage(drill.feedback);
   if (drill.status === 'done') renderStrugglingEnd();
@@ -1399,6 +1455,7 @@ function bindEvents() {
   });
   $('practice-restart-button').addEventListener('click', restartFsrsSession);
   $('practice-shuffle-button').addEventListener('click', toggleShuffle);
+  $('practice-round-next-button').addEventListener('click', handleRoundNextClick);
   $('practice-extra-words-button').addEventListener('click', handleExtraNewWordsClick);
 
   // Правила

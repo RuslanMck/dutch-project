@@ -74,6 +74,14 @@ export function createPracticeRepository({ database }) {
     WHERE deck_answers.superseded_at IS NULL AND deck_answers.is_first_in_session = 0
     ORDER BY answered_at ASC
   `);
+  // The answers that still count for the given words, oldest first: the round summary reads them.
+  const selectDeckAnswersForWordsStatement = database.prepare(`
+    SELECT deck_answers.word_id, deck_answers.grade, deck_answers.answered_at, deck_answers.required_correct_after
+    FROM deck_answers
+    WHERE deck_answers.superseded_at IS NULL
+      AND deck_answers.word_id IN (SELECT json_each.value FROM json_each(@wordIdsJson))
+    ORDER BY deck_answers.answered_at ASC, deck_answers.id ASC
+  `);
   const updateWordPriorityStatement = database.prepare(`
     UPDATE words
     SET priority = @priority
@@ -257,6 +265,10 @@ export function createPracticeRepository({ database }) {
     return selectDeckWordIdsStatement.all();
   }
 
+  function listDeckAnswersForWords(wordIds) {
+    return selectDeckAnswersForWordsStatement.all({ wordIdsJson: JSON.stringify(wordIds) });
+  }
+
   function updateWordPriority(wordId, { priority, priorityOverride }) {
     if (priorityOverride === undefined) {
       updateWordPriorityStatement.run({ wordId, priority });
@@ -341,6 +353,7 @@ export function createPracticeRepository({ database }) {
     markDeckAnswersSuperseded,
     listCountingAnswers,
     listDeckWordIds,
+    listDeckAnswersForWords,
     updateWordPriority,
     updateWordFrequencyRank,
     listDueWordIds,

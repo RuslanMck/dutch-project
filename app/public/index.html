@@ -150,7 +150,7 @@
       <button id="practice-skip-button" class="practice-skip" type="button" hidden>Не знаю</button>
       <p id="practice-msg" class="msg" aria-live="polite"></p>
       <p id="practice-schedule" class="muted practice-schedule"></p>
-      <div class="practice-meta">
+      <div id="practice-meta" class="practice-meta">
         <p id="practice-progress" class="muted practice-meta__progress"></p>
         <button id="practice-shuffle-button" class="icon-button shuffle-button" type="button"
           aria-label="Перемішувати слова" aria-pressed="true">
@@ -181,6 +181,14 @@
         <p id="practice-drill-note" class="muted"></p>
         <button id="practice-drill-again-button" class="primary practice-summary__struggling-button"
           type="button">Потренувати ще раз</button>
+      </section>
+      <section id="practice-round" class="practice-summary practice-round" aria-labelledby="practice-round-title" hidden>
+        <h2 id="practice-round-title" class="practice-round__title"></h2>
+        <ul id="practice-round-stats" class="practice-summary__list"></ul>
+        <p id="practice-round-hardest" class="practice-round__hardest"></p>
+        <ul id="practice-round-words" class="practice-round__words"></ul>
+        <button id="practice-round-next-button" class="primary practice-summary__extra-button" type="button">Далі: нові
+          слова</button>
       </section>
       <button id="practice-restart-button" class="primary practice-restart" type="button" hidden>Почати знову</button>
     </section>

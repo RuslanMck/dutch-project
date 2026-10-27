@@ -387,6 +387,59 @@ table.words td.w {
   overflow-wrap: anywhere;
 }
 
+.practice-round__title {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.practice-round__hardest {
+  margin: 12px 0 8px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.practice-round__words {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.practice-round__word {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.practice-round__word-detail {
+  grid-column: 1 / -1;
+}
+
+.difficulty-badge {
+  align-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+}
+
+.difficulty-badge--easy {
+  color: #15803d;
+  border-color: currentColor;
+}
+
+.difficulty-badge--medium {
+  color: #b45309;
+  border-color: currentColor;
+}
+
+.difficulty-badge--hard {
+  color: #b91c1c;
+  border-color: currentColor;
+}
+
 .practice-restart {
   margin-top: 8px;
 }

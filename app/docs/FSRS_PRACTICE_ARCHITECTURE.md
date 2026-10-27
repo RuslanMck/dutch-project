@@ -468,3 +468,19 @@ finished, and reviews join the session.
 - New words: a fresh allocation of `new_per_day` opens when the block has no leftovers and no word that entered the deck
   as New is left (`deck_entered_by_lapse` = 0), on any day, so a finished session starts the next one at once. Lapses
   do not hold it back. There is no daily limit beyond that.
+
+## 16. Five active words, shuffle and the round summary (27.10.2026)
+
+- **Active window.** The web client rotates among the first 5 words of the queue only (`advanceWindowedQueue` in
+  `public/logic.js`). A word not yet learned goes back into the window; a learned word leaves it, and the first waiting
+  word takes its place. The progress line reads «Залишилось: N · вчимо 5» while words wait.
+- **Shuffle.** A button next to the progress line, on by default and remembered per device (`localStorage.shuffle`).
+  On: batches are shuffled (deck and review words still before new ones) and a returning word goes to a random place
+  in the window, never straight back. Off: the server's order, and a returning word goes to the back of the window.
+- **Round summary.** `GET /api/practice/round-summary` (read only, `round-summary.js`) returns the intake block's words
+  with their deck answers: answers, mistakes (again or hard), difficulty (0 easy, 1–2 medium, 3+ hard), the hardest
+  word, and the time from the first answer to the last. `active_seconds` adds the gaps between answers and leaves out
+  gaps longer than 5 minutes as pauses. A word's answers end at the one that learned it. When the queue runs out and
+  the round is complete with a word answered in this visit, the client shows «Вітаємо!» with these numbers; its button
+  asks the batch for the next words.
+

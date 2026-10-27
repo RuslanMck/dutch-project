@@ -274,3 +274,59 @@ export function renderRuleBody(body) {
     .map(block => renderBlock(block.split('\n')))
     .join('');
 }
+
+// Ukrainian plural by count: pluralize(3, ['помилка', 'помилки', 'помилок']) is 'помилки'.
+export function pluralize(count, [one, few, many]) {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return many;
+  if (lastDigit === 1) return one;
+  if (lastDigit >= 2 && lastDigit <= 4) return few;
+  return many;
+}
+
+// "45 с", "12 хв 30 с", "1 год 5 хв".
+export function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const restSeconds = seconds % 60;
+  if (hours) return minutes ? `${hours} год ${minutes} хв` : `${hours} год`;
+  if (minutes) return restSeconds ? `${minutes} хв ${restSeconds} с` : `${minutes} хв`;
+  return `${restSeconds} с`;
+}
+
+const DIFFICULTY_LABELS = Object.freeze({ easy: 'легко', medium: 'середньо', hard: 'важко' });
+const MISTAKE_WORDS = ['помилка', 'помилки', 'помилок'];
+const PAUSED_SPAN_MINIMUM_SECONDS = 5 * 60;
+
+// The congratulation screen after a round of new words: the totals, the hardest word and a row per word, hardest
+// first (the server's order). round is the round-summary response's round.
+export function buildRoundSummaryView(round) {
+  const spanSeconds = (round.finished_at - round.started_at) / 1000;
+  const stats = [
+    ['Вивчено слів', `${round.learned_count} з ${round.total_count}`],
+    ['Час навчання', formatDuration(round.active_seconds)],
+  ];
+  if (spanSeconds - round.active_seconds >= PAUSED_SPAN_MINIMUM_SECONDS) {
+    stats.push(['Від початку до кінця, з перервами', formatDuration(spanSeconds)]);
+  }
+  stats.push(['Відповідей', String(round.answer_count)], ['Помилок', String(round.mistake_count)]);
+  const hardestWord = round.words.find(word => word.id === round.hardest_word_id);
+  const hardestText = hardestWord
+    ? `Найважче слово: ${formatDutch(hardestWord)} — ${hardestWord.uk} (${hardestWord.mistake_count} ${
+      pluralize(hardestWord.mistake_count, MISTAKE_WORDS)})`
+    : 'Жодної помилки — чудово!';
+  const words = round.words.map(word => ({
+    dutch: formatDutch(word),
+    ukrainian: word.uk,
+    difficulty: word.difficulty,
+    difficultyLabel: DIFFICULTY_LABELS[word.difficulty],
+    detail: `відповідей: ${word.answer_count} · ${word.mistake_count} ${pluralize(word.mistake_count, MISTAKE_WORDS)}`,
+  }));
+  return { title: 'Вітаємо! Усі нові слова вивчено 🎉', stats, hardestText, words };
+}
+
+function formatDutch(word) {
+  return word.article ? `${word.article} ${word.nl}` : word.nl;
+}
