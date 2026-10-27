@@ -136,12 +136,30 @@ export function canOfferExtraNewWords({ newWordsBlocked, newRemainingByPriority 
   return newWordsBlocked !== true && newRemainingCount > 0;
 }
 
-// The struggling-words drill ("Важкі слова"): the front word leaves the queue when it is typed right (grade good);
-// any other answer sends it to the end. Returns a new queue; the one passed in is not changed.
-export function advanceDrillQueue(queue, grade) {
+// Practice rotates among the first ACTIVE_WINDOW_SIZE words of the queue only; the rest wait their turn.
+export const ACTIVE_WINDOW_SIZE = 5;
+
+// The front word leaves the queue when isDone; otherwise it goes to the back of the active window, so it comes back
+// after the other active words, and a waiting word takes a learned word's place. Returns a new queue; the one passed
+// in is not changed.
+export function advanceWindowedQueue(queue, isDone, windowSize = ACTIVE_WINDOW_SIZE) {
   if (!queue.length) return [];
   const [answeredWord, ...restOfQueue] = queue;
-  return grade === 'good' ? restOfQueue : [...restOfQueue, answeredWord];
+  if (isDone) return restOfQueue;
+  const insertAt = Math.min(windowSize - 1, restOfQueue.length);
+  return [...restOfQueue.slice(0, insertAt), answeredWord, ...restOfQueue.slice(insertAt)];
+}
+
+// The progress line of a windowed queue: how many words are left, and how many of them rotate now when some wait.
+export function formatQueueProgress(queueLength, windowSize = ACTIVE_WINDOW_SIZE) {
+  const leftText = `Залишилось: ${queueLength}`;
+  return queueLength > windowSize ? `${leftText} · зараз вчимо ${windowSize}` : leftText;
+}
+
+// The struggling-words drill ("Важкі слова"): the front word leaves the queue when it is typed right (grade good);
+// any other answer sends it to the back of the active window.
+export function advanceDrillQueue(queue, grade) {
+  return advanceWindowedQueue(queue, grade === 'good');
 }
 
 // The button under the FSRS summary that starts the drill with this many words.

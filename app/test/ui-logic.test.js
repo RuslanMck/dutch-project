@@ -18,6 +18,8 @@ import {
   canOfferExtraNewWords,
   formatShortDate,
   advanceDrillQueue,
+  advanceWindowedQueue,
+  formatQueueProgress,
   formatStrugglingDrillButton,
   buildStrugglingDrillEnd,
 } from '../public/logic.js';
@@ -327,7 +329,7 @@ test('advanceDrillQueue: a word typed right leaves the front of the queue', () =
   assert.deepEqual(advanceDrillQueue(['a'], 'good'), []);
 });
 
-test('advanceDrillQueue: wrong, hard and "Не знаю" answers send the word to the end', () => {
+test('advanceDrillQueue: wrong, hard and "Не знаю" answers send the word to the end of a short queue', () => {
   assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'again'), ['b', 'c', 'a']);
   assert.deepEqual(advanceDrillQueue(['a', 'b', 'c'], 'hard'), ['b', 'c', 'a']);
   assert.deepEqual(advanceDrillQueue(['a'], 'again'), ['a']);
@@ -370,4 +372,32 @@ test('the deck line says the right answers still needed, a word learned just now
   assert.match(buildDeckLine({ deck: learned, intervalDays: 6 }), /^Вивчено ✓ — наступне повторення: /);
   const outside = { in_deck: false, required_correct: null, correct_count: 0, times_left: 0, has_learned: false };
   assert.match(buildDeckLine({ deck: outside, intervalDays: 30 }), /^Повторено ✓ — наступне повторення: /);
+});
+
+test('advanceWindowedQueue: a word not yet learned comes back after the other four active words, not the waiting ones', () => {
+  const queue = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+  assert.deepEqual(advanceWindowedQueue(queue, false), ['b', 'c', 'd', 'e', 'a', 'f', 'g']);
+  assert.deepEqual(advanceWindowedQueue(['a', 'b'], false), ['b', 'a']);
+  assert.deepEqual(advanceWindowedQueue(['a'], false), ['a']);
+});
+
+test('advanceWindowedQueue: a learned word leaves, so the first waiting word joins the active five', () => {
+  assert.deepEqual(advanceWindowedQueue(['a', 'b', 'c', 'd', 'e', 'f'], true), ['b', 'c', 'd', 'e', 'f']);
+});
+
+test('advanceWindowedQueue: only five words rotate until one is learned', () => {
+  let queue = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9'];
+  const shown = [];
+  for (let step = 0; step < 10; step += 1) {
+    shown.push(queue[0]);
+    queue = advanceWindowedQueue(queue, false);
+  }
+  assert.deepEqual([...new Set(shown)].sort(), ['w1', 'w2', 'w3', 'w4', 'w5']);
+  queue = advanceWindowedQueue(queue, true);
+  assert.ok(queue.slice(0, 5).includes('w6'));
+});
+
+test('formatQueueProgress: names the five active words only while others wait', () => {
+  assert.equal(formatQueueProgress(9), 'Залишилось: 9 · зараз вчимо 5');
+  assert.equal(formatQueueProgress(5), 'Залишилось: 5');
 });

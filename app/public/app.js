@@ -3,6 +3,8 @@
 import * as api from './api.js';
 import {
   advanceDrillQueue,
+  advanceWindowedQueue,
+  formatQueueProgress,
   buildDeckLine,
   buildStrugglingDrillEnd,
   canOfferExtraNewWords,
@@ -852,7 +854,7 @@ async function postFsrsGrade(current, answer) {
   }
 }
 
-// "Далі": a word still in the learning deck comes back at the end of the queue; a word learned, or a review answered
+// "Далі": a word still in the learning deck comes back after the other active words (advanceWindowedQueue); a word learned, or a review answered
 // right, leaves the session. The server's answer decides, so the grade is awaited first.
 async function advanceFsrsWord() {
   const session = ui.fsrs;
@@ -861,10 +863,8 @@ async function advanceFsrsWord() {
   current.isAdvancing = true;
   await current.post;
   if (session.current !== current) return;
-  const { word, grade } = current;
-  const isStillInSession = current.schedule ? current.schedule.deck.in_deck : grade !== 'good';
-  session.queue.shift();
-  if (isStillInSession) session.queue.push(word);
+  const isStillInSession = current.schedule ? current.schedule.deck.in_deck : current.grade !== 'good';
+  session.queue = advanceWindowedQueue(session.queue, !isStillInSession);
   $('practice-input').value = '';
   showNextFsrsWord();
   renderPractice();
@@ -972,7 +972,7 @@ function renderFsrsPractice() {
     $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
     $('practice-input').placeholder = 'нідерландською';
   }
-  $('practice-progress').textContent = isReady ? `Залишилось: ${session.queue.length}` : '';
+  $('practice-progress').textContent = isReady ? formatQueueProgress(session.queue.length) : '';
   const isGateShown = session.newWordsBlocked && (isReady || session.status === 'done');
   $('practice-gate').hidden = !isGateShown;
   $('practice-schedule').textContent = formatScheduleLine(current);
@@ -1119,7 +1119,8 @@ function answerStrugglingWord(result) {
   renderPractice();
 }
 
-// "Далі": a word typed right leaves the queue; any other word comes back at the end, until it is typed right.
+// "Далі": a word typed right leaves the queue; any other word comes back after the other active words, until it is
+// typed right.
 function advanceStrugglingWord() {
   const drill = ui.struggling;
   drill.queue = advanceDrillQueue(drill.queue, drill.current.grade);
@@ -1149,7 +1150,7 @@ function renderStrugglingPractice() {
     $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
     $('practice-input').placeholder = 'нідерландською';
   }
-  $('practice-progress').textContent = isReady ? `Залишилось: ${drill.queue.length}` : '';
+  $('practice-progress').textContent = isReady ? formatQueueProgress(drill.queue.length) : '';
   $('practice-schedule').textContent = '';
   $('practice-score').textContent = '';
   $('practice-gate').hidden = true;
