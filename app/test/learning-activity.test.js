@@ -33,6 +33,8 @@ test('resolvePeriodRange: day, the last 7 and 30 days, the last 12 months, and a
   assert.equal(month.fromDate, '2026-09-28');
   const year = resolvePeriodRange({ period: 'year', today, timeZone: TIME_ZONE, firstAnswerAt: NOW });
   assert.deepEqual([year.fromDate, year.unit], ['2025-11-01', 'month']);
+  assert.equal(year.previous.start, at('2024-11-01T00:00:00+01:00'));
+  assert.equal(year.previous.end, at('2025-10-28T00:00:00+01:00'));
   const all = resolvePeriodRange({ period: 'all', today, timeZone: TIME_ZONE, firstAnswerAt: at('2026-08-15T10:00:00+02:00') });
   assert.deepEqual([all.fromDate, all.previous], ['2026-08-01', null]);
 });
@@ -85,6 +87,8 @@ test('findLearnedMoments: a word leaving the deck is learned; a review answered 
     { word_id: 1, answered_at: 2, required_correct_after: null },
     { word_id: 1, answered_at: 3, required_correct_after: null },
     { word_id: 2, answered_at: 4, required_correct_after: null },
+    { word_id: 1, answered_at: 5, required_correct_after: 3 },
+    { word_id: 1, answered_at: 6, required_correct_after: null },
   ];
   assert.deepEqual(findLearnedMoments(deckAnswers), [{ word_id: 1, at: 2 }]);
 });

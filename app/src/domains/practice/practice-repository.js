@@ -76,12 +76,22 @@ export function createPracticeRepository({ database }) {
   `);
   // The answers that still count for the given words, oldest first: the round summary reads them.
   const selectDeckAnswersForWordsStatement = database.prepare(`
-    SELECT deck_answers.word_id, deck_answers.grade, deck_answers.answered_at, deck_answers.required_correct_after
+    SELECT deck_answers.word_id, deck_answers.session_id, deck_answers.grade, deck_answers.answered_at,
+      deck_answers.required_correct_after
     FROM deck_answers
     WHERE deck_answers.superseded_at IS NULL
       AND deck_answers.word_id IN (SELECT json_each.value FROM json_each(@wordIdsJson))
     ORDER BY deck_answers.answered_at ASC, deck_answers.id ASC
   `);
+  // The time of every word and phrase answer in a span, oldest first: the round summary's time spent.
+  const selectAnswerTimesBetweenStatement = database.prepare(`
+    SELECT deck_answers.answered_at FROM deck_answers
+    WHERE deck_answers.answered_at BETWEEN @startedAt AND @finishedAt
+    UNION ALL
+    SELECT phrase_review_logs.reviewed_at FROM phrase_review_logs
+    WHERE phrase_review_logs.reviewed_at BETWEEN @startedAt AND @finishedAt
+    ORDER BY 1 ASC
+  `).pluck();
   const updateWordPriorityStatement = database.prepare(`
     UPDATE words
     SET priority = @priority
@@ -265,6 +275,10 @@ export function createPracticeRepository({ database }) {
     return selectDeckWordIdsStatement.all();
   }
 
+  function listAnswerTimesBetween({ startedAt, finishedAt }) {
+    return selectAnswerTimesBetweenStatement.all({ startedAt, finishedAt });
+  }
+
   function listDeckAnswersForWords(wordIds) {
     return selectDeckAnswersForWordsStatement.all({ wordIdsJson: JSON.stringify(wordIds) });
   }
@@ -354,6 +368,7 @@ export function createPracticeRepository({ database }) {
     listCountingAnswers,
     listDeckWordIds,
     listDeckAnswersForWords,
+    listAnswerTimesBetween,
     updateWordPriority,
     updateWordFrequencyRank,
     listDueWordIds,

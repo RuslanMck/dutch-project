@@ -27,7 +27,7 @@
   </header>
 
   <div id="nav-backdrop" class="drawer-backdrop" hidden></div>
-  <nav id="nav-drawer" class="drawer" aria-label="Розділи" hidden>
+  <nav id="nav-drawer" class="drawer" aria-label="Розділи" role="dialog" aria-modal="true" hidden>
     <div class="drawer__header">
       <span class="drawer__brand">Dutch матеріали</span>
       <button id="menu-close-button" class="icon-button" type="button" aria-label="Закрити меню">
@@ -54,7 +54,7 @@
 
   <main>
     <!-- 1 · Таблиця -->
-    <section id="tab-table" class="tab" role="tabpanel" data-tab="table">
+    <section id="tab-table" class="tab" data-tab="table">
       <form id="word-form" class="form" autocomplete="off">
         <label class="field">
           <span>Слово</span>
@@ -111,7 +111,7 @@
     </section>
 
     <!-- 2 · Картки -->
-    <section id="tab-cards" class="tab" role="tabpanel" data-tab="cards" hidden>
+    <section id="tab-cards" class="tab" data-tab="cards" hidden>
       <div class="cards-settings">
         <label class="field">
           <span>Набір</span>
@@ -146,7 +146,7 @@
     </section>
 
     <!-- 3 · Практика -->
-    <section id="tab-practice" class="tab" role="tabpanel" data-tab="practice" hidden>
+    <section id="tab-practice" class="tab" data-tab="practice" hidden>
       <div class="hint-field">
         <div class="hint-label">
           <label for="practice-mode">Режим</label>
@@ -245,13 +245,13 @@
     </section>
 
     <!-- 4 · Правила -->
-    <section id="tab-rules" class="tab" role="tabpanel" data-tab="rules" hidden>
+    <section id="tab-rules" class="tab" data-tab="rules" hidden>
       <input id="rules-q" type="search" placeholder="Пошук у правилах і помилках" aria-label="Пошук у правилах">
       <div id="rules-list" class="rules-list"></div>
     </section>
 
     <!-- 5 · Фрази -->
-    <section id="tab-phrases" class="tab" role="tabpanel" data-tab="phrases" hidden>
+    <section id="tab-phrases" class="tab" data-tab="phrases" hidden>
       <form id="phrase-form" class="form" autocomplete="off">
         <label class="field">
           <span>Фраза</span>
@@ -271,7 +271,7 @@
     </section>
 
     <!-- 6 · Тексти -->
-    <section id="tab-texts" class="tab" role="tabpanel" data-tab="texts" hidden>
+    <section id="tab-texts" class="tab" data-tab="texts" hidden>
       <div id="texts-list"></div>
     </section>
   </main>

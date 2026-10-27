@@ -81,15 +81,25 @@ export function resolvePeriodRange({ period, today, timeZone, firstAnswerAt }) {
   const end = findStartOfDay(tomorrow, timeZone);
   if (period === 'year') {
     const fromDate = addMonthsToMonthStart(currentMonthStartDate, 1 - YEAR_MONTH_COUNT);
+    // The same span a year earlier, so a month still under way is compared with the same days of that month.
     const previousFromDate = addMonthsToMonthStart(fromDate, -YEAR_MONTH_COUNT);
     return {
       start: findStartOfDay(fromDate, timeZone), end, fromDate, toDate: today, unit: 'month',
-      previous: { start: findStartOfDay(previousFromDate, timeZone), end: findStartOfDay(fromDate, timeZone) },
+      previous: {
+        start: findStartOfDay(previousFromDate, timeZone),
+        end: findStartOfDay(subtractOneYear(tomorrow), timeZone),
+      },
     };
   }
   const firstDate = formatCalendarDateInTimeZone(Math.min(firstAnswerAt, end - 1), timeZone);
   const fromDate = `${firstDate.slice(0, 7)}-01`;
   return { start: findStartOfDay(fromDate, timeZone), end, fromDate, toDate: today, unit: 'month', previous: null };
+}
+
+// The same calendar date a year earlier; 29 February becomes 1 March.
+function subtractOneYear(calendarDate) {
+  const [year, month, day] = calendarDate.split('-').map(Number);
+  return new Date(Date.UTC(year - 1, month - 1, day)).toISOString().slice(0, 10);
 }
 
 function addMonthsToMonthStart(monthStartDate, monthCount) {
@@ -195,14 +205,17 @@ export function calculateStreak(answers, today, timeZone) {
   return { current, longest, is_today_practised: practisedDates.has(today) };
 }
 
-// Learned moments from a word's deck answers, oldest first: an answer that left the deck (required_correct_after
-// null) right after one that was in it. deckAnswers: [{ word_id, answered_at, required_correct_after }].
+// The moment each word was first learned, oldest first: its first answer that left the deck (required_correct_after
+// null) right after one that was in it. A lapse learned again does not count twice. deckAnswers: [{ word_id,
+// answered_at, required_correct_after }].
 export function findLearnedMoments(deckAnswers) {
   const wasInDeckByWordId = new Map();
+  const learnedWordIds = new Set();
   const learnedWords = [];
   for (const answer of [...deckAnswers].sort((left, right) => left.answered_at - right.answered_at)) {
     const isInDeck = answer.required_correct_after !== null;
-    if (!isInDeck && wasInDeckByWordId.get(answer.word_id)) {
+    if (!isInDeck && wasInDeckByWordId.get(answer.word_id) && !learnedWordIds.has(answer.word_id)) {
+      learnedWordIds.add(answer.word_id);
       learnedWords.push({ word_id: answer.word_id, at: answer.answered_at });
     }
     wasInDeckByWordId.set(answer.word_id, isInDeck);

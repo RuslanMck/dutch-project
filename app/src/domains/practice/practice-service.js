@@ -293,9 +293,14 @@ export function createPracticeService({
     const block = settings.newWordBlock;
     if (!block || !block.itemIds.length) return { round: null };
     const words = block.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId)).filter(Boolean)
-      .map(wordRow => ({ ...mapToPracticeWord(wordRow), in_deck: wordRow.deck_required_correct !== null }));
+      .map(mapToPracticeWord);
     const answers = practiceRepository.listDeckAnswersForWords(words.map(word => word.id));
-    return { round: summarizeRound({ words, answers }) };
+    if (!answers.length) return { round: null };
+    const answerTimes = practiceRepository.listAnswerTimesBetween({
+      startedAt: answers[0].answered_at,
+      finishedAt: answers.at(-1).answered_at,
+    });
+    return { round: summarizeRound({ words, answers, answerTimes }) };
   }
 
   // Due counts, overdue words, introductions, New words per priority, words per state and the good share of the last 7

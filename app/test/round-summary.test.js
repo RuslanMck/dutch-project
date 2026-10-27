@@ -82,3 +82,33 @@ test('getRoundSummary: all 10 new words learned, the hardest first, and an hour-
   assert.equal(round.active_seconds, (round.answer_count - 2) * 10);
   assert.equal(round.finished_at - round.started_at, ONE_HOUR + (round.answer_count - 1) * TEN_SECONDS);
 });
+
+test('summarizeRound: a word learned and then lapsed still counts as learned, so the round is complete', () => {
+  const words = [{ id: 1, nl: 'kat', uk: 'кіт', article: 'de' }, { id: 2, nl: 'hond', uk: 'пес', article: 'de' }];
+  const answers = [
+    { word_id: 1, session_id: 'day-1', grade: 'good', answered_at: 0, required_correct_after: 2 },
+    { word_id: 1, session_id: 'day-1', grade: 'good', answered_at: 10, required_correct_after: null },
+    { word_id: 2, session_id: 'day-1', grade: 'again', answered_at: 20, required_correct_after: 3 },
+    { word_id: 1, session_id: 'day-2', grade: 'again', answered_at: 100, required_correct_after: 3 },
+    { word_id: 2, session_id: 'day-2', grade: 'good', answered_at: 110, required_correct_after: 2 },
+    { word_id: 2, session_id: 'day-2', grade: 'good', answered_at: 120, required_correct_after: 1 },
+    { word_id: 2, session_id: 'day-2', grade: 'good', answered_at: 130, required_correct_after: null },
+  ];
+  const round = summarizeRound({ words, answers });
+  assert.equal(round.is_complete, true);
+  assert.equal(round.finished_in_session_id, 'day-2');
+  const unfinished = summarizeRound({ words, answers: answers.slice(0, 5) });
+  assert.equal(unfinished.is_complete, false);
+  assert.equal(unfinished.finished_in_session_id, null);
+});
+
+test('summarizeRound: the time spent counts the other answers mixed in between the round\'s', () => {
+  const words = [{ id: 1, nl: 'kat', uk: 'кіт', article: 'de' }];
+  const answers = [
+    { word_id: 1, session_id: 's', grade: 'good', answered_at: 0, required_correct_after: 2 },
+    { word_id: 1, session_id: 's', grade: 'good', answered_at: 400_000, required_correct_after: null },
+  ];
+  assert.equal(summarizeRound({ words, answers }).active_seconds, 0);
+  const answerTimes = [0, 100_000, 200_000, 300_000, 400_000];
+  assert.equal(summarizeRound({ words, answers, answerTimes }).active_seconds, 400);
+});

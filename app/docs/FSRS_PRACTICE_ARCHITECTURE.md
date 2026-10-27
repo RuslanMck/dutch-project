@@ -481,6 +481,23 @@ finished, and reviews join the session.
   with their deck answers: answers, mistakes (again or hard), difficulty (0 easy, 1–2 medium, 3+ hard), the hardest
   word, and the time from the first answer to the last. `active_seconds` adds the gaps between answers and leaves out
   gaps longer than 5 minutes as pauses. A word's answers end at the one that learned it. When the queue runs out and
-  the round is complete with a word answered in this visit, the client shows «Вітаємо!» with these numbers; its button
-  asks the batch for the next words.
+  the round is complete and `finished_in_session_id` (the session of the answer that learned its last word) is the
+  current session, the client shows «Вітаємо!» with these numbers; its button asks the batch for the next words. A
+  word learned and later lapsed still counts as learned for the round. The time spent counts every answer between the
+  round's first and last (reviews and phrases mixed in too).
+
+## 17. Menu and the statistics page (27.10.2026)
+
+- **Menu.** The sections moved from the tab row into a left drawer (burger button, `setDrawerOpen` in `public/app.js`).
+  While it is open the rest of the page is `inert`; Escape, the backdrop and the close button close it. The header
+  shows the current section's name.
+- **Statistics.** `GET /api/stats/activity?period=day|week|month|year|all` (`src/domains/statistics/learning-activity.js`,
+  pure): answers (words and phrases), accuracy, mistakes, time spent (gaps over 5 minutes are pauses), days practised,
+  words started and first learned, a chart per hour (day), per day (week = 7 days, month = 30 days) or per month
+  (year = the last 12 months, all time), the 5 words with the most mistakes, and the streak of days in a row. Each
+  period but all time also returns the period before it for comparison; the year is compared with the same span a
+  year earlier. Answers count every row, resets included (they are history); words started and learned count only
+  rows since the last reset, so periods before a reset show answers but no started or learned words.
+- **Page.** Tiles with the comparison, the bar chart (tap a bar for its numbers), the streak, the hardest words and the
+  vocabulary now from `GET /api/stats` («Запам’ятовано надовго» is the learned status: next review 21+ days away).
 

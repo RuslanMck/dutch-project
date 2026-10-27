@@ -217,10 +217,14 @@ function showTab(name) {
 
 // ---------- navigation drawer ----------
 
+// While the drawer is open the page behind it is inert: Tab stays in the menu and screen readers read only the menu.
 function setDrawerOpen(isOpen) {
   const wasOpen = !$('nav-drawer').hidden;
   $('nav-drawer').hidden = !isOpen;
   $('nav-backdrop').hidden = !isOpen;
+  for (const element of document.querySelectorAll('.app > :not(#nav-drawer):not(#nav-backdrop)')) {
+    element.inert = isOpen;
+  }
   $('menu-open-button').setAttribute('aria-expanded', String(isOpen));
   if (isOpen) document.querySelector('.tabs [aria-current="page"]')?.focus();
   else if (wasOpen) $('menu-open-button').focus();
@@ -789,8 +793,8 @@ function showNextFsrsWord() {
   showRoundSummaryOrRefill();
 }
 
-// The queue ran out. When it held the last words of the round of new words, the congratulation screen shows first and
-// its button asks for the next words; otherwise the batch is asked again at once.
+// The queue ran out. When this session learned the last word of the round of new words, the congratulation screen
+// shows first and its button asks for the next words; otherwise the batch is asked again at once.
 async function showRoundSummaryOrRefill() {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
@@ -803,7 +807,7 @@ async function showRoundSummaryOrRefill() {
     round = (await api.getRoundSummary()).round;
   } catch { /* no summary: the session goes on */ }
   if (ui.fsrs.sessionId !== sessionId) return;
-  if (round?.is_complete && round.words.some(word => session.answered.has(word.id))) {
+  if (round?.is_complete && round.finished_in_session_id === sessionId) {
     session.round = round;
     session.status = 'round-done';
     renderPractice();
