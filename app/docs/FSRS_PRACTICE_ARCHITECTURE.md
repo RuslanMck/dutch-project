@@ -429,3 +429,25 @@ setting `extra_new_words` from §10 is no longer read. `reset_practice` clears b
 - **One dry-run schema.** `resetPracticeInputSchema` and `migrateToFsrsInputSchema` derive from one base schema.
 - **Allowance.** `calculateNewWordAllowance` takes the block size directly; §10's `extra_new_words` setting is marked
   superseded by §12/§13.
+
+## 14. The learning deck (27.10.2026)
+
+Ruslan saw «Залишилось: 19» after missing 9 of 10 new words: the intake block freed new words once yesterday's were
+started, not once they were learned. His rules, with his answers to the open questions:
+
+- A word in the deck needs `required_correct` right answers in a row: 2 for a clean word; each again or hard (both are
+  mistakes here) adds one, up to 6, and resets the streak. At the streak's end the word is learned and leaves the deck.
+- Every answer counts, repeats at the end of a session too. FSRS still grades only the first answer per session: a
+  later answer (no longer a 409) moves only the deck and is kept in `deck_answers`.
+- A word enters the deck on its first answer ever, or when a word outside it is answered again or hard (a lapse; it
+  comes back with 3 left).
+- A word in the deck is due every day (`words.due_at` = the start of tomorrow after each answer); its card keeps the
+  FSRS due date, which it follows once learned (tomorrow at the earliest).
+- New words fill only the deck's free slots: `new_per_day` plus today's extra words minus the words in the deck. The
+  intake block stays, sized to the free slots, and its leftovers are capped by them. Freed slots fill once a day: a
+  block opened today stays finished for the day, as before.
+- The batch, `grade_word`, `list_words` and `practice_stats` carry the deck (`deck {in_deck, required_correct,
+  correct_streak, times_left}`, `counts.deck_size`, `counts.deck_free_slots`); the web practice shows
+  «Ще N рази правильно поспіль до вивчення» or «Вивчено ✓» under each answer. «Залишилось» stays the session queue.
+- Migration 006 adds the columns and `deck_answers`; `scripts/rebuild-learning-deck.js --apply` replays the review logs
+  that still count once (repeats before the deck were not stored, so only first answers replay).

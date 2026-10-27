@@ -315,7 +315,7 @@ test('GET and DELETE with the bearer token get 405', SKIP, async () => {
 });
 
 // Its own application and database, so the seeded words are not changed by the migration.
-test('grade_word round trip over HTTP: refused before the migration, graded once, a repeat refused', async () => {
+test('grade_word round trip over HTTP: refused before the migration, graded once, a repeat moves only the deck', async () => {
   const practiceContext = createTestContext();
   const practiceApplication = createApplication({
     configuration: parseEnvironmentConfiguration({ NODE_ENV: 'test', MCP_SECRET: SECRET, API_TOKEN: TOKEN }),
@@ -351,9 +351,10 @@ test('grade_word round trip over HTTP: refused before the migration, graded once
     assert.equal(graded.state, 'review');
     assert.match(graded.next_due_on, /^\d{4}-\d{2}-\d{2}$/);
 
-    const repeat = await practiceClient.callTool({ name: 'grade_word', arguments: gradeArguments });
-    assert.equal(repeat.isError, true);
-    assert.match(repeat.content[0].text, /already graded/);
+    assert.deepEqual(graded.deck, { in_deck: true, required_correct: 2, correct_streak: 1, times_left: 1, has_learned: false });
+    const repeat = await call(practiceClient, 'grade_word', { ...gradeArguments, grade: 'again' });
+    assert.equal(repeat.is_repeat, true);
+    assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_streak: 0, times_left: 3, has_learned: false });
 
     const stats = await call(practiceClient, 'practice_stats');
     assert.equal(stats.introduced_today, 1);

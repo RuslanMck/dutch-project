@@ -277,7 +277,8 @@ test('list_words filters by state, priority and due day, and sorts by due and by
   assert.deepEqual(listWordIds(wordContext, { state: 'learning' }), []);
   assert.deepEqual(listWordIds(wordContext, { priority: 1 }), [huisId, tafelId]);
   assert.deepEqual(listWordIds(wordContext, { priority: 3 }), [stoelId, raamId]);
-  assert.deepEqual(listWordIds(wordContext, { dueBefore: findStartOfDay('2026-10-26', TIME_ZONE) }), []);
+  // huis is in the learning deck, so it came back the day after its grade (2026-10-25).
+  assert.deepEqual(listWordIds(wordContext, { dueBefore: findStartOfDay('2026-10-26', TIME_ZONE) }), [huisId]);
   assert.deepEqual(listWordIds(wordContext, { dueBefore: findStartOfDay('2026-11-04', TIME_ZONE) }), [huisId]);
 
   assert.deepEqual(listWordIds(wordContext, { sort: 'due' }), [huisId, stoelId, tafelId, raamId]);

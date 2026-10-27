@@ -5,7 +5,8 @@ const WORD_SELECT = `
   SELECT v_words.id, v_words.legacy_id, v_words.nl, v_words.uk, v_words.article, v_words.kind,
     v_words.example_nl, v_words.example_uk, topics.name AS topic, v_words.section_code AS section,
     v_words.status, v_words.error_count, v_words.priority, v_words.priority_override, v_words.frequency_rank,
-    v_words.due_at, v_words.fsrs_card, v_words.added_at, v_words.updated_at
+    v_words.due_at, v_words.fsrs_card, v_words.deck_required_correct, v_words.deck_correct_streak, v_words.added_at,
+    v_words.updated_at
   FROM v_words
   LEFT JOIN topics ON topics.id = v_words.topic_id
 `;
@@ -38,6 +39,8 @@ const COLUMN_NAME_BY_FIELD_NAME = Object.freeze({
   fsrsCard: 'fsrs_card',
   dueAt: 'due_at',
   introducedOn: 'introduced_on',
+  deckRequiredCorrect: 'deck_required_correct',
+  deckCorrectStreak: 'deck_correct_streak',
   updatedAt: 'updated_at',
 });
 

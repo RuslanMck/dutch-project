@@ -1,11 +1,13 @@
-// SQL for the FSRS practice: settings, card and priority columns of words, and review_logs. No business rules.
+// SQL for the FSRS practice: settings, card, priority and learning-deck columns of words, review_logs and deck_answers.
+// No business rules.
 const EMPTY_PRIORITY_COUNTS = Object.freeze({ 1: 0, 2: 0, 3: 0 });
 const EMPTY_GRADE_COUNTS = Object.freeze({ again: 0, hard: 0, good: 0 });
 
 const PRACTICE_WORD_SELECT = `
   SELECT v_words.id, v_words.nl, v_words.uk, v_words.article, v_words.kind, v_words.section_code,
     v_words.status, v_words.fsrs_card, v_words.due_at, v_words.introduced_on, v_words.frequency_rank,
-    v_words.priority_override, v_words.priority, v_words.error_count
+    v_words.priority_override, v_words.priority, v_words.error_count, v_words.deck_required_correct,
+    v_words.deck_correct_streak
   FROM v_words
 `;
 
@@ -26,6 +28,40 @@ export function createPracticeRepository({ database }) {
     SET fsrs_card = @fsrsCard, due_at = @dueAt, introduced_on = @introducedOn, status = @learningStatus,
       updated_at = @updatedAt
     WHERE words.id = @wordId
+  `);
+  const updateWordDeckStatement = database.prepare(`
+    UPDATE words
+    SET deck_required_correct = @requiredCorrect, deck_correct_streak = @correctStreak, due_at = @dueAt,
+      status = @learningStatus, updated_at = @updatedAt
+    WHERE words.id = @wordId
+  `);
+  const clearDeckStatement = database.prepare(`
+    UPDATE words
+    SET deck_required_correct = NULL, deck_correct_streak = 0
+    WHERE words.deck_required_correct IS NOT NULL
+  `);
+  const countDeckWordsStatement = database.prepare(`
+    SELECT COUNT(*)
+    FROM words
+    WHERE words.deck_required_correct IS NOT NULL
+  `).pluck();
+  const insertDeckAnswerStatement = database.prepare(`
+    INSERT INTO deck_answers (word_id, session_id, answered_at, grade, is_first_in_session, required_correct_after,
+      correct_streak_after)
+    VALUES (@wordId, @sessionId, @answeredAt, @grade, @isFirstInSession, @requiredCorrectAfter, @correctStreakAfter)
+  `);
+  const updateDeckAnswersSupersededStatement = database.prepare(`
+    UPDATE deck_answers
+    SET superseded_at = @timestamp
+    WHERE deck_answers.superseded_at IS NULL
+  `);
+  // The review logs that still count, oldest first, with whether the word was New before each: the deck rebuild
+  // replays them.
+  const selectCountingReviewLogsStatement = database.prepare(`
+    SELECT review_logs.word_id, review_logs.grade, review_logs.reviewed_at, review_logs.card_before IS NULL AS was_new
+    FROM review_logs
+    WHERE review_logs.superseded_at IS NULL
+    ORDER BY review_logs.reviewed_at ASC, review_logs.id ASC
   `);
   const updateWordPriorityStatement = database.prepare(`
     UPDATE words
@@ -145,6 +181,49 @@ export function createPracticeRepository({ database }) {
   }
 
   // priorityOverride undefined leaves the override as it is; null clears it.
+  // deckPosition: { requiredCorrect, correctStreak } or null (out of the deck). dueAt and learningStatus are written
+  // with it, because the deck decides when a word comes back.
+  function updateWordDeck(wordId, { deckPosition, dueAt, learningStatus, updatedAt }) {
+    updateWordDeckStatement.run({
+      wordId,
+      requiredCorrect: deckPosition?.requiredCorrect ?? null,
+      correctStreak: deckPosition?.correctStreak ?? 0,
+      dueAt,
+      learningStatus,
+      updatedAt,
+    });
+  }
+
+  function clearDeck() {
+    clearDeckStatement.run();
+  }
+
+  function countDeckWords() {
+    return countDeckWordsStatement.get();
+  }
+
+  // deckPositionAfter: the position after the answer, or null.
+  function createDeckAnswer({ wordId, sessionId, answeredAt, grade, isFirstInSession, deckPositionAfter }) {
+    insertDeckAnswerStatement.run({
+      wordId,
+      sessionId,
+      answeredAt,
+      grade,
+      isFirstInSession: isFirstInSession ? 1 : 0,
+      requiredCorrectAfter: deckPositionAfter?.requiredCorrect ?? null,
+      correctStreakAfter: deckPositionAfter?.correctStreak ?? 0,
+    });
+  }
+
+  function markDeckAnswersSuperseded(timestamp) {
+    updateDeckAnswersSupersededStatement.run({ timestamp });
+  }
+
+  function listCountingReviewLogs() {
+    return selectCountingReviewLogsStatement.all()
+      .map(reviewLog => ({ ...reviewLog, was_new: reviewLog.was_new === 1 }));
+  }
+
   function updateWordPriority(wordId, { priority, priorityOverride }) {
     if (priorityOverride === undefined) {
       updateWordPriorityStatement.run({ wordId, priority });
@@ -221,6 +300,12 @@ export function createPracticeRepository({ database }) {
     findPracticeWordById,
     listStrugglingWordRows,
     updateWordSchedule,
+    updateWordDeck,
+    clearDeck,
+    countDeckWords,
+    createDeckAnswer,
+    markDeckAnswersSuperseded,
+    listCountingReviewLogs,
     updateWordPriority,
     updateWordFrequencyRank,
     listDueWordIds,

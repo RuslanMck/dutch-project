@@ -121,7 +121,7 @@ test('a started word whose priority changes keeps the block: its leftovers and c
   assert.equal(nextDayBatch.counts.new_today_remaining, 6);
 });
 
-test('grading a New word outside the block leaves the block\'s leftovers unchanged', () => {
+test('grading a New word outside the block keeps the block, but the word takes a deck slot', () => {
   const context = createPracticeContext();
   const originalIds = addWords(context, '6.1', makeNames('oud', 10));
   migrate(context);
@@ -132,12 +132,12 @@ test('grading a New word outside the block leaves the block\'s leftovers unchang
   context.practiceService.gradeWord({ wordId: outsideId, grade: 'again', answer: 'x', sessionId: 's1' });
 
   const batch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
-  assert.deepEqual(batch.new_words.map(word => word.id), originalIds.slice(4));
-  assert.equal(batch.counts.new_today_remaining, 6);
+  assert.deepEqual(batch.new_words.map(word => word.id), originalIds.slice(4, 9), '5 words in the deck leave 5 slots');
+  assert.equal(batch.counts.new_today_remaining, 5);
   assert.equal(context.practiceSettings.readSettings().newWordBlock.itemIds.length, 10);
 });
 
-test('a deleted leftover counts as done; once all leftovers are done a fresh 10 opens the same day', () => {
+test('a deleted leftover counts as done; once all leftovers are done a fresh block fills the free deck slots', () => {
   const context = createPracticeContext();
   addWords(context, '6.1', makeNames('oud', 25));
   migrate(context);
@@ -154,8 +154,8 @@ test('a deleted leftover counts as done; once all leftovers are done a fresh 10 
   gradeGood(context, leftovers.map(word => word.id), 's2');
   const afterLeftovers = context.practiceService.getPracticeBatch({ sessionId: 's2' });
 
-  assert.equal(afterLeftovers.new_words.length, 10, 'a fresh block of 10 opens the same day');
-  assert.equal(afterLeftovers.counts.new_today_remaining, 10);
+  assert.equal(afterLeftovers.new_words.length, 1, 'the 9 started words are in the deck, so 1 slot is free');
+  assert.equal(afterLeftovers.counts.new_today_remaining, 1);
   const blockWordIds = blockWords.map(word => word.id);
   assert.equal(afterLeftovers.new_words.some(word => blockWordIds.includes(word.id)), false);
 });
@@ -180,8 +180,9 @@ test('a block opened today that is finished gives no new words; extra words appe
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
   const carriedOver = context.practiceService.getPracticeBatch({ sessionId: 's3' });
-  assert.deepEqual(carriedOver.new_words.map(word => word.id), block.itemIds.slice(10));
-  assert.equal(carriedOver.counts.new_today_remaining, 10);
+  assert.deepEqual(carriedOver.new_words, [], 'the 10 words in the deck fill it, so the unstarted extras wait');
+  assert.equal(carriedOver.counts.new_today_remaining, 0);
+  assert.equal(carriedOver.counts.deck_free_slots, 0);
   assert.equal(context.practiceService.calculatePracticeStatistics().extra_new_words_today, 0);
 });
 

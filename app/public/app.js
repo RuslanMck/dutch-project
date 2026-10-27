@@ -3,7 +3,7 @@
 import * as api from './api.js';
 import {
   advanceDrillQueue,
-  buildNextReviewLine,
+  buildDeckLine,
   buildStrugglingDrillEnd,
   canOfferExtraNewWords,
   checkAnswer,
@@ -809,7 +809,8 @@ function revealFsrsAnswer() {
   $('practice-btn').focus();
 }
 
-// Checks the current word. Only its first answer in the session is posted; a repeat shows the result and nothing else.
+// Checks the current word and posts the answer: every answer counts in the learning deck, repeats too. The tally
+// counts only the first answer to each word, the one FSRS grades.
 function answerFsrsWord(result, answer) {
   const session = ui.fsrs;
   const current = session.current;
@@ -822,13 +823,13 @@ function answerFsrsWord(result, answer) {
     session.answered.add(word.id);
     session.tally[result.grade] += 1;
     if (word.state === 'new') session.introducedCount += 1;
-    trackPendingPost(session.pendingGradePosts, postFsrsGrade(current, answer));
   }
+  trackPendingPost(session.pendingGradePosts, postFsrsGrade(current, answer));
   renderPractice();
 }
 
-// A 409 means this word was already graded in the session, which is not an error for the learner. Any other failure
-// undoes the local count of this first answer, so the next first answer to the word posts again.
+// The response carries the deck position, which the line under the message shows. A failed first answer undoes its
+// local count, so the next first answer to the word posts again; a failed repeat only shows the notice.
 async function postFsrsGrade(current, answer) {
   const session = ui.fsrs;
   const { sessionId, answered } = session;
@@ -840,14 +841,8 @@ async function postFsrsGrade(current, answer) {
       renderPractice();
     }
   } catch (error) {
-    if (error.status === 409) {
-      // Graded before in this session: the answer reads as a repeat, so the schedule line says so.
-      current.repeat = true;
-      if (session.current === current) renderPractice();
-      return;
-    }
     // A new batch replaces the answered set and the tally, so only the batch that posted is rolled back.
-    if (session.answered === answered) {
+    if (!current.repeat && session.answered === answered) {
       answered.delete(word.id);
       session.tally[grade] -= 1;
       if (word.state === 'new') session.introducedCount -= 1;
@@ -942,13 +937,13 @@ function renderArticlePractice() {
   $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
 }
 
-// The line under the practice message: the next review from the grade response, or a note for a repeat.
+// The line under the practice message, from the grade response: the times left in the learning deck, the word
+// learned, or the next review.
 function formatScheduleLine(current) {
-  if (!current?.checked) return '';
-  if (current.repeat) return 'повтор — не зараховується';
-  if (!current.schedule) return '';
+  if (!current?.checked || !current.schedule) return '';
   const { schedule } = current;
-  return buildNextReviewLine({
+  return buildDeckLine({
+    deck: schedule.deck,
     intervalDays: schedule.interval_days,
     status: schedule.status,
     errorCount: schedule.word?.error_count,

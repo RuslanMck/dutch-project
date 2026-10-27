@@ -1,6 +1,7 @@
-// Practice business rules: the batch of reviews and new words (with the backlog gate, the intake block and the
-// extra new words), grading a word once per session, the one-time migration to FSRS, the struggling words and the
-// practice statistics. Publishes 'words' after each write.
+// Practice business rules: the batch of reviews and new words (with the backlog gate, the intake block, the learning
+// deck's free slots and the extra new words), grading a word (FSRS for the first answer in a session, the learning deck
+// for every answer), the one-time migration to FSRS, the deck rebuild, the struggling words and the practice
+// statistics. Publishes 'words' after each write.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { mapBlankTextToNull } from '../blank-text.js';
 import {
@@ -11,6 +12,7 @@ import {
   serializeCard,
 } from './fsrs-scheduling.js';
 import { countExtraItemsToday, mapToStoredBlock, openIntakeBlock } from './intake-block.js';
+import { applyAnswerToDeck, describeDeckPosition, readDeckPosition, replayDeckAnswers } from './learning-deck.js';
 import { planMigration, summarizeMigration } from './migration-planning.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 
@@ -18,6 +20,8 @@ const FSRS_ALREADY_SET_UP_MESSAGE = 'FSRS practice is already set up: migrate_to
 const SHORT_GOOD_SHARE_DAY_COUNT = 7;
 const LONG_GOOD_SHARE_DAY_COUNT = 30;
 const GOOD_SHARE_DECIMAL_PLACES = 3;
+const DECK_LEARNING_STATUS = 'learning';
+const MILLISECONDS_PER_DAY = 24 * 3600_000;
 
 export function createPracticeService({
   practiceRepository,
@@ -51,6 +55,8 @@ export function createPracticeService({
         new_today_remaining: newWordPlan.newTodayRemainingCount,
         new_remaining_by_priority: newWordPlan.remainingByPriority,
         new_words_blocked: newWordPlan.isBlocked,
+        deck_size: newWordPlan.deckSize,
+        deck_free_slots: newWordPlan.deckFreeSlotCount,
       },
     };
   }
@@ -84,7 +90,9 @@ export function createPracticeService({
     return addResult;
   }
 
-  // Grades a word's first answer in a session. Again and hard are logged as word errors. Returns the word's new state.
+  // Grades an answer. The first answer to a word in a session updates its FSRS card and is logged as a review (again
+  // and hard also as a word error); every answer, repeats in the session too, moves the word in the learning deck.
+  // Returns the word's new state, with its deck position and is_repeat.
   function gradeWord({ wordId, grade, answer, sessionId }) {
     const settings = practiceSettings.readActiveSettings();
     const gradeResult = runInTransaction(() => gradeWordInTransaction({ settings, wordId, grade, answer, sessionId }));
@@ -94,12 +102,11 @@ export function createPracticeService({
 
   function gradeWordInTransaction({ settings, wordId, grade, answer, sessionId }) {
     const word = getPracticeWordRowOrThrow(wordId);
-    const gradedLog = practiceRepository.findReviewLog({ sessionId, wordId });
-    if (gradedLog) {
-      throw new ConflictError(`word ${wordId} was already graded in session ${sessionId}`);
-    }
     const timestamp = clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
+    if (practiceRepository.findReviewLog({ sessionId, wordId })) {
+      return gradeRepeatInTransaction({ settings, word, grade, sessionId, timestamp, today });
+    }
     const cardBefore = parseCard(word.fsrs_card);
     const { card: cardAfter } = fsrsScheduler.gradeCard(cardBefore, grade, timestamp);
     // The due time is the start of the calendar day the interval lands on, so a grade late in the day or on a 25-hour
@@ -107,16 +114,35 @@ export function createPracticeService({
     const intervalDays = Math.max(1, cardAfter.scheduled_days);
     const dueAt = findStartOfDay(addDaysToCalendarDate(today, intervalDays), settings.timeZone);
     cardAfter.due = new Date(dueAt);
-    const learningStatus = deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
+    const deckMove = applyAnswerToDeck({
+      deckPosition: readDeckPosition(word),
+      grade,
+      isFirstAnswerEver: cardBefore === null,
+    });
+    // A word in the deck comes back tomorrow whatever its FSRS interval; a learned word follows its FSRS due date.
+    const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
+    const scheduledDueAt = deckMove.deckPosition ? tomorrowStart : dueAt;
+    const learningStatus = deckMove.deckPosition
+      ? DECK_LEARNING_STATUS
+      : deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
     const cardAfterJson = serializeCard(cardAfter);
     const wrongAnswer = mapBlankTextToNull(answer);
     if (cardBefore === null) saveIntakeBlockOnFirstStart({ settings, today });
     practiceRepository.updateWordSchedule(wordId, {
       fsrsCard: cardAfterJson,
-      dueAt,
+      dueAt: scheduledDueAt,
       introducedOn: cardBefore === null ? today : word.introduced_on,
       learningStatus,
       updatedAt: timestamp,
+    });
+    practiceRepository.updateWordDeck(wordId, {
+      deckPosition: deckMove.deckPosition,
+      dueAt: scheduledDueAt,
+      learningStatus,
+      updatedAt: timestamp,
+    });
+    practiceRepository.createDeckAnswer({
+      wordId, sessionId, answeredAt: timestamp, grade, isFirstInSession: true, deckPositionAfter: deckMove.deckPosition,
     });
     practiceRepository.createReviewLog({
       wordId,
@@ -132,11 +158,96 @@ export function createPracticeService({
     return {
       word: { ...mapToPracticeWord(gradedWordRow), error_count: gradedWordRow.error_count },
       grade,
+      is_repeat: false,
       state: describeCardState(cardAfter),
       status: learningStatus,
-      interval_days: intervalDays,
-      next_due_on: formatCalendarDateInTimeZone(dueAt, settings.timeZone),
+      interval_days: countDaysBetween(today, scheduledDueAt, settings.timeZone),
+      next_due_on: formatCalendarDateInTimeZone(scheduledDueAt, settings.timeZone),
+      deck: { ...describeDeckPosition(deckMove.deckPosition), has_learned: deckMove.hasLearned },
     };
+  }
+
+  // A later answer in the same session: FSRS and the review log stay as the first answer left them; only the deck
+  // moves. A word learned now leaves for its FSRS due date (tomorrow at the earliest).
+  function gradeRepeatInTransaction({ settings, word, grade, sessionId, timestamp, today }) {
+    const card = parseCard(word.fsrs_card);
+    const deckMove = applyAnswerToDeck({ deckPosition: readDeckPosition(word), grade, isFirstAnswerEver: false });
+    const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
+    const isInDeck = deckMove.deckPosition !== null;
+    const cardDueAt = card ? new Date(card.due).getTime() : tomorrowStart;
+    const dueAt = isInDeck ? tomorrowStart : Math.max(tomorrowStart, cardDueAt);
+    const learningStatus = isInDeck || !card
+      ? DECK_LEARNING_STATUS
+      : deriveLearningStatus(card, settings.learnedThresholdDays);
+    practiceRepository.updateWordDeck(word.id, {
+      deckPosition: deckMove.deckPosition,
+      dueAt,
+      learningStatus,
+      updatedAt: timestamp,
+    });
+    practiceRepository.createDeckAnswer({
+      wordId: word.id, sessionId, answeredAt: timestamp, grade, isFirstInSession: false,
+      deckPositionAfter: deckMove.deckPosition,
+    });
+    const gradedWordRow = getPracticeWordRowOrThrow(word.id);
+    return {
+      word: { ...mapToPracticeWord(gradedWordRow), error_count: gradedWordRow.error_count },
+      grade,
+      is_repeat: true,
+      state: describeCardState(card),
+      status: learningStatus,
+      interval_days: countDaysBetween(today, dueAt, settings.timeZone),
+      next_due_on: formatCalendarDateInTimeZone(dueAt, settings.timeZone),
+      deck: { ...describeDeckPosition(deckMove.deckPosition), has_learned: deckMove.hasLearned },
+    };
+  }
+
+  // Rebuilds every word's deck position from the review logs that still count (first answers only: repeats were not
+  // stored before the deck existed). A dry run reports the positions and writes nothing. Words left in the deck come
+  // back on the day after their last answer at the latest; learned words keep their FSRS due date.
+  // Returns { dry_run, deck_size, words }.
+  function rebuildLearningDeck({ isDryRun = true } = {}) {
+    const settings = practiceSettings.readActiveSettings();
+    const timestamp = clock.now();
+    const summary = runInTransaction(() => {
+      const answersByWordId = new Map();
+      const lastAnsweredAtByWordId = new Map();
+      for (const reviewLog of practiceRepository.listCountingReviewLogs()) {
+        if (!answersByWordId.has(reviewLog.word_id)) answersByWordId.set(reviewLog.word_id, []);
+        answersByWordId.get(reviewLog.word_id).push({ grade: reviewLog.grade, isFirstAnswerEver: reviewLog.was_new });
+        lastAnsweredAtByWordId.set(reviewLog.word_id, reviewLog.reviewed_at);
+      }
+      const words = [];
+      for (const [wordId, answers] of answersByWordId) {
+        const word = practiceRepository.findPracticeWordById(wordId);
+        if (!word || word.fsrs_card === null) continue;
+        const deckPosition = replayDeckAnswers(answers);
+        words.push({
+          id: wordId,
+          nl: word.nl,
+          grades: answers.map(answer => answer.grade),
+          ...describeDeckPosition(deckPosition),
+        });
+        if (isDryRun) continue;
+        const card = parseCard(word.fsrs_card);
+        const lastAnsweredOn = formatCalendarDateInTimeZone(lastAnsweredAtByWordId.get(wordId), settings.timeZone);
+        const dayAfterLastAnswerStart = findStartOfDay(addDaysToCalendarDate(lastAnsweredOn, 1), settings.timeZone);
+        const dueAt = deckPosition
+          ? Math.min(word.due_at ?? dayAfterLastAnswerStart, dayAfterLastAnswerStart)
+          : word.due_at;
+        practiceRepository.updateWordDeck(wordId, {
+          deckPosition,
+          dueAt,
+          learningStatus: deckPosition
+            ? DECK_LEARNING_STATUS
+            : deriveLearningStatus(card, settings.learnedThresholdDays),
+          updatedAt: timestamp,
+        });
+      }
+      return { dry_run: isDryRun, deck_size: words.filter(word => word.in_deck).length, words };
+    });
+    if (!isDryRun) changeEventBus.publishChange('words');
+    return summary;
   }
 
   // Switches the practice to FSRS. A dry run reports the counts and writes nothing. A real run writes the cards and the
@@ -193,6 +304,8 @@ export function createPracticeService({
       overdue: newWordPlan.overdueCount,
       introduced_today: newWordPlan.introducedTodayCount,
       new_words_blocked: newWordPlan.isBlocked,
+      deck_size: newWordPlan.deckSize,
+      deck_free_slots: newWordPlan.deckFreeSlotCount,
       extra_new_words_today: newWordPlan.extraNewWordsToday,
       new_remaining_by_priority: newCounts,
       states: stateCounts,
@@ -223,6 +336,12 @@ export function createPracticeService({
     return practiceRepository.listDueWordIds(tomorrowStart);
   }
 
+  // Whole calendar days from today to the day that starts at dueAt.
+  function countDaysBetween(today, dueAt, timeZone) {
+    const todayStart = findStartOfDay(today, timeZone);
+    return Math.max(0, Math.round((dueAt - todayStart) / MILLISECONDS_PER_DAY));
+  }
+
   function getPracticeWordRowOrThrow(wordId) {
     const word = practiceRepository.findPracticeWordById(wordId);
     if (!word) throw new NotFoundError(`word ${wordId} not found`);
@@ -244,6 +363,7 @@ export function createPracticeService({
     addExtraNewWords,
     gradeWord,
     migrateToFsrs,
+    rebuildLearningDeck,
     listStrugglingWords,
     calculatePracticeStatistics,
   });
@@ -258,6 +378,7 @@ function mapToPracticeWord(wordRow) {
     kind: wordRow.kind,
     state: describeCardState(parseCard(wordRow.fsrs_card)),
     priority: wordRow.priority,
+    deck: describeDeckPosition(readDeckPosition(wordRow)),
   };
 }
 

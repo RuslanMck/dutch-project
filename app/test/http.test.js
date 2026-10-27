@@ -254,7 +254,11 @@ test('practice REST after the migration: batch, grade, repeat, unknown field, st
   assert.equal(graded.status, 200);
   assert.equal((await graded.json()).grade, 'good');
   const repeated = await postPracticeGrade(gradeBody);
-  assert.equal(repeated.status, 409, 'a second grade of the word in the same session is refused');
+  assert.equal(repeated.status, 200, 'a second answer in the same session is a repeat');
+  const repeatedBody = await repeated.json();
+  assert.equal(repeatedBody.is_repeat, true);
+  assert.equal(repeatedBody.deck.in_deck, false, 'right twice in a row: learned');
+  assert.equal(repeatedBody.deck.has_learned, true);
   const unknownField = await postPracticeGrade({ ...gradeBody, session_id: 'http-after-2', extra: true });
   assert.equal(unknownField.status, 400);
 

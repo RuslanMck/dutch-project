@@ -266,11 +266,18 @@ export function createWordService({
   }
 
   // Before FSRS is set up, a status is set directly. After it, status follows the schedule: 'new' takes the word out
-  // of rotation by clearing its card, and learning or learned come only from grading.
+  // of rotation by clearing its card and its learning-deck place, and learning or learned come only from grading.
   function mapStatusChangeToColumns(learningStatus) {
     if (!practiceSettings.isFsrsActive()) return { learningStatus };
     if (learningStatus !== 'new') throw new ValidationError(FSRS_STATUS_MESSAGE);
-    return { learningStatus, fsrsCard: null, dueAt: null, introducedOn: null };
+    return {
+      learningStatus,
+      fsrsCard: null,
+      dueAt: null,
+      introducedOn: null,
+      deckRequiredCorrect: null,
+      deckCorrectStreak: 0,
+    };
   }
 
   return Object.freeze({

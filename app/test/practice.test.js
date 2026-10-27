@@ -215,7 +215,7 @@ test('after 4 new words are graded, the next batch in a new session offers 6', (
   assert.ok(secondBatch.new_words.every(word => !gradedWordIds.includes(word.id)));
 });
 
-test('good, hard and again give due dates in that order', () => {
+test('good, hard and again give FSRS due dates in that order; in the learning deck all three come back tomorrow', () => {
   const context = createPracticeContext();
   const [goodId, hardId, againId] = addWords(context, '6.1', ['goed', 'moeilijk', 'fout']);
   migrate(context);
@@ -224,9 +224,11 @@ test('good, hard and again give due dates in that order', () => {
   context.practiceService.gradeWord({ wordId: hardId, grade: 'hard', answer: 'de moeilijk', sessionId: 's1' });
   context.practiceService.gradeWord({ wordId: againId, grade: 'again', answer: 'xxx', sessionId: 's1' });
 
-  const dueAtOf = wordId => readWordRow(context, wordId).due_at;
-  assert.ok(dueAtOf(goodId) > dueAtOf(hardId), 'good must be due after hard');
-  assert.ok(dueAtOf(hardId) > dueAtOf(againId), 'hard must be due after again');
+  const cardDueOf = wordId => Date.parse(JSON.parse(readWordRow(context, wordId).fsrs_card).due);
+  assert.ok(cardDueOf(goodId) > cardDueOf(hardId), 'good must be due after hard');
+  assert.ok(cardDueOf(hardId) > cardDueOf(againId), 'hard must be due after again');
+  const tomorrowStart = findStartOfDay('2026-10-25', TIME_ZONE);
+  for (const wordId of [goodId, hardId, againId]) assert.equal(readWordRow(context, wordId).due_at, tomorrowStart);
 });
 
 test('grading returns the word, the state and the next due day in Amsterdam', () => {
@@ -243,24 +245,26 @@ test('grading returns the word, the state and the next due day in Amsterdam', ()
   assert.ok(result.interval_days >= 1);
 });
 
-test('a second grade of the same word in one session is refused, and the schedule does not change', () => {
+test('a second answer in one session is a repeat: FSRS and the review log stay, the learning deck moves', () => {
   const context = createPracticeContext();
   const [wordId] = addWords(context, '6.1', ['goed']);
   migrate(context);
-  context.practiceService.gradeWord({ wordId, grade: 'good', sessionId: 's1' });
+  const first = context.practiceService.gradeWord({ wordId, grade: 'good', sessionId: 's1' });
+  assert.deepEqual(first.deck, { in_deck: true, required_correct: 2, correct_streak: 1, times_left: 1, has_learned: false });
   const rowBefore = readWordRow(context, wordId);
 
-  assert.throws(
-    () => context.practiceService.gradeWord({ wordId, grade: 'again', answer: 'x', sessionId: 's1' }),
-    ConflictError,
-  );
+  const repeat = context.practiceService.gradeWord({ wordId, grade: 'again', answer: 'x', sessionId: 's1' });
 
+  assert.equal(repeat.is_repeat, true);
+  assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_streak: 0, times_left: 3, has_learned: false });
   const rowAfter = readWordRow(context, wordId);
   assert.equal(rowAfter.due_at, rowBefore.due_at);
   assert.equal(rowAfter.fsrs_card, rowBefore.fsrs_card);
-  const reviewLogCount = context.database.prepare('SELECT COUNT(*) FROM review_logs WHERE word_id = ?').pluck()
+  const countRows = tableName => context.database.prepare(`SELECT COUNT(*) FROM ${tableName} WHERE word_id = ?`).pluck()
     .get(wordId);
-  assert.equal(reviewLogCount, 1);
+  assert.equal(countRows('review_logs'), 1);
+  assert.equal(countRows('word_errors'), 0, 'a repeat adds no word error');
+  assert.equal(countRows('deck_answers'), 2);
 });
 
 test('again and hard add a practice word error, good adds none', () => {
@@ -387,16 +391,17 @@ test('a grade at 00:30 on the 25-hour day 2026-10-25 is due on 2026-10-26, at th
   assert.deepEqual(context.practiceService.getPracticeBatch({ sessionId: 's2' }).reviews, []);
 });
 
-test('a new word graded good at 20:00 on 2026-10-24 is due on 2026-10-27, at the start of that day', () => {
+test('a new word graded good at 20:00 on 2026-10-24 has its FSRS due on 2026-10-27, but the deck brings it back on 2026-10-25', () => {
   const context = createPracticeContext('2026-10-24T20:00:00+02:00');
   const [wordId] = addWords(context, '6.1', ['goed']);
   migrate(context);
 
   const result = context.practiceService.gradeWord({ wordId, grade: 'good', sessionId: 's1' });
 
-  assert.equal(result.interval_days, 3);
-  assert.equal(result.next_due_on, '2026-10-27');
-  assert.equal(readWordRow(context, wordId).due_at, findStartOfDay('2026-10-27', TIME_ZONE));
+  assert.equal(JSON.parse(readWordRow(context, wordId).fsrs_card).due, new Date(findStartOfDay('2026-10-27', TIME_ZONE)).toISOString());
+  assert.equal(result.interval_days, 1, 'a word in the learning deck comes back tomorrow');
+  assert.equal(result.next_due_on, '2026-10-25');
+  assert.equal(readWordRow(context, wordId).due_at, findStartOfDay('2026-10-25', TIME_ZONE));
 });
 
 test('practice_stats counts due words, introductions, states and the good share', () => {
@@ -411,7 +416,9 @@ test('practice_stats counts due words, introductions, states and the good share'
   const stats = context.practiceService.calculatePracticeStatistics();
 
   assert.equal(stats.due_today, 1);
-  assert.equal(stats.due_tomorrow, 1, 'the word graded again is due tomorrow');
+  assert.equal(stats.due_tomorrow, 2, 'both new words are in the learning deck, so both are due tomorrow');
+  assert.equal(stats.deck_size, 2);
+  assert.equal(stats.deck_free_slots, 8);
   assert.equal(stats.introduced_today, 2, 'migrated words count as introduced the day before');
   assert.deepEqual(stats.new_remaining_by_priority, { 1: 0, 2: 0, 3: 0 });
   assert.equal(stats.states.new, 0);

@@ -97,8 +97,8 @@ test('after a reset, skipping days never makes the list grow beyond the words ac
   context.clock.moveTo('2026-10-31T10:00:00+01:00');
   const afterSkippedDays = context.practiceService.getPracticeBatch({ sessionId: 'much-later' });
   assert.equal(afterSkippedDays.reviews.length, 10, 'only the 10 started words come back');
-  assert.equal(afterSkippedDays.new_words.length, 0, 'no new words while they are overdue');
-  assert.equal(afterSkippedDays.counts.new_words_blocked, true);
+  assert.equal(afterSkippedDays.new_words.length, 0, 'no new words while the 10 started words fill the deck');
+  assert.equal(afterSkippedDays.counts.deck_free_slots, 0);
 });
 
 test('a reset clears today\'s extra new words', () => {
@@ -153,11 +153,8 @@ test('reset mid-session: words and phrases graded earlier in session S are offer
   assert.equal(regradedWord.word.id, gradedWords[0].id);
   context.phrasePracticeService.gradePhrase({ phraseId: gradedPhrases[0].id, grade: 'again', sessionId: 's1' });
 
-  assert.throws(() => context.practiceService.gradeWord({
-    wordId: gradedWords[0].id,
-    grade: 'good',
-    sessionId: 's1',
-  }), ConflictError, 'a second grade after the reset is still refused');
+  const repeat = context.practiceService.gradeWord({ wordId: gradedWords[0].id, grade: 'good', sessionId: 's1' });
+  assert.equal(repeat.is_repeat, true, 'a second word grade after the reset is a repeat: only the deck moves');
   assert.throws(() => context.phrasePracticeService.gradePhrase({
     phraseId: gradedPhrases[0].id,
     grade: 'good',
@@ -192,7 +189,7 @@ test('a dry run supersedes no review log; a real reset supersedes every log that
   assert.equal(countRows(context, 'SELECT COUNT(*) FROM phrase_review_logs'), 1, 'the phrase log stays as history');
 });
 
-test('the database refuses a second log for a word in a session while the first one still counts', () => {
+test('the database refuses a second log for a word in a session while the first one still counts; a second answer is a repeat', () => {
   const context = createMigratedContext();
   const [word] = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
   context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
@@ -202,11 +199,12 @@ test('the database refuses a second log for a word in a session while the first 
   `).run({ wordId: word.id, reviewedAt: context.clock.now() });
 
   assert.throws(insertSecondLog, /UNIQUE constraint failed/);
-  assert.throws(() => context.practiceService.gradeWord({ wordId: word.id, grade: 'hard', sessionId: 's1' }),
-    ConflictError);
+  const repeat = context.practiceService.gradeWord({ wordId: word.id, grade: 'hard', sessionId: 's1' });
+  assert.equal(repeat.is_repeat, true);
+  assert.equal(countRows(context, `SELECT COUNT(*) FROM review_logs WHERE word_id = ${word.id}`), 1);
 });
 
-test('after a reset the same session grades the word once more, and a third grade is refused', () => {
+test('after a reset the same session grades the word once more, and a third answer is a repeat', () => {
   const context = createMigratedContext();
   const [word] = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
   context.practiceService.gradeWord({ wordId: word.id, grade: 'again', answer: 'x', sessionId: 's1' });
@@ -216,8 +214,8 @@ test('after a reset the same session grades the word once more, and a third grad
 
   const regraded = context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
   assert.equal(regraded.grade, 'good');
-  assert.throws(() => context.practiceService.gradeWord({ wordId: word.id, grade: 'hard', sessionId: 's1' }),
-    ConflictError, 'the regrade counts, so a third grade in the session is refused');
+  const thirdAnswer = context.practiceService.gradeWord({ wordId: word.id, grade: 'hard', sessionId: 's1' });
+  assert.equal(thirdAnswer.is_repeat, true, 'the regrade counts, so a third answer in the session is a repeat');
   assert.equal(countRows(context, `SELECT COUNT(*) FROM review_logs WHERE word_id = ${word.id}`), 2);
   const countingLogs = `SELECT COUNT(*) FROM review_logs WHERE word_id = ${word.id} AND superseded_at IS NULL`;
   assert.equal(countRows(context, countingLogs), 1);
