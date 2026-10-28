@@ -3,6 +3,7 @@
 // REST query values arrive as text, so their numbers are read with z.coerce.
 import { z } from 'zod';
 
+import { PRACTICE_DIRECTIONS, UK_TO_NL_DIRECTION } from '../domains/practice/practice-direction.js';
 import {
   createNonEmptyTextSchema,
   createOptionalTextSchema,
@@ -29,6 +30,12 @@ export const phraseGradeSchema = practiceGradeSchema.describe(
   "'good' fully right; 'hard' right phrase with a slip; 'again' wrong, or the learner did not know it",
 );
 
+// Every card is graded in both directions; the default is round 1, where the Ukrainian is shown and the Dutch answered.
+export const practiceDirectionSchema = z.enum(PRACTICE_DIRECTIONS).default(UK_TO_NL_DIRECTION).describe(
+  "'uk_nl' = the Ukrainian was shown and the Dutch answered (round 1); 'nl_uk' = the Dutch was shown and the "
+  + 'Ukrainian answered (round 2); default uk_nl',
+);
+
 export const practiceSessionIdSchema = z.string().trim().min(1, 'required').max(100)
   .describe('id of this practice session; use the same value for every call in one session, e.g. a UUID');
 
@@ -48,6 +55,7 @@ const gradeWordFieldsSchema = z.object({
   grade: practiceGradeSchema,
   answer: createOptionalTextSchema().describe('the answer the learner typed; leave out when there is none'),
   session_id: practiceSessionIdSchema,
+  direction: practiceDirectionSchema,
 });
 
 export const gradeWordToolInputSchema = gradeWordFieldsSchema.extend({
@@ -58,10 +66,11 @@ export const gradeWordInputSchema = gradeWordFieldsSchema.extend({
   word_id: identifierSchema.describe('word id, from the practice batch'),
 }).strict();
 
-// A phrase has no article or answer text, so its grade takes no answer field.
+// A phrase has no article or answer text, so its grade takes no answer field; it is still graded per direction.
 const gradePhraseFieldsSchema = z.object({
   grade: phraseGradeSchema,
   session_id: practiceSessionIdSchema,
+  direction: practiceDirectionSchema,
 });
 
 export const gradePhraseToolInputSchema = gradePhraseFieldsSchema.extend({

@@ -120,7 +120,7 @@
             <option value="phrases">Картки — Фрази</option>
           </select>
         </label>
-        <label class="field">
+        <label class="field" id="cards-direction-field">
           <span>Лицьовий бік</span>
           <select id="cards-direction">
             <option value="nl">нідерландська</option>
@@ -158,7 +158,7 @@
           <option value="art">Артикль</option>
           <option value="struggling">Важкі слова</option>
         </select>
-        <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" — основна практика. Сесія — це слова, які ви зараз вивчаєте: вона триває, навіть кілька днів, доки всі слова не вивчені; прогрес зберігається. Нове слово треба назвати правильно 2 рази; кожна помилка додає ще один раз, до 6, а правильні відповіді зберігаються. Повтори теж рахуються. Вивчене слово йде за розкладом повторень; якщо ви його забули, воно повертається в сесію. Коли всі нові слова сесії вивчені, одразу приходять наступні 10. "Артикль" — це тренування, яке нічого не змінює. "Важкі слова" — тренування слів, на які ви останнього разу відповіли неправильно або важко; нічого не змінює.</p>
+        <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" — основна практика. Сесія — це слова, які ви зараз вивчаєте: вона триває, навіть кілька днів, доки всі слова не вивчені; прогрес зберігається. Нове слово треба назвати правильно 2 рази; кожна помилка додає ще один раз, до 6, а правильні відповіді зберігаються. Повтори теж рахуються. Набір іде у два раунди: спершу UA → NL, потім NL → UA; слово вивчене, коли його знаєте в обидва боки. Вивчене слово йде за розкладом повторень; якщо ви його забули, воно повертається в сесію. Коли всі нові слова сесії вивчені, одразу приходять наступні 10. "Артикль" — це тренування, яке нічого не змінює. "Важкі слова" — тренування слів, на які ви останнього разу відповіли неправильно або важко; нічого не змінює.</p>
       </div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
       <form id="practice-form" class="row-form" autocomplete="off">
@@ -166,6 +166,7 @@
         <button id="practice-btn" class="primary" type="submit">Перевірити</button>
       </form>
       <button id="practice-skip-button" class="practice-skip" type="button" hidden>Не знаю</button>
+      <button id="practice-override-button" class="practice-skip" type="button" hidden>Я мав рацію</button>
       <p id="practice-msg" class="msg" aria-live="polite"></p>
       <p id="practice-schedule" class="muted practice-schedule"></p>
       <div id="practice-meta" class="practice-meta">

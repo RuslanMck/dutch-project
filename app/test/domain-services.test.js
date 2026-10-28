@@ -257,6 +257,34 @@ test('once FSRS is set up, status learning or learned is refused, and new resets
   assert.deepEqual({ ...row }, { fsrs_card: null, due_at: null, introduced_on: null });
 });
 
+test('resetting a word to new clears its learning-deck places in both directions', () => {
+  const clock = createFixedClock(MORNING_IN_AMSTERDAM);
+  const wordContext = createTestContext({ clock });
+  const [wordId] = createWordIds(wordContext, [{ nl: 'huis', uk: 'дім', section: '6.1' }]);
+  wordContext.practiceService.migrateToFsrs({ isDryRun: false });
+  wordContext.practiceService.gradeWord({ wordId, grade: 'again', answer: 'x', sessionId: 'session-1' });
+  const inDeck = wordContext.database.prepare(`
+    SELECT deck_required_correct, deck_reverse_required_correct FROM words WHERE id = ?
+  `).get(wordId);
+  assert.deepEqual({ ...inDeck }, { deck_required_correct: 3, deck_reverse_required_correct: 2 });
+
+  wordContext.wordService.updateWordStatus(wordId, 'new');
+  const cleared = wordContext.database.prepare(`
+    SELECT deck_required_correct, deck_correct_count, deck_entered_by_lapse,
+      deck_reverse_required_correct, deck_reverse_correct_count, deck_reverse_entered_by_lapse
+    FROM words WHERE id = ?
+  `).get(wordId);
+  assert.deepEqual({ ...cleared }, {
+    deck_required_correct: null,
+    deck_correct_count: 0,
+    deck_entered_by_lapse: 0,
+    deck_reverse_required_correct: null,
+    deck_reverse_correct_count: 0,
+    deck_reverse_entered_by_lapse: 0,
+  });
+  assert.equal(wordContext.practiceService.calculatePracticeStatistics().deck_size, 0);
+});
+
 test('list_words filters by state, priority and due day, and sorts by due and by frequency', () => {
   const clock = createFixedClock(MORNING_IN_AMSTERDAM);
   const wordContext = createTestContext({ clock });

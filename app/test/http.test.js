@@ -257,8 +257,11 @@ test('practice REST after the migration: batch, grade, repeat, unknown field, st
   assert.equal(repeated.status, 200, 'a second answer in the same session is a repeat');
   const repeatedBody = await repeated.json();
   assert.equal(repeatedBody.is_repeat, true);
-  assert.equal(repeatedBody.deck.in_deck, false, 'right twice in a row: learned');
-  assert.equal(repeatedBody.deck.has_learned, true);
+  assert.equal(repeatedBody.deck.uk_nl.in_deck, false, 'right twice in a row: uk_nl left the deck');
+  assert.equal(repeatedBody.deck.has_learned_direction, true);
+  assert.equal(repeatedBody.deck.nl_uk.in_deck, true, 'nl_uk is still to be answered');
+  assert.equal(repeatedBody.deck.in_deck, true);
+  assert.equal(repeatedBody.deck.has_learned, false, 'learned only when both directions are answered');
   const unknownField = await postPracticeGrade({ ...gradeBody, session_id: 'http-after-2', extra: true });
   assert.equal(unknownField.status, 400);
 
@@ -273,6 +276,40 @@ test('practice REST after the migration: batch, grade, repeat, unknown field, st
   const [listedWord] = await (await fetch(`${base}/api/words?priority=1`, { headers: BEARER })).json();
   assert.equal(Object.hasOwn(listedWord, 'fsrs_card'), false, 'the card JSON is internal');
   assert.equal(typeof listedWord.state, 'string');
+});
+
+test('practice REST word grades take a direction: uk_nl by default, nl_uk accepted, other values refused', async () => {
+  const batch = await (await fetch(`${base}/api/practice/batch?session_id=http-direction`, { headers: BEARER })).json();
+  const [card] = [...batch.reviews, ...batch.new_words];
+  assert.ok(card, 'the set has a word to grade');
+  const gradeBody = { word_id: card.id, grade: 'good', session_id: 'http-direction' };
+  const byDefault = await postPracticeGrade(gradeBody);
+  assert.equal(byDefault.status, 200);
+  assert.equal((await byDefault.json()).direction, 'uk_nl');
+  const reverse = await postPracticeGrade({ ...gradeBody, direction: 'nl_uk' });
+  assert.equal(reverse.status, 200);
+  assert.equal((await reverse.json()).direction, 'nl_uk');
+  const refused = await postPracticeGrade({ ...gradeBody, direction: 'de_nl' });
+  assert.equal(refused.status, 400);
+});
+
+test('practice REST phrase grades take a direction: uk_nl by default, nl_uk accepted, other values refused', async () => {
+  const batch = await (await fetch(`${base}/api/practice/phrases/batch?session_id=http-phrase-direction`, { headers: BEARER })).json();
+  const [phrase] = [...batch.reviews, ...batch.new_phrases];
+  assert.ok(phrase, 'the set has a phrase to grade');
+  const postPhraseGrade = body => fetch(`${base}/api/practice/phrases/grades`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify(body),
+  });
+  const gradeBody = { phrase_id: phrase.id, grade: 'hard', session_id: 'http-phrase-direction' };
+  const byDefault = await postPhraseGrade(gradeBody);
+  assert.equal(byDefault.status, 200);
+  assert.equal((await byDefault.json()).direction, 'uk_nl');
+  const reverse = await postPhraseGrade({ ...gradeBody, direction: 'nl_uk' });
+  assert.equal(reverse.status, 200);
+  assert.equal((await reverse.json()).direction, 'nl_uk');
+  assert.equal((await postPhraseGrade({ ...gradeBody, direction: 'de_nl' })).status, 400);
 });
 
 test('phrase practice REST: batch, grade, repeat, unknown field, phrase list and stats', async () => {
@@ -317,7 +354,8 @@ test('phrase practice REST: batch, grade, repeat, unknown field, phrase list and
 
   const stats = await (await fetch(`${base}/api/practice/stats`, { headers: BEARER })).json();
   assert.equal(typeof stats.phrases.due_today, 'number');
-  assert.equal(stats.phrases.introduced_today, 1);
+  // This phrase and the one the direction test above graded first were both New today.
+  assert.equal(stats.phrases.introduced_today, 2);
 });
 
 test('a wrong word grade returns the word with its error count; a New word outside the open set is refused', async () => {

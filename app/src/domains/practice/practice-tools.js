@@ -30,12 +30,16 @@ export function registerPracticeTools({
     title: 'Get practice batch',
     description: 'Words to practise now: one set of at most 10 words (counts.set_size). Old words fill it first: '
       + 'words still being learned, then reviews due today (most overdue first); new words fill only the room '
-      + 'left, so a set can be 10 new, 6 new and 4 old, or 10 old. A set stays until each word is learned or '
-      + 'answered right that day; then the same call with the same session_id gives the next set. Show each word '
-      + 'by its uk and ask for the Dutch; grade every answer with grade_word, repeats too, and ask a word again '
-      + 'until grade_word says it is no longer in the deck. Returns {session_id, reviews, new_words, counts '
-      + '(with deck_size)}, each word {id, uk, nl, article, kind, state, priority, deck {in_deck, '
-      + 'required_correct, correct_count, times_left}}.',
+      + 'left, so a set can be 10 new, 6 new and 4 old, or 10 old. Every card of the set is practised in two '
+      + 'rounds. Round 1, direction uk_nl: show each card whose directions_left has uk_nl by its uk and ask for the '
+      + 'Dutch. Round 2, direction nl_uk, once round 1 is done: show each card whose directions_left has nl_uk by '
+      + 'its nl with the article and ask for the Ukrainian, in a new order (not the order of round 1, and not the '
+      + 'card just answered). Grade each answer with grade_word and its direction, repeats too, and ask a word '
+      + 'again until grade_word says it is no longer in the deck. A word is learned only when both directions are '
+      + 'done. When the set is done, the same call with the same session_id gives the next set. Returns {session_id, '
+      + 'reviews, new_words, counts (with deck_size)}, each word {id, uk, nl, article, kind, state, priority, '
+      + 'directions_left (uk_nl and/or nl_uk still to answer in this set), deck {in_deck, times_left, uk_nl: '
+      + '{in_deck, required_correct, correct_count, times_left}, nl_uk: {same fields}}}.',
     inputSchema: practiceBatchToolInputSchema.shape,
   }, ({ session_id: sessionId, max_reviews: maxReviews }) => practiceService.getPracticeBatch({
     sessionId,
@@ -44,32 +48,39 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'grade_word', {
     title: 'Grade word',
-    description: 'Record an answer to a word. Grades: "good" fully right; the article is optional, so a missing or '
-      + 'wrong de/het still counts as good (say what the right article is). "hard" right word with a spelling'
-      + ' slip, or a correct Dutch synonym; "again" wrong or not known. The first answer per word per session'
-      + ' schedules its FSRS review and, for again and hard, logs a word error. Every answer, repeats too, '
-      + 'moves the word in the learning deck: a word needs required_correct right answers in total (2, plus 1'
-      + ' for each again or hard, up to 6); a mistake keeps the right answers given. Then it is learned and '
-      + 'leaves the session. A review answered right is done; answered wrong it joins the session with 3 to '
-      + 'go. Returns {word, grade, is_repeat, state, status, interval_days, next_due_on, deck {in_deck, '
-      + 'required_correct, correct_count, times_left, has_learned}}: tell the learner "повторень до вивчення:'
-      + ' times_left", or that the word is learned.',
+    description: 'Record an answer to a word in one direction: "uk_nl" (round 1, the Ukrainian was shown and the '
+      + 'Dutch answered; the default) or "nl_uk" (round 2, the Dutch was shown and the Ukrainian answered). Grades: '
+      + '"good" fully right; the article is optional, so a missing or wrong de/het still counts as good (say what '
+      + 'the right article is). "hard" (uk_nl only) a spelling slip of one letter or a correct Dutch synonym; for '
+      + 'nl_uk the Ukrainian is "good" when it is right (any fitting translation, judge the meaning), otherwise '
+      + '"again"; "again" wrong or not known. The first answer per word per session schedules its FSRS review and, '
+      + 'for again and hard, logs a word error. Every answer, repeats too, moves the word in the learning deck: each '
+      + 'direction needs required_correct right answers (2, plus 1 for each again or hard, up to 6); a mistake keeps '
+      + 'the right answers given. A review answered right is done; answered wrong it joins the session with 3 to go. '
+      + 'Returns {word, grade, direction, is_repeat, state, status, interval_days, next_due_on, deck {in_deck, '
+      + 'times_left, uk_nl and nl_uk (each {in_deck, required_correct, correct_count, times_left}), has_learned, '
+      + 'has_learned_direction}}: tell the learner "повторень до вивчення: times_left" of the answered direction; '
+      + 'when has_learned_direction and not has_learned, that direction is learned and the other one is still to go; '
+      + 'when has_learned, that the word is learned.',
     inputSchema: gradeWordToolInputSchema.shape,
-  }, ({ id, grade, answer, session_id: sessionId }) => practiceService.gradeWord({
+  }, ({ id, grade, answer, session_id: sessionId, direction }) => practiceService.gradeWord({
     wordId: id,
     grade,
     answer,
     sessionId,
+    direction,
   }));
 
   registerJsonTool(mcpServer, 'get_phrase_batch', {
     title: 'Get phrase batch',
     description: 'Phrases to practise now: one set of at most 10 phrases. Due phrases fill it first (most overdue '
-      + 'first), new phrases (oldest first) only the room left; once every phrase of the set is graded, the same '
-      + 'call with the same session_id gives the next set. Show each phrase by its uk and ask for the Dutch; grade '
-      + 'the first '
-      + 'answer with grade_phrase. Returns {session_id, reviews, new_phrases, counts}, each phrase {id, nl, uk, '
-      + 'context, state, status}.',
+      + 'first), new phrases (oldest first) only the room left. Every phrase of the set is practised in two rounds: '
+      + 'round 1, direction uk_nl, shows the uk of each phrase whose directions_left has uk_nl and asks for the Dutch; '
+      + 'round 2, direction nl_uk, shows the nl of each phrase whose directions_left has nl_uk and asks for the '
+      + 'Ukrainian, in a new order. Grade each answer with grade_phrase and its direction. A phrase is finished when '
+      + 'both directions are graded; once every phrase of the set is finished, the same call with the same session_id '
+      + 'gives the next set. Returns {session_id, reviews, new_phrases, counts}, each phrase {id, nl, uk, context, '
+      + 'state, status, directions_left}.',
     inputSchema: practiceBatchToolInputSchema.shape,
   }, ({ session_id: sessionId, max_reviews: maxReviews }) => phrasePracticeService.getPhraseBatch({
     sessionId,
@@ -78,15 +89,17 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'grade_phrase', {
     title: 'Grade phrase',
-    description: 'Record the first answer to a phrase in this session and schedule its next review. Grades: "good" '
-      + 'fully right; "hard" right phrase with a small slip; "again" wrong or not known. Only the first grade per '
-      + 'phrase per session counts: a second one is refused. Phrases log no word errors. Returns {phrase, grade, '
-      + 'state, status, interval_days, next_due_on}.',
+    description: 'Record the answer to a phrase in one direction in this session: "uk_nl" (round 1, the Ukrainian was '
+      + 'shown; the default) or "nl_uk" (round 2, the Dutch was shown). Grades: "good" fully right; "hard" right '
+      + 'phrase with a small slip; "again" wrong or not known. Only the first grade per phrase and direction per '
+      + 'session counts: a second one in the same direction is refused. Phrases log no word errors. Returns {phrase, '
+      + 'direction, grade, state, status, interval_days, next_due_on}.',
     inputSchema: gradePhraseToolInputSchema.shape,
-  }, ({ id, grade, session_id: sessionId }) => phrasePracticeService.gradePhrase({
+  }, ({ id, grade, session_id: sessionId, direction }) => phrasePracticeService.gradePhrase({
     phraseId: id,
     grade,
     sessionId,
+    direction,
   }));
 
   registerJsonTool(mcpServer, 'set_current_chapter', {

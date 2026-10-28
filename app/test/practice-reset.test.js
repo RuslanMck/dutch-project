@@ -100,6 +100,26 @@ test('after a reset, skipping days never makes the list grow beyond the words ac
   assert.equal(afterSkippedDays.counts.set_words, 10);
 });
 
+test('a reset takes every word out of the learning deck in both directions and supersedes its deck answers', () => {
+  const context = createMigratedContext();
+  const [firstWord, secondWord] = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
+  context.practiceService.gradeWord({ wordId: firstWord.id, grade: 'good', sessionId: 's1' });
+  context.practiceService.gradeWord({ wordId: secondWord.id, grade: 'again', answer: 'x', sessionId: 's1' });
+  context.practiceService.gradeWord({ wordId: secondWord.id, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
+  const inAnyDeck = 'SELECT COUNT(*) FROM words WHERE deck_required_correct IS NOT NULL OR deck_reverse_required_correct IS NOT NULL';
+  const countingDeckAnswers = 'SELECT COUNT(*) FROM deck_answers WHERE superseded_at IS NULL';
+  assert.ok(countRows(context, inAnyDeck) > 0, 'the answered words are in the deck');
+  assert.equal(countRows(context, countingDeckAnswers), 3);
+
+  context.clock.moveTo(MORNING_IN_AMSTERDAM);
+  context.practiceResetService.resetPractice({ isDryRun: false });
+
+  assert.equal(countRows(context, inAnyDeck), 0);
+  assert.equal(countRows(context, 'SELECT COUNT(*) FROM words WHERE deck_reverse_correct_count <> 0'), 0);
+  assert.equal(countRows(context, countingDeckAnswers), 0);
+  assert.equal(countRows(context, 'SELECT COUNT(*) FROM deck_answers'), 3, 'the deck answers stay as history');
+});
+
 test('a reset clears the pinned word set', () => {
   const context = createMigratedContext();
   context.clock.moveTo(MORNING_IN_AMSTERDAM);
@@ -187,19 +207,18 @@ test('a dry run supersedes no review log; a real reset supersedes every log that
   assert.equal(countRows(context, 'SELECT COUNT(*) FROM phrase_review_logs'), 1, 'the phrase log stays as history');
 });
 
-test('the database refuses a second log for a word in a session while the first counts; a second answer is a repeat', () => {
+test('a session id used again on a later day grades the word again; a second answer the same day is a repeat', () => {
   const context = createMigratedContext();
   const [word] = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
   context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
-  const insertSecondLog = () => context.database.prepare(`
-    INSERT INTO review_logs (word_id, session_id, reviewed_at, grade, card_after)
-    VALUES (@wordId, 's1', @reviewedAt, 'good', '{}')
-  `).run({ wordId: word.id, reviewedAt: context.clock.now() });
-
-  assert.throws(insertSecondLog, /UNIQUE constraint failed/);
   const repeat = context.practiceService.gradeWord({ wordId: word.id, grade: 'hard', sessionId: 's1' });
   assert.equal(repeat.is_repeat, true);
   assert.equal(countRows(context, `SELECT COUNT(*) FROM review_logs WHERE word_id = ${word.id}`), 1);
+
+  context.clock.moveTo('2026-10-25T10:00:00+02:00');
+  const nextDay = context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
+  assert.equal(nextDay.is_repeat, false);
+  assert.equal(countRows(context, `SELECT COUNT(*) FROM review_logs WHERE word_id = ${word.id}`), 2);
 });
 
 test('after a reset the same session grades the word once more, and a third answer is a repeat', () => {

@@ -42,11 +42,11 @@ article hints in exercises. I mark words I don't know with "DNK". Don't give ans
 
 **Word practice (FSRS).** When I ask to practise words, run a session on the spaced-repetition schedule. Call
 `get_practice_batch` with a new `session_id` (today's date plus a random suffix, e.g. `2026-10-24-k3x9`) and use that
-same `session_id` for every `grade_word` call of the session. Give the words in blocks of 10: the Ukrainian text only,
-with no hints. Grade every answer, repeats too: `again` for a wrong answer or "DNK"; `hard` for the right word with a
-spelling slip, or a correct Dutch synonym that is not the dictionary word (explain the difference); `good` for a fully
-right answer. The article is optional: a missing or wrong `de` or `het` does not lower the grade, but I still want the
-right article shown. After each block show my answer, the right one (with the article) and a short explanation for
+same `session_id` for every `grade_word` call of the session. In round 1 give the words in blocks of 10: the
+Ukrainian text only, with no hints. Round 2 comes after it (see Sets below). Grade every answer, repeats too: `again`
+for a wrong answer or "DNK"; `hard` for the right word with a spelling slip, or a correct Dutch synonym that is not
+the dictionary word (explain the difference); `good` for a fully right answer. The article is optional: a missing or wrong `de` or `het` does not lower the grade,
+but I still want the right article shown. After each block show my answer, the right one (with the article) and a short explanation for
 every mistake, and for each word "повторень до вивчення: N" (`deck.times_left`) or that it is learned
 (`deck.has_learned`). A word comes back at the end of the queue until it is learned (`deck.in_deck` false); grade
 those repeats with `grade_word` too (they return `is_repeat: true`). `grade_word` logs the error itself, so do not
@@ -63,14 +63,17 @@ one I get wrong joins it and needs 3.
 **Sets.** A session is one set of at most 10 words, never more. Old words fill it first (words I am still learning,
 then reviews due today, most overdue first); new words fill only the room left, so after a hard day a set may hold no
 new words, and skipped days never pile up more than 10. When the set is done, `get_practice_batch` with the same
-`session_id` gives the next set; ask me before starting it. `reset_practice` starts my practice over (every word and
+`session_id` gives the next set; ask me before starting it. Every word of a set is practised in two rounds. Round 1
+asks every word with `uk_nl` left (the Ukrainian is shown, I answer in Dutch); then round 2 asks every word with
+`nl_uk` left, in a new order (the Dutch is shown with its article, I answer in Ukrainian). Grade each answer with
+`grade_word` and its `direction`. A word is learned only when I can translate it both ways. `reset_practice` starts my practice over (every word and
 phrase back to New, history kept): only when I ask for it, dry run first.
 
 **Phrase practice (FSRS).** I also score phrases myself in the web app's Картки tab (again / hard / good). When I ask
 to practise phrases, you can run a session too: call `get_phrase_batch` with a new `session_id` and grade the first
-answer to each phrase with `grade_phrase` (`again`, `hard` or `good`), as for words. Only the first grade per phrase
-counts, phrases come in sets of at most 10 (due phrases first, then new ones, oldest first), and phrases have no word
-errors.
+answer to each phrase with `grade_phrase` (`again`, `hard` or `good`) and its `direction`, in the same two rounds as
+words. Only the first grade per phrase and direction counts, phrases come in sets of at most 10 (due phrases first,
+then new ones, oldest first), and phrases have no word errors.
 
 **Difficult words.** When I ask to drill the words I find hard, call `get_struggling_words`: it lists the words whose
 last answer was `again` or `hard`, most errors first. Quiz them as above, but do not call `grade_word` or

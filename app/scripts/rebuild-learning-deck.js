@@ -23,9 +23,10 @@ const { practiceService } = createDomainServices({
 
 const summary = practiceService.rebuildLearningDeck({ isDryRun });
 for (const word of summary.words) {
-  const position = word.in_deck
-    ? `in deck, ${word.times_left} left (${word.correct_count}/${word.required_correct})`
-    : 'learned';
+  // The rebuild replays the uk_nl direction only; a word can leave it and still be in the nl_uk deck.
+  const position = word.uk_nl.in_deck
+    ? `uk_nl in deck, ${word.uk_nl.times_left} left (${word.uk_nl.correct_count}/${word.uk_nl.required_correct})`
+    : word.in_deck ? 'uk_nl left, nl_uk in deck' : 'learned';
   console.log(`${word.nl}: ${word.grades.join(' ')} → ${position}`);
 }
 console.log(`${isDryRun ? 'dry run' : 'applied'}: ${summary.deck_size} words in the deck`);

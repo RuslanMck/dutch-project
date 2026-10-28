@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { buildMigrationCard, serializeCard } from '../src/domains/practice/fsrs-scheduling.js';
+import { PRACTICE_DIRECTIONS } from '../src/domains/practice/practice-direction.js';
 import { createPhrasePracticeRepository } from '../src/domains/practice/phrase-practice-repository.js';
 import { createPracticeRepository } from '../src/domains/practice/practice-repository.js';
 import { createTestContext } from './database-test-helpers.js';
@@ -87,13 +88,15 @@ function countByPriority(words) {
   return [1, 2, 3].map(priority => words.filter(word => word.priority === priority).length);
 }
 
-// Answers every word of the batch until it leaves the set (good each time), in one session.
+// Answers every word of the batch in both directions, good until each direction has left the deck, in one session.
 function finishSet(context, batch, sessionId) {
   for (const word of [...batch.reviews, ...batch.new_words]) {
-    let result;
-    do {
-      result = context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId });
-    } while (result.deck.in_deck);
+    for (const direction of PRACTICE_DIRECTIONS) {
+      let result;
+      do {
+        result = context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId, direction });
+      } while (result.deck[direction].in_deck);
+    }
   }
 }
 
@@ -174,7 +177,8 @@ test('a finished word leaves the set; the set closes when all are finished and t
   const [firstWord] = firstSet.new_words;
   context.practiceService.gradeWord({ wordId: firstWord.id, grade: 'good', sessionId: 's1' });
   context.practiceService.gradeWord({ wordId: firstWord.id, grade: 'good', sessionId: 's1' });
-  assert.equal(batchIds(context.practiceService.getPracticeBatch({ sessionId: 's1' })).length, 9);
+  assert.equal(batchIds(context.practiceService.getPracticeBatch({ sessionId: 's1' })).length, 10,
+    'learned in uk_nl only: the word still owes nl_uk, so it stays in the set');
 
   finishSet(context, firstSet, 's1');
   const nextSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
@@ -203,7 +207,7 @@ test('the next day an unfinished set gives way: its deck words first, then today
   assert.equal(nextDay.counts.is_set_open, false);
 });
 
-test('yesterday 9 wrong and 1 right: today the 9 unfinished words and 1 new word make the set', () => {
+test('yesterday 9 wrong and 1 right: today the 10 started words are all still owed, and no new word joins', () => {
   const context = createPracticeContext();
   addWords(context, '6.1', makeNames('nieuw', 20));
   migrate(context);
@@ -217,9 +221,47 @@ test('yesterday 9 wrong and 1 right: today the 9 unfinished words and 1 new word
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
   const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day2' });
 
-  assert.equal(nextDay.reviews.length, 9);
-  assert.equal(nextDay.new_words.length, 1);
-  assert.equal(batchIds(nextDay).includes(firstGood.id), false);
+  assert.equal(nextDay.reviews.length, 10);
+  assert.equal(nextDay.new_words.length, 0, 'the set is full of unfinished words');
+  // The set of today opened after yesterday's answers: every card owes both directions in it, even the learned one.
+  const owedFirstGood = nextDay.reviews.find(word => word.id === firstGood.id);
+  assert.deepEqual(owedFirstGood.directions_left, ['uk_nl', 'nl_uk']);
+});
+
+test('a word leaves the set only when both directions are answered since it opened; directions_left says what is owed', () => {
+  const context = createPracticeContext();
+  addWords(context, '6.1', makeNames('nieuw', 12));
+  migrate(context);
+  const firstSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const [word] = firstSet.new_words;
+  assert.deepEqual(word.directions_left, ['uk_nl', 'nl_uk'], 'a new set owes both directions of every card');
+
+  context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
+  context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
+  const ukDone = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.ok(batchIds(ukDone).includes(word.id), 'the nl_uk direction is still owed');
+  assert.deepEqual(ukDone.reviews.find(card => card.id === word.id).directions_left, ['nl_uk']);
+
+  context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
+  context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
+  const bothDone = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.equal(batchIds(bothDone).includes(word.id), false, 'finished in both directions: it leaves the set');
+  assert.equal(bothDone.counts.set_words, 9);
+  assert.equal(bothDone.counts.is_set_open, true);
+});
+
+test('a card answered in one direction only, and not owed in the other, stays in the set until answered there', () => {
+  const context = createPracticeContext();
+  const [reviewId] = addWords(context, '6.1', ['oud']);
+  addWords(context, '6.1', makeNames('nieuw', 12));
+  migrate(context);
+  scheduleWord(context, reviewId, '2026-10-24T09:00:00+02:00');
+  const firstSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.deepEqual(firstSet.reviews.find(card => card.id === reviewId).directions_left, ['uk_nl', 'nl_uk']);
+
+  context.practiceService.gradeWord({ wordId: reviewId, grade: 'good', sessionId: 's1' });
+  const afterUk = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.deepEqual(afterUk.reviews.find(card => card.id === reviewId).directions_left, ['nl_uk']);
 });
 
 test('the round summary counts only the answers given since the set opened', () => {
@@ -264,11 +306,15 @@ test('phrases: due phrases fill the set first, new phrases the room left, and th
 
   context.phrasePracticeService.gradePhrase({ phraseId: dueIds[0], grade: 'again', sessionId: 's1' });
   const pinned = context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
-  assert.deepEqual(pinned.reviews.map(phrase => phrase.id), dueIds.slice(1, 10), 'a graded phrase is finished');
+  assert.deepEqual(pinned.reviews.map(phrase => phrase.id), dueIds.slice(0, 10), 'one direction is not finished');
+  assert.deepEqual(pinned.reviews[0].directions_left, ['nl_uk']);
   assert.equal(pinned.counts.is_set_open, true);
 
+  context.phrasePracticeService.gradePhrase({ phraseId: dueIds[0], grade: 'good', sessionId: 's1', direction: 'nl_uk' });
   for (const phraseId of dueIds.slice(1, 10)) {
-    context.phrasePracticeService.gradePhrase({ phraseId, grade: 'good', sessionId: 's1' });
+    for (const direction of PRACTICE_DIRECTIONS) {
+      context.phrasePracticeService.gradePhrase({ phraseId, grade: 'good', sessionId: 's1', direction });
+    }
   }
   const nextSet = context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
   assert.deepEqual(nextSet.reviews.map(phrase => phrase.id), dueIds.slice(10));

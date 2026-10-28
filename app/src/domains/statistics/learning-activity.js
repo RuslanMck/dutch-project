@@ -2,6 +2,7 @@
 // practised, words started and learned, a chart of answers per hour, day or month, the hardest words, and the streak
 // of days in a row. Pure: the caller passes the rows, the instant and the time zone.
 import { ACTIVITY_PERIODS } from '../../contracts/statistics-contracts.js';
+import { findOtherDirection } from '../practice/practice-direction.js';
 import {
   addDaysToCalendarDate,
   findHourInTimeZone,
@@ -205,20 +206,25 @@ export function calculateStreak(answers, today, timeZone) {
   return { current, longest, is_today_practised: practisedDates.has(today) };
 }
 
-// The moment each word was first learned, oldest first: its first answer that left the deck (required_correct_after
-// null) right after one that was in it. A lapse learned again does not count twice. deckAnswers: [{ word_id,
-// answered_at, required_correct_after }].
+// The moment each word was first learned, oldest first: the answer after which neither direction is in the deck, when
+// one was before. A direction never entered counts as not in the deck; a word's first answer as New enters the other
+// direction too. A lapse learned again does not count twice. deckAnswers: [{ word_id, direction, answered_at,
+// required_correct_after, is_first_answer_ever }].
 export function findLearnedMoments(deckAnswers) {
-  const wasInDeckByWordId = new Map();
+  const deckStateByWordId = new Map();
   const learnedWordIds = new Set();
   const learnedWords = [];
   for (const answer of [...deckAnswers].sort((left, right) => left.answered_at - right.answered_at)) {
-    const isInDeck = answer.required_correct_after !== null;
-    if (!isInDeck && wasInDeckByWordId.get(answer.word_id) && !learnedWordIds.has(answer.word_id)) {
+    const deckState = { uk_nl: false, nl_uk: false, ...deckStateByWordId.get(answer.word_id) };
+    const wasInAnyDeck = deckState.uk_nl || deckState.nl_uk;
+    if (answer.is_first_answer_ever) deckState[findOtherDirection(answer.direction)] = true;
+    deckState[answer.direction] = answer.required_correct_after !== null;
+    deckStateByWordId.set(answer.word_id, deckState);
+    const isInAnyDeck = deckState.uk_nl || deckState.nl_uk;
+    if (wasInAnyDeck && !isInAnyDeck && !learnedWordIds.has(answer.word_id)) {
       learnedWordIds.add(answer.word_id);
       learnedWords.push({ word_id: answer.word_id, at: answer.answered_at });
     }
-    wasInDeckByWordId.set(answer.word_id, isInDeck);
   }
   return learnedWords;
 }

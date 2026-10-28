@@ -63,14 +63,38 @@ test('the struggling words are the latest answers again or hard, most errors fir
 
   const drill = context.practiceService.listStrugglingWords();
 
-  assert.deepEqual(drill.words.map(word => word.id), [kat, boek, hond]);
-  assert.equal(drill.count, 3);
-  assert.deepEqual(drill.words.map(word => word.error_count), [2, 1, 1]);
-  assert.deepEqual(drill.words.map(word => word.last_grade), ['again', 'hard', 'hard']);
-  assert.deepEqual(drill.words.map(word => word.last_reviewed_on), ['2026-10-25', '2026-10-25', '2026-10-24']);
+  // vis's good in session s2 is a repeat of the same day in the same direction: its log still counts again.
+  assert.deepEqual(drill.words.map(word => word.id), [kat, boek, vis, hond]);
+  assert.equal(drill.count, 4);
+  assert.deepEqual(drill.words.map(word => word.error_count), [2, 1, 1, 1]);
+  assert.deepEqual(drill.words.map(word => word.last_grade), ['again', 'hard', 'again', 'hard']);
+  assert.deepEqual(drill.words.map(word => word.last_reviewed_on), ['2026-10-25', '2026-10-25', '2026-10-24', '2026-10-24']);
   assert.deepEqual(Object.keys(drill.words[0]).sort(), [
     'article', 'deck', 'error_count', 'id', 'kind', 'last_grade', 'last_reviewed_on', 'nl', 'priority', 'state', 'uk',
   ]);
+});
+
+test('a word whose other direction was answered worse in the session is struggling: the session grade is the worse one', () => {
+  const clock = createFakeClock(MORNING_IN_AMSTERDAM);
+  const context = createTestContext({ clock });
+  const [kat, hond, vis] = context.wordService.createWords(
+    ['kat', 'hond', 'vis'].map(dutchText => ({ nl: dutchText, uk: `${dutchText} (переклад)`, section: '6.1' })),
+  ).added.map(word => word.id);
+  context.practiceService.migrateToFsrs({ isDryRun: false });
+
+  context.practiceService.gradeWord({ wordId: kat, grade: 'good', sessionId: 's1' });
+  context.practiceService.gradeWord({ wordId: kat, grade: 'again', answer: 'x', sessionId: 's1', direction: 'nl_uk' });
+  context.practiceService.gradeWord({ wordId: hond, grade: 'hard', answer: 'x', sessionId: 's1' });
+  context.practiceService.gradeWord({ wordId: hond, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
+  context.practiceService.gradeWord({ wordId: vis, grade: 'good', sessionId: 's1' });
+  context.practiceService.gradeWord({ wordId: vis, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
+
+  const drill = context.practiceService.listStrugglingWords();
+
+  assert.deepEqual(drill.words.map(word => word.id).sort(), [kat, hond].sort());
+  const lastGradeOf = wordId => drill.words.find(word => word.id === wordId).last_grade;
+  assert.equal(lastGradeOf(kat), 'again');
+  assert.equal(lastGradeOf(hond), 'hard');
 });
 
 test('the drill writes nothing: no card, review log, word error or status changes', () => {

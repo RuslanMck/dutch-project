@@ -139,8 +139,8 @@ test('list_words filters by section and returns compact rows', SKIP, async () =>
   assert.ok(rows.length >= 1 && rows.length <= 5);
   assert.ok(rows.every(r => r.section === '6.1'));
   assert.deepEqual(Object.keys(rows[0]).sort(), [
-    'article', 'error_count', 'example_nl', 'example_uk', 'frequency_rank', 'id', 'kind', 'next_due_on', 'nl',
-    'priority', 'priority_override', 'section', 'state', 'status', 'topic', 'uk',
+    'article', 'error_count', 'example_nl', 'example_uk', 'frequency_rank', 'id', 'in_deck', 'kind', 'next_due_on',
+    'nl', 'priority', 'priority_override', 'section', 'state', 'status', 'times_left', 'topic', 'uk',
   ]);
 });
 
@@ -351,10 +351,25 @@ test('grade_word round trip over HTTP: refused before the migration, graded once
     assert.equal(graded.state, 'review');
     assert.match(graded.next_due_on, /^\d{4}-\d{2}-\d{2}$/);
 
-    assert.deepEqual(graded.deck, { in_deck: true, required_correct: 2, correct_count: 1, times_left: 1, has_learned: false });
+    // A New word enters both directions on its first answer: uk_nl answered once, nl_uk not yet.
+    assert.deepEqual(graded.deck, {
+      in_deck: true,
+      times_left: 3,
+      has_learned: false,
+      has_learned_direction: false,
+      uk_nl: { in_deck: true, required_correct: 2, correct_count: 1, times_left: 1 },
+      nl_uk: { in_deck: true, required_correct: 2, correct_count: 0, times_left: 2 },
+    });
     const repeat = await call(practiceClient, 'grade_word', { ...gradeArguments, grade: 'again' });
     assert.equal(repeat.is_repeat, true);
-    assert.deepEqual(repeat.deck, { in_deck: true, required_correct: 3, correct_count: 1, times_left: 2, has_learned: false });
+    assert.deepEqual(repeat.deck, {
+      in_deck: true,
+      times_left: 4,
+      has_learned: false,
+      has_learned_direction: false,
+      uk_nl: { in_deck: true, required_correct: 3, correct_count: 1, times_left: 2 },
+      nl_uk: { in_deck: true, required_correct: 2, correct_count: 0, times_left: 2 },
+    });
 
     const stats = await call(practiceClient, 'practice_stats');
     assert.equal(stats.introduced_today, 1);
@@ -447,7 +462,10 @@ test('the phrase practice tools are listed, and get_phrase_batch is not read-onl
     const toolByName = Object.fromEntries(tools.map(tool => [tool.name, tool]));
     assert.ok(toolByName.grade_phrase, 'grade_phrase is listed');
     assert.notEqual(toolByName.get_phrase_batch.annotations?.readOnlyHint, true);
-    assert.deepEqual(Object.keys(toolByName.grade_phrase.inputSchema.properties).sort(), ['grade', 'id', 'session_id']);
+    assert.deepEqual(
+      Object.keys(toolByName.grade_phrase.inputSchema.properties).sort(),
+      ['direction', 'grade', 'id', 'session_id'],
+    );
   });
 });
 
@@ -498,6 +516,41 @@ test('grade_word returns the word with its error count, read after the error is 
 
     assert.equal(graded.word.id, added.added[0].id);
     assert.equal(graded.word.error_count, 1);
+  });
+});
+
+test('grade_word and grade_phrase take a direction: uk_nl by default, nl_uk accepted, other values refused', async () => {
+  await withFreshMcpClient(async freshClient => {
+    const { tools } = await freshClient.listTools();
+    const toolByName = Object.fromEntries(tools.map(tool => [tool.name, tool]));
+    assert.deepEqual(toolByName.grade_word.inputSchema.properties.direction.enum, ['uk_nl', 'nl_uk']);
+    assert.deepEqual(toolByName.grade_phrase.inputSchema.properties.direction.enum, ['uk_nl', 'nl_uk']);
+
+    await call(freshClient, 'add_words', { words: [{ nl: 'de tafel', uk: 'стіл', article: 'de', section: '6.1' }] });
+    await call(freshClient, 'add_phrases', { phrases: [{ nl: 'Hoe gaat het?', uk: 'Як справи?' }] });
+    await call(freshClient, 'migrate_to_fsrs', { dry_run: false });
+
+    const batch = await call(freshClient, 'get_practice_batch', { session_id: 'mcp-direction' });
+    const wordArguments = { id: batch.new_words[0].id, grade: 'good', session_id: 'mcp-direction' };
+    assert.equal((await call(freshClient, 'grade_word', wordArguments)).direction, 'uk_nl');
+    assert.equal((await call(freshClient, 'grade_word', { ...wordArguments, direction: 'nl_uk' })).direction, 'nl_uk');
+    const refusedWord = await freshClient.callTool({
+      name: 'grade_word',
+      arguments: { ...wordArguments, direction: 'de_nl' },
+    }).catch(error => ({ isError: true, content: [{ text: error.message }] }));
+    assert.equal(refusedWord.isError, true);
+    assert.match(refusedWord.content[0].text, /direction/);
+
+    const phraseBatch = await call(freshClient, 'get_phrase_batch', { session_id: 'mcp-direction-phrases' });
+    const phraseArguments = { id: phraseBatch.new_phrases[0].id, grade: 'hard', session_id: 'mcp-direction-phrases' };
+    assert.equal((await call(freshClient, 'grade_phrase', phraseArguments)).direction, 'uk_nl');
+    assert.equal((await call(freshClient, 'grade_phrase', { ...phraseArguments, direction: 'nl_uk' })).direction, 'nl_uk');
+    const refusedPhrase = await freshClient.callTool({
+      name: 'grade_phrase',
+      arguments: { ...phraseArguments, direction: 'de_nl' },
+    }).catch(error => ({ isError: true, content: [{ text: error.message }] }));
+    assert.equal(refusedPhrase.isError, true);
+    assert.match(refusedPhrase.content[0].text, /direction/);
   });
 });
 

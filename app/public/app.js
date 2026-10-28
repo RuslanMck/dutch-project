@@ -4,8 +4,14 @@ import * as api from './api.js';
 import {
   advanceDrillQueue,
   advanceWindowedQueue,
+  answerKey,
   formatQueueProgress,
+  formatRoundProgress,
+  formatRoundStart,
   buildRoundSummaryView,
+  planNextRound,
+  ROUND_DIRECTIONS,
+  splitIntoRounds,
   TAB_TITLES,
   buildActivityTiles,
   buildChartView,
@@ -21,9 +27,11 @@ import {
   formatDutchWithArticle,
   formatShortDate,
   formatStrugglingDrillButton,
+  gradeReverseTranslationAnswer,
   gradeTranslationAnswer,
   normalise,
   renderRuleBody,
+  revealReverseTranslationAnswer,
   revealTranslationAnswer,
 } from './logic.js';
 
@@ -74,14 +82,19 @@ const ui = {
     flipped: false,                  // words: the back side is showing
     // words.index is the card on screen; past the last card the batch is finished.
     words: { status: 'idle', deck: [], index: 0 },
-    // queue: phrases still to show; answered: ids whose first grade was posted; tally counts first grades by grade.
+    // queue: phrases of the round on screen; direction: that round (uk_nl shows the Ukrainian first, nl_uk the Dutch);
+    // waiting: phrases of each round not started yet; lastAnsweredId: the phrase answered last in this round.
+    // answered: keys (answerKey) of the first grades posted; tally counts first grades by grade.
     // pendingGradePosts: grade posts still in flight; the next batch request waits for them.
     // calendarDate: the Amsterdam day the batch was loaded for. revealed / grade / repeat / message describe the card.
     phrases: {
       status: 'idle',
       sessionId: '',
       calendarDate: '',
+      direction: 'uk_nl',
       queue: [],
+      waiting: { uk_nl: [], nl_uk: [] },
+      lastAnsweredId: null,
       answered: new Set(),
       pendingGradePosts: new Set(),
       tally: { again: 0, hard: 0, good: 0 },
@@ -93,18 +106,22 @@ const ui = {
   },
   practice: { mode: 'fsrs', current: null, lastWordId: null, feedback: null, score: { correct: 0, total: 0 } },
   // FSRS translation practice. status: idle | loading | ready | done | unconfigured | failed.
-  // queue: batch words still to answer (reviews, then new words; again/hard words go to the end).
-  // answered: word ids whose first answer was posted; tally counts first answers by grade.
+  // direction: the round on screen (uk_nl, then nl_uk). queue: the words of that round still to answer (reviews, then
+  // new words; again/hard words go to the end). waiting: the words of each round not started yet (19.6).
+  // answered: keys (answerKey) of the first answers posted; tally counts first answers by grade.
   // pendingGradePosts: answer posts still in flight; the next batch request waits for them.
   fsrs: {
     status: 'idle',
     sessionId: '',
+    direction: 'uk_nl',
     queue: [],
+    waiting: { uk_nl: [], nl_uk: [] },
+    lastAnsweredId: null,
     answered: new Set(),
     pendingGradePosts: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
     introducedCount: 0,
-    current: null,                   // { word, checked, grade, repeat, schedule }
+    current: null,                   // { word, direction, checked, grade, repeat, schedule, canOverride, post }
     feedback: null,
     dueTomorrow: null,
     strugglingCount: null,           // words the struggling drill would ask, read when the summary shows
@@ -414,7 +431,10 @@ async function loadCardPhrases(sessionId) {
     status: 'loading',
     sessionId,
     calendarDate: formatTodayInAmsterdam(),
+    direction: 'uk_nl',
     queue: [],
+    waiting: { uk_nl: [], nl_uk: [] },
+    lastAnsweredId: null,
     answered: new Set(),
     pendingGradePosts: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
@@ -426,7 +446,13 @@ async function loadCardPhrases(sessionId) {
   renderCards();
   try {
     const batch = await api.getPhraseBatch(sessionId);
-    phrases.queue = [...orderWords(batch.reviews), ...orderWords(batch.new_phrases)];
+    phrases.waiting = splitIntoRounds({
+      reviews: batch.reviews,
+      newCards: batch.new_phrases,
+      answered: phrases.answered,
+      order: orderWords,
+    });
+    if (startNextRound(phrases) === 'nl_uk') phrases.message = formatRoundStart('nl_uk');
     phrases.status = 'ready';
   } catch (error) {
     if (error.status === 409) {
@@ -453,12 +479,13 @@ function ensureCardsBatch() {
   }
 }
 
-// One side of a card: the front shows the language chosen in ui.cards.front, the back shows the other one.
-function renderCardSide(card, isBackShowing) {
+// One side of a card: the front shows the language given (the chosen one for words, the round's one for phrases), the
+// back shows the other one.
+function renderCardSide(card, isBackShowing, front = ui.cards.front) {
   const dutchSide = `<span class="card-nl">${card.dutchHtml}</span>`;
   const ukrainianSide = `<span class="card-uk">${esc(card.ukrainianText)}</span>`;
   const exampleLine = card.exampleText ? `<span class="card-ex">${esc(card.exampleText)}</span>` : '';
-  const isDutchFront = ui.cards.front === 'nl';
+  const isDutchFront = front === 'nl';
   if (!isBackShowing) return isDutchFront ? dutchSide : ukrainianSide;
   return isDutchFront ? ukrainianSide + exampleLine : dutchSide + exampleLine;
 }
@@ -467,6 +494,8 @@ function renderCards() {
   const cards = ui.cards;
   $('cards-mode').value = cards.mode;
   $('cards-direction').value = cards.front;
+  // The front selector applies to word cards only: phrases turn over in the order of their round.
+  $('cards-direction-field').hidden = cards.mode !== 'words';
   $('cards-note').hidden = cards.mode !== 'words';
   if (cards.mode === 'words') renderWordCards();
   else renderPhraseCards();
@@ -518,7 +547,12 @@ function renderPhraseCards() {
   $('card-next').hidden = !isShowing || !isGraded;
   $('card-msg').textContent = isShowing ? phrases.message : '';
   if (isShowing) {
-    $('card-count').textContent = `Залишилось: ${phrases.queue.length}`;
+    // Phrases do not rotate in a window, so the count has no "вчимо" part.
+    $('card-count').textContent = formatRoundProgress({
+      direction: phrases.direction,
+      queueLength: phrases.queue.length,
+      windowSize: Infinity,
+    });
   } else if (phrases.answered.size) {
     const { again, hard, good } = phrases.tally;
     $('card-count').textContent = `Знову: ${again} · Важко: ${hard} · Добре: ${good}`;
@@ -535,7 +569,7 @@ function renderPhraseCards() {
     dutchHtml: esc(phrase.nl),
     ukrainianText: phrase.uk,
     exampleText: phrase.context || '',
-  }, phrases.revealed);
+  }, phrases.revealed, phrases.direction === 'uk_nl' ? 'uk' : 'nl');
 }
 
 // Words: «Далі» moves to the next card; a word never changes a grade here. Past the last card the batch is finished.
@@ -565,13 +599,14 @@ function gradeCardPhrase(grade, isSkip) {
   const phrases = ui.cards.phrases;
   const phrase = phrases.queue[0];
   if (!phrase || phrases.grade !== null) return;
+  const key = answerKey(phrases.direction, phrase.id);
   phrases.revealed = true;
   phrases.grade = grade;
-  phrases.repeat = phrases.answered.has(phrase.id);
+  phrases.repeat = phrases.answered.has(key);
   if (phrases.repeat) {
     phrases.message = 'Повтор: оцінка не зараховується';
   } else {
-    phrases.answered.add(phrase.id);
+    phrases.answered.add(key);
     phrases.tally[grade] += 1;
     phrases.message = `${isSkip ? 'Не знаю. ' : ''}Записано: ${GRADE_LABEL[grade]}`;
     trackPendingPost(phrases.pendingGradePosts, postPhraseGrade(phrase, grade));
@@ -586,9 +621,10 @@ function gradeCardPhrase(grade, isSkip) {
 // of the phrase posts again.
 async function postPhraseGrade(phrase, grade) {
   const phrases = ui.cards.phrases;
-  const { sessionId, answered } = phrases;
+  const { sessionId, answered, direction } = phrases;
+  const key = answerKey(direction, phrase.id);
   try {
-    await api.gradePracticePhrase({ phrase_id: phrase.id, grade, session_id: sessionId });
+    await api.gradePracticePhrase({ phrase_id: phrase.id, grade, session_id: sessionId, direction });
   } catch (error) {
     if (error.status === 409) {
       const isStillOnScreen = phrases.sessionId === sessionId && phrases.grade === grade
@@ -601,7 +637,7 @@ async function postPhraseGrade(phrase, grade) {
       return;
     }
     if (phrases.answered === answered) {
-      answered.delete(phrase.id);
+      answered.delete(key);
       phrases.tally[grade] -= 1;
       renderCards();
     }
@@ -609,18 +645,24 @@ async function postPhraseGrade(phrase, grade) {
   }
 }
 
-// "Далі" after a grade: a phrase graded good leaves the queue; any other phrase comes back at the end.
-// When the deck runs out, the phrase batch is asked again.
+// "Далі" after a grade: a phrase graded good leaves the queue; any other phrase comes back at the end. When the round
+// runs out, the next round starts (round 2 after round 1); when no round is left, the phrase batch is asked again.
 function advanceCardPhrase() {
   const phrases = ui.cards.phrases;
   if (!phrases.queue.length || phrases.grade === null) return;
   const phrase = phrases.queue.shift();
   if (phrases.grade !== 'good') phrases.queue.push(phrase);
+  phrases.lastAnsweredId = phrase.id;
   Object.assign(phrases, { revealed: false, grade: null, repeat: false, message: '' });
-  if (!phrases.queue.length) {
+  if (phrases.queue.length) {
+    renderCards();
+    return;
+  }
+  if (!startNextRound(phrases)) {
     refillCardPhrases();
     return;
   }
+  if (phrases.direction === 'nl_uk') phrases.message = formatRoundStart('nl_uk');
   renderCards();
 }
 
@@ -646,9 +688,16 @@ async function refillCardPhrases() {
     return;
   }
   if (ui.cards.phrases.sessionId !== sessionId) return;
-  phrases.queue = [...orderWords(batch.reviews), ...orderWords(batch.new_phrases)]
-    .filter(phrase => !phrases.answered.has(phrase.id));
+  // Each phrase is asked again in every direction it has left; a direction answered in this session is not.
+  phrases.queue = [];
+  phrases.waiting = splitIntoRounds({
+    reviews: batch.reviews,
+    newCards: batch.new_phrases,
+    answered: phrases.answered,
+    order: orderWords,
+  });
   phrases.status = 'ready';
+  if (startNextRound(phrases) === 'nl_uk') phrases.message = formatRoundStart('nl_uk');
   renderCards();
 }
 
@@ -737,7 +786,10 @@ async function loadFsrsBatch(sessionId) {
   Object.assign(session, {
     status: 'loading',
     sessionId,
+    direction: 'uk_nl',
     queue: [],
+    waiting: { uk_nl: [], nl_uk: [] },
+    lastAnsweredId: null,
     answered: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
     pendingGradePosts: new Set(),
@@ -751,7 +803,12 @@ async function loadFsrsBatch(sessionId) {
   renderPractice();
   try {
     const batch = await api.getPracticeBatch(sessionId);
-    session.queue = [...orderWords(batch.reviews), ...orderWords(batch.new_words)];
+    session.waiting = splitIntoRounds({
+      reviews: batch.reviews,
+      newCards: batch.new_words,
+      answered: session.answered,
+      order: orderWords,
+    });
     session.status = 'ready';
     showNextFsrsWord();
   } catch (error) {
@@ -765,13 +822,34 @@ async function loadFsrsBatch(sessionId) {
   renderPractice();
 }
 
-// Shows the first word of the queue. An empty queue means the set is done: the batch is asked again with the same
-// session id for the next set. The session ends only when that brings no words.
+// Starts the next round of a practice holder ({ direction, queue, waiting, lastAnsweredId }) when its queue is empty.
+// Returns the direction that started, or null when no round is left.
+function startNextRound(holder) {
+  const next = planNextRound(holder, holder.lastAnsweredId);
+  if (!next) return null;
+  Object.assign(holder, next);
+  return next.direction;
+}
+
+// Shows the first word of the queue. An empty round hands over to the next round (round 2 says so); when no round is
+// left, the set is done: the batch is asked again with the same session id for the next set. The session ends only
+// when that brings no words.
 function showNextFsrsWord() {
   const session = ui.fsrs;
   session.feedback = null;
+  if (!session.queue.length && startNextRound(session) === 'nl_uk') {
+    session.feedback = { text: formatRoundStart('nl_uk'), ok: true };
+  }
   if (session.queue.length) {
-    session.current = { word: session.queue[0], checked: false, grade: null, repeat: false, schedule: null };
+    session.current = {
+      word: session.queue[0],
+      direction: session.direction,
+      checked: false,
+      grade: null,
+      repeat: false,
+      schedule: null,
+      canOverride: false,
+    };
     return;
   }
   session.current = null;
@@ -846,21 +924,24 @@ async function refillFsrsQueue(continueMessage = '') {
     return false;
   }
   if (ui.fsrs.sessionId !== sessionId) return false;
-  // A word answered in this session and finished never comes back as a question, even if the batch still lists it.
-  const setWords = [...orderWords(batch.reviews), ...orderWords(batch.new_words)]
-    .filter(word => !session.answered.has(word.id) || word.deck?.in_deck);
-  if (!setWords.length) {
+  // A card answered in this session in a direction never comes back in that direction, even if the batch still lists it.
+  session.waiting = splitIntoRounds({
+    reviews: batch.reviews,
+    newCards: batch.new_words,
+    answered: session.answered,
+    order: orderWords,
+  });
+  if (!ROUND_DIRECTIONS.some(direction => session.waiting[direction].length)) {
     finishFsrsSession();
     return false;
   }
-  session.queue.push(...setWords);
   session.status = 'ready';
   // The session continues, so its id stays the stored one (finishing replaced it).
   saveSession(sessionId);
   showNextFsrsWord();
   // The message says a set was finished, so it shows only when the batch is a new set, not the rest of an open one.
   const isNewSet = batch.counts?.is_set_open !== true;
-  session.feedback = continueMessage && isNewSet ? { text: continueMessage, ok: true } : null;
+  if (continueMessage && isNewSet) session.feedback = { text: continueMessage, ok: true };
   renderPractice();
   return true;
 }
@@ -886,6 +967,9 @@ function forgetDeletedWord(wordId) {
   const practice = ui.practice;
   const wasOnScreen = findCurrentPracticeWord()?.id === wordId || drill.current?.word.id === wordId;
   session.queue = session.queue.filter(word => word.id !== wordId);
+  for (const direction of ROUND_DIRECTIONS) {
+    session.waiting[direction] = session.waiting[direction].filter(word => word.id !== wordId);
+  }
   if (session.current?.word.id === wordId) showNextFsrsWord();
   drill.queue = drill.queue.filter(word => word.id !== wordId);
   if (drill.current?.word.id === wordId) showNextStrugglingWord();
@@ -927,7 +1011,10 @@ function submitFsrsAnswer() {
     return;
   }
   if (!session.current) return;
-  const result = gradeTranslationAnswer(session.current.word, input.value);
+  const { current } = session;
+  const result = current.direction === 'uk_nl'
+    ? gradeTranslationAnswer(current.word, input.value)
+    : gradeReverseTranslationAnswer(current.word, input.value);
   if (!result.counted) {
     input.focus();
     return;
@@ -939,65 +1026,96 @@ function submitFsrsAnswer() {
 function revealFsrsAnswer() {
   const session = ui.fsrs;
   if (!session.current || session.current.checked) return;
-  answerFsrsWord(revealTranslationAnswer(session.current.word), undefined);
+  const { word, direction } = session.current;
+  answerFsrsWord(direction === 'uk_nl' ? revealTranslationAnswer(word) : revealReverseTranslationAnswer(word),
+    undefined);
   // «Не знаю» is hidden once the answer is shown; «Далі» takes the focus.
   $('practice-btn').focus();
 }
 
-// Checks the current word and posts the answer: every answer counts in the learning deck, repeats too. The tally
-// counts only the first answer to each word, the one FSRS grades.
+// Checks the current word and shows the result. The answer is posted at once, unless the learner may still overrule
+// it («Я мав рацію»): then the grade waits for that button or for «Далі» (recordFsrsAnswer).
 function answerFsrsWord(result, answer) {
   const session = ui.fsrs;
   const current = session.current;
-  const { word } = current;
   current.checked = true;
   current.grade = result.grade;
-  current.repeat = session.answered.has(word.id);
+  current.answer = answer;
+  current.canOverride = !!result.canOverride;
   session.feedback = { text: result.message, ok: result.grade === 'good' };
-  if (!current.repeat) {
-    session.answered.add(word.id);
-    session.tally[result.grade] += 1;
-    if (word.state === 'new') session.introducedCount += 1;
-  }
-  current.post = postFsrsGrade(current, answer);
-  trackPendingPost(session.pendingGradePosts, current.post);
+  if (!current.canOverride) recordFsrsAnswer(current);
   renderPractice();
 }
 
+// Counts the answer and posts it. Every answer counts in the learning deck, repeats too. The tally counts only the first
+// answer to each word in each direction, the one FSRS grades.
+function recordFsrsAnswer(current) {
+  const session = ui.fsrs;
+  const { word, direction, grade } = current;
+  const key = answerKey(direction, word.id);
+  current.canOverride = false;
+  current.repeat = session.answered.has(key);
+  if (!current.repeat) {
+    session.answered.add(key);
+    session.tally[grade] += 1;
+    if (word.state === 'new' && direction === 'uk_nl') session.introducedCount += 1;
+  }
+  current.post = postFsrsGrade(current, current.answer);
+  trackPendingPost(session.pendingGradePosts, current.post);
+}
+
+// «Я мав рацію» on a wrong round-2 answer: the answer counts as right (good) and is posted now.
+function handleOverrideClick() {
+  const session = ui.fsrs;
+  const current = session.current;
+  if (!current?.canOverride || current.post) return;
+  current.grade = 'good';
+  session.feedback = { text: '✓ Зараховано', ok: true };
+  recordFsrsAnswer(current);
+  renderPractice();
+  $('practice-btn').focus();
+}
+
 // The response carries the deck position, which the line under the message shows. A failed first answer undoes its
-// local count, so the next first answer to the word posts again; a failed repeat only shows the notice.
+// local count, so the next first answer to the word in this direction posts again; a failed repeat only shows the notice.
 async function postFsrsGrade(current, answer) {
   const session = ui.fsrs;
   const { sessionId, answered } = session;
-  const { word, grade } = current;
+  const { word, grade, direction } = current;
+  const key = answerKey(direction, word.id);
   try {
-    const schedule = await api.gradePracticeWord({ word_id: word.id, grade, answer, session_id: sessionId });
+    const schedule = await api.gradePracticeWord({ word_id: word.id, grade, answer, session_id: sessionId, direction });
     current.schedule = schedule;
     word.deck = schedule.deck;
     if (session.current === current) renderPractice();
   } catch (error) {
     // A new batch replaces the answered set and the tally, so only the batch that posted is rolled back.
     if (!current.repeat && session.answered === answered) {
-      answered.delete(word.id);
+      answered.delete(key);
       session.tally[grade] -= 1;
-      if (word.state === 'new') session.introducedCount -= 1;
+      if (word.state === 'new' && direction === 'uk_nl') session.introducedCount -= 1;
       renderPractice();
     }
     notice(error.message || 'Помилка');
   }
 }
 
-// "Далі": a word still in the learning deck comes back later among the active words (advanceWindowedQueue); a word learned, or a review answered
-// right, leaves the session. The server's answer decides, so the grade is awaited first.
+// "Далі": a word still in the round's deck comes back later among the active words (advanceWindowedQueue); a word
+// learned in this direction, or a review answered right, leaves the round. The server's answer decides, so the grade
+// is awaited first; a held grade («Я мав рацію» not pressed) is posted now.
 async function advanceFsrsWord() {
   const session = ui.fsrs;
   const current = session.current;
   if (current.isAdvancing) return;
   current.isAdvancing = true;
+  if (!current.post) recordFsrsAnswer(current);
   await current.post;
   if (session.current !== current) return;
-  const isStillInSession = current.schedule ? current.schedule.deck.in_deck : current.grade !== 'good';
+  const isStillInSession = current.schedule
+    ? current.schedule.deck[current.direction]?.in_deck
+    : current.grade !== 'good';
   session.queue = advanceWindowedQueue(session.queue, !isStillInSession, { isShuffled: ui.isShuffleOn });
+  session.lastAnsweredId = current.word.id;
   $('practice-input').value = '';
   showNextFsrsWord();
   renderPractice();
@@ -1044,6 +1162,8 @@ function renderPractice() {
   $('practice-progress-hint-button').hidden = !isFsrs;
   if (!isFsrs) setHintOpen($('practice-progress-hint-button'), false);
   $('practice-delete-button').hidden = !findCurrentPracticeWord();
+  // Only the FSRS round 2 shows «Я мав рацію» (renderFsrsPractice).
+  $('practice-override-button').hidden = true;
   $('practice-drill-summary').hidden = mode !== 'struggling' || ui.struggling.status !== 'done';
   if (isFsrs) renderFsrsPractice();
   else if (mode === 'struggling') renderStrugglingPractice();
@@ -1079,12 +1199,21 @@ function renderArticlePractice() {
   $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
 }
 
-// The line under the practice message, from the grade response: the right answers still needed in the session, the
-// word learned, or a review answered right.
+// The line under the practice message, from the grade response: the right answers still needed in the session, a
+// direction or the word learned, or a review answered right.
 function formatScheduleLine(current) {
   if (!current?.checked || !current.schedule) return '';
   const { schedule } = current;
-  return buildDeckLine({ deck: schedule.deck, intervalDays: schedule.interval_days });
+  // In round 1 a word whose round 2 is still to come in this set is not finished yet, whatever its review date.
+  const isOtherRoundLeft = current.direction === 'uk_nl' && !!current.word.directions_left?.includes('nl_uk');
+  return buildDeckLine({
+    direction: current.direction, deck: schedule.deck, intervalDays: schedule.interval_days, isOtherRoundLeft,
+  });
+}
+
+// The question on screen: the Ukrainian in round 1, the Dutch with its article in round 2.
+function formatFsrsQuestion(session, current) {
+  return session.direction === 'uk_nl' ? current.word.uk : formatDutchWithArticle(current.word);
 }
 
 function renderFsrsPractice() {
@@ -1095,7 +1224,7 @@ function renderFsrsPractice() {
   const questionByStatus = {
     idle: '',
     loading: 'Завантаження…',
-    ready: isReady ? current.word.uk : '',
+    ready: isReady ? formatFsrsQuestion(session, current) : '',
     done: answeredCount ? 'Сесію завершено' : 'На сьогодні слів немає',
     'round-done': '',
     unconfigured: 'Практика FSRS ще не налаштована',
@@ -1104,11 +1233,14 @@ function renderFsrsPractice() {
   $('practice-q').textContent = questionByStatus[session.status];
   $('practice-form').hidden = !isReady;
   $('practice-skip-button').hidden = !isReady || current.checked;
+  $('practice-override-button').hidden = !isReady || !current.canOverride;
   if (isReady) {
     $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
-    $('practice-input').placeholder = 'нідерландською';
+    $('practice-input').placeholder = session.direction === 'uk_nl' ? 'нідерландською' : 'українською';
   }
-  $('practice-progress').textContent = isReady ? formatQueueProgress(session.queue.length) : '';
+  $('practice-progress').textContent = isReady
+    ? formatRoundProgress({ direction: session.direction, queueLength: session.queue.length })
+    : '';
   $('practice-schedule').textContent = formatScheduleLine(current);
   $('practice-score').textContent = '';
   $('practice-summary').hidden = session.status !== 'done';
@@ -1540,6 +1672,7 @@ function bindEvents() {
     submitPractice();
   });
   $('practice-skip-button').addEventListener('click', handlePracticeSkipClick);
+  $('practice-override-button').addEventListener('click', handleOverrideClick);
   $('practice-struggling-button').addEventListener('click', handleStrugglingButtonClick);
   $('practice-drill-again-button').addEventListener('click', () => startStrugglingDrill());
   $('practice-delete-button').addEventListener('click', () => {

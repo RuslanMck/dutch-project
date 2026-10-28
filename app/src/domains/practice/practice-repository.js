@@ -1,13 +1,23 @@
 // SQL for the FSRS practice: settings, card, priority and learning-deck columns of words, review_logs and deck_answers.
-// No business rules.
+// No business rules. A word is in the deck when either direction is (uk_nl: deck_required_correct, nl_uk:
+// deck_reverse_required_correct).
 const EMPTY_PRIORITY_COUNTS = Object.freeze({ 1: 0, 2: 0, 3: 0 });
 const EMPTY_GRADE_COUNTS = Object.freeze({ again: 0, hard: 0, good: 0 });
+const IS_IN_ANY_DECK_SQL = `(words.deck_required_correct IS NOT NULL
+    OR words.deck_reverse_required_correct IS NOT NULL)`;
+// The grade a review log counts for in its session: the worse of its first grade and its second one (NULL = none yet).
+const SESSION_GRADE_SQL = `CASE
+    WHEN 'again' IN (review_logs.grade, review_logs.second_grade) THEN 'again'
+    WHEN 'hard' IN (review_logs.grade, review_logs.second_grade) THEN 'hard'
+    ELSE 'good'
+  END`;
 
 const PRACTICE_WORD_SELECT = `
   SELECT v_words.id, v_words.nl, v_words.uk, v_words.article, v_words.kind, v_words.section_code,
     v_words.status, v_words.fsrs_card, v_words.due_at, v_words.introduced_on, v_words.frequency_rank,
     v_words.priority_override, v_words.priority, v_words.error_count, v_words.deck_required_correct,
-    v_words.deck_correct_count, v_words.deck_entered_by_lapse
+    v_words.deck_correct_count, v_words.deck_entered_by_lapse, v_words.deck_reverse_required_correct,
+    v_words.deck_reverse_correct_count, v_words.deck_reverse_entered_by_lapse
   FROM v_words
 `;
 
@@ -32,52 +42,65 @@ export function createPracticeRepository({ database }) {
   const updateWordDeckStatement = database.prepare(`
     UPDATE words
     SET deck_required_correct = @requiredCorrect, deck_correct_count = @correctCount,
-      deck_entered_by_lapse = @isLapse, due_at = @dueAt,
-      status = @learningStatus, updated_at = @updatedAt
+      deck_entered_by_lapse = @isLapse, deck_reverse_required_correct = @reverseRequiredCorrect,
+      deck_reverse_correct_count = @reverseCorrectCount, deck_reverse_entered_by_lapse = @reverseIsLapse,
+      due_at = @dueAt, status = @learningStatus, updated_at = @updatedAt
     WHERE words.id = @wordId
   `);
   const clearDeckStatement = database.prepare(`
     UPDATE words
-    SET deck_required_correct = NULL, deck_correct_count = 0, deck_entered_by_lapse = 0
-    WHERE words.deck_required_correct IS NOT NULL
+    SET deck_required_correct = NULL, deck_correct_count = 0, deck_entered_by_lapse = 0,
+      deck_reverse_required_correct = NULL, deck_reverse_correct_count = 0, deck_reverse_entered_by_lapse = 0
+    WHERE ${IS_IN_ANY_DECK_SQL}
   `);
   const countDeckWordsStatement = database.prepare(`
     SELECT COUNT(*)
     FROM words
-    WHERE words.deck_required_correct IS NOT NULL
+    WHERE ${IS_IN_ANY_DECK_SQL}
   `).pluck();
+  // Words in the deck with a direction that entered as a New word (not by a lapse).
   const countDeckWordsEnteredAsNewStatement = database.prepare(`
     SELECT COUNT(*)
     FROM words
-    WHERE words.deck_required_correct IS NOT NULL AND words.deck_entered_by_lapse = 0
+    WHERE (words.deck_required_correct IS NOT NULL AND words.deck_entered_by_lapse = 0)
+      OR (words.deck_reverse_required_correct IS NOT NULL AND words.deck_reverse_entered_by_lapse = 0)
   `).pluck();
   const insertDeckAnswerStatement = database.prepare(`
-    INSERT INTO deck_answers (word_id, session_id, answered_at, grade, is_first_in_session, required_correct_after,
-      correct_count_after)
-    VALUES (@wordId, @sessionId, @answeredAt, @grade, @isFirstInSession, @requiredCorrectAfter, @correctCountAfter)
+    INSERT INTO deck_answers (word_id, session_id, direction, answered_at, grade, is_first_in_session,
+      required_correct_after, correct_count_after)
+    VALUES (@wordId, @sessionId, @direction, @answeredAt, @grade, @isFirstInSession, @requiredCorrectAfter,
+      @correctCountAfter)
+  `);
+  // The directions in which each of the words has a counting answer since sinceTimestamp (ms).
+  const selectAnsweredDirectionsStatement = database.prepare(`
+    SELECT DISTINCT deck_answers.word_id, deck_answers.direction
+    FROM deck_answers
+    WHERE deck_answers.superseded_at IS NULL AND deck_answers.answered_at >= @sinceTimestamp
+      AND deck_answers.word_id IN (SELECT json_each.value FROM json_each(@wordIdsJson))
   `);
   const updateDeckAnswersSupersededStatement = database.prepare(`
     UPDATE deck_answers
     SET superseded_at = @timestamp
     WHERE deck_answers.superseded_at IS NULL
   `);
-  // Every answer that still counts, oldest first: the first answers from review_logs (with whether the word was New
-  // before it) and the repeats from deck_answers. The deck rebuild replays them.
+  // Every uk_nl answer that still counts, oldest first: the first answers from review_logs (with whether the word was
+  // New before it) and the uk_nl repeats from deck_answers. The deck rebuild replays them; nl_uk stays as stored.
   const selectCountingAnswersStatement = database.prepare(`
     SELECT review_logs.word_id, review_logs.grade, review_logs.reviewed_at AS answered_at,
       review_logs.card_before IS NULL AS was_new
     FROM review_logs
-    WHERE review_logs.superseded_at IS NULL
+    WHERE review_logs.superseded_at IS NULL AND review_logs.direction = 'uk_nl'
     UNION ALL
     SELECT deck_answers.word_id, deck_answers.grade, deck_answers.answered_at, 0 AS was_new
     FROM deck_answers
     WHERE deck_answers.superseded_at IS NULL AND deck_answers.is_first_in_session = 0
+      AND deck_answers.direction = 'uk_nl'
     ORDER BY answered_at ASC
   `);
   // The answers that still count for the given words, oldest first: the round summary reads them.
   const selectDeckAnswersForWordsStatement = database.prepare(`
-    SELECT deck_answers.word_id, deck_answers.session_id, deck_answers.grade, deck_answers.answered_at,
-      deck_answers.required_correct_after
+    SELECT deck_answers.word_id, deck_answers.session_id, deck_answers.direction, deck_answers.grade,
+      deck_answers.answered_at, deck_answers.required_correct_after
     FROM deck_answers
     WHERE deck_answers.superseded_at IS NULL
       AND deck_answers.word_id IN (SELECT json_each.value FROM json_each(@wordIdsJson))
@@ -111,13 +134,13 @@ export function createPracticeRepository({ database }) {
   const selectDueWordIdsStatement = database.prepare(`
     SELECT words.id
     FROM words
-    WHERE words.due_at < @beforeTimestamp AND words.deck_required_correct IS NULL
+    WHERE words.due_at < @beforeTimestamp AND NOT ${IS_IN_ANY_DECK_SQL}
     ORDER BY words.due_at ASC, words.id ASC
   `).pluck();
   const countWordsDueBeforeStatement = database.prepare(`
     SELECT COUNT(*)
     FROM words
-    WHERE words.due_at < @beforeTimestamp AND words.deck_required_correct IS NULL
+    WHERE words.due_at < @beforeTimestamp AND NOT ${IS_IN_ANY_DECK_SQL}
   `).pluck();
   // The words of the current session, the ones that entered the deck first coming first.
   const selectDeckWordIdsStatement = database.prepare(`
@@ -128,7 +151,7 @@ export function createPracticeRepository({ database }) {
       FROM deck_answers
       GROUP BY deck_answers.word_id
     ) AS first_deck_answers ON first_deck_answers.word_id = words.id
-    WHERE words.deck_required_correct IS NOT NULL
+    WHERE ${IS_IN_ANY_DECK_SQL}
     ORDER BY first_deck_answers.first_answer_id ASC, words.id ASC
   `).pluck();
   const selectIntroducedOnCountsStatement = database.prepare(`
@@ -137,14 +160,15 @@ export function createPracticeRepository({ database }) {
     WHERE words.introduced_on = @calendarDate
     GROUP BY words.priority
   `);
-  // Each word with a card whose latest review log is again or hard, with that log. recency_rank 1 is the latest log.
+  // Each word with a card whose latest review log counts as again or hard (its session grade, see SESSION_GRADE_SQL),
+  // with that log. recency_rank 1 is the latest log.
   const selectStrugglingWordRowsStatement = database.prepare(`
     SELECT v_words.id, v_words.nl, v_words.uk, v_words.article, v_words.kind, v_words.fsrs_card, v_words.priority,
       v_words.error_count, latest_review_logs.grade AS last_grade,
       latest_review_logs.reviewed_at AS last_reviewed_at
     FROM v_words
     JOIN (
-      SELECT review_logs.word_id, review_logs.grade, review_logs.reviewed_at,
+      SELECT review_logs.word_id, ${SESSION_GRADE_SQL} AS grade, review_logs.reviewed_at,
         ROW_NUMBER() OVER (
           PARTITION BY review_logs.word_id
           ORDER BY review_logs.reviewed_at DESC, review_logs.id DESC
@@ -156,16 +180,26 @@ export function createPracticeRepository({ database }) {
     ORDER BY v_words.error_count DESC, latest_review_logs.reviewed_at DESC, v_words.id ASC
   `);
   const insertReviewLogStatement = database.prepare(`
-    INSERT INTO review_logs (word_id, session_id, reviewed_at, grade, answer, card_before, card_after)
-    VALUES (@wordId, @sessionId, @reviewedAt, @grade, @answer, @cardBefore, @cardAfter)
+    INSERT INTO review_logs (word_id, session_id, reviewed_at, grade, direction, answer, card_before, card_after)
+    VALUES (@wordId, @sessionId, @reviewedAt, @grade, @direction, @answer, @cardBefore, @cardAfter)
   `);
-  // Only logs that still count are looked up: a practice reset supersedes the logs before it.
-  const selectReviewLogStatement = database.prepare(`
+  // The first answer's review log in the other direction: its second grade and the card graded with the worse grade.
+  const updateReviewLogSecondGradeStatement = database.prepare(`
+    UPDATE review_logs
+    SET second_grade = @secondGrade, card_after = @cardAfter
+    WHERE review_logs.id = @reviewLogId
+  `);
+  // The word's latest log that still counts and was reviewed since sinceTimestamp (ms): the review log of the day. A
+  // practice reset supersedes the logs before it.
+  const selectLatestReviewLogSinceStatement = database.prepare(`
     SELECT review_logs.id, review_logs.word_id, review_logs.session_id, review_logs.reviewed_at,
-      review_logs.grade, review_logs.answer, review_logs.card_before, review_logs.card_after
+      review_logs.grade, review_logs.direction, review_logs.second_grade, review_logs.answer,
+      review_logs.card_before, review_logs.card_after
     FROM review_logs
-    WHERE review_logs.session_id = @sessionId AND review_logs.word_id = @wordId
+    WHERE review_logs.word_id = @wordId AND review_logs.reviewed_at >= @sinceTimestamp
       AND review_logs.superseded_at IS NULL
+    ORDER BY review_logs.reviewed_at DESC, review_logs.id DESC
+    LIMIT 1
   `);
   const selectReviewedWordIdsStatement = database.prepare(`
     SELECT review_logs.word_id
@@ -178,11 +212,12 @@ export function createPracticeRepository({ database }) {
     SET superseded_at = @timestamp
     WHERE review_logs.superseded_at IS NULL
   `);
+  // Counts the review logs (one per word and session) by their session grade, since timestamp.
   const selectFirstGradeCountsStatement = database.prepare(`
-    SELECT review_logs.grade, COUNT(*) AS grade_count
+    SELECT ${SESSION_GRADE_SQL} AS session_grade, COUNT(*) AS grade_count
     FROM review_logs
     WHERE review_logs.reviewed_at >= @timestamp
-    GROUP BY review_logs.grade
+    GROUP BY session_grade
   `);
 
   // Returns { name: parsedValue } for every setting.
@@ -223,14 +258,19 @@ export function createPracticeRepository({ database }) {
   }
 
   // priorityOverride undefined leaves the override as it is; null clears it.
-  // deckPosition: { requiredCorrect, correctCount } or null (out of the deck). dueAt and learningStatus are written
-  // with it, because the deck decides when a word comes back.
-  function updateWordDeck(wordId, { deckPosition, dueAt, learningStatus, updatedAt }) {
+  // deckPositions: { uk_nl, nl_uk }, each { requiredCorrect, correctCount, isLapse } or null (out of that deck).
+  // dueAt and learningStatus are written with it, because the deck decides when a word comes back.
+  function updateWordDeck(wordId, { deckPositions, dueAt, learningStatus, updatedAt }) {
+    const ukPosition = deckPositions.uk_nl;
+    const reversePosition = deckPositions.nl_uk;
     updateWordDeckStatement.run({
       wordId,
-      requiredCorrect: deckPosition?.requiredCorrect ?? null,
-      correctCount: deckPosition?.correctCount ?? 0,
-      isLapse: deckPosition?.isLapse ? 1 : 0,
+      requiredCorrect: ukPosition?.requiredCorrect ?? null,
+      correctCount: ukPosition?.correctCount ?? 0,
+      isLapse: ukPosition?.isLapse ? 1 : 0,
+      reverseRequiredCorrect: reversePosition?.requiredCorrect ?? null,
+      reverseCorrectCount: reversePosition?.correctCount ?? 0,
+      reverseIsLapse: reversePosition?.isLapse ? 1 : 0,
       dueAt,
       learningStatus,
       updatedAt,
@@ -250,17 +290,23 @@ export function createPracticeRepository({ database }) {
     return countDeckWordsEnteredAsNewStatement.get();
   }
 
-  // deckPositionAfter: the position after the answer, or null.
-  function createDeckAnswer({ wordId, sessionId, answeredAt, grade, isFirstInSession, deckPositionAfter }) {
+  // direction: 'uk_nl' or 'nl_uk'. deckPositionAfter: the position in that direction after the answer, or null.
+  function createDeckAnswer({ wordId, sessionId, direction, answeredAt, grade, isFirstInSession, deckPositionAfter }) {
     insertDeckAnswerStatement.run({
       wordId,
       sessionId,
+      direction,
       answeredAt,
       grade,
       isFirstInSession: isFirstInSession ? 1 : 0,
       requiredCorrectAfter: deckPositionAfter?.requiredCorrect ?? null,
       correctCountAfter: deckPositionAfter?.correctCount ?? 0,
     });
+  }
+
+  // The { word_id, direction } pairs with a counting deck answer since sinceTimestamp (ms), for the given words.
+  function listAnsweredDirectionsSince({ wordIds, sinceTimestamp }) {
+    return selectAnsweredDirectionsStatement.all({ wordIdsJson: JSON.stringify(wordIds), sinceTimestamp });
   }
 
   function markDeckAnswersSuperseded(timestamp) {
@@ -314,13 +360,16 @@ export function createPracticeRepository({ database }) {
     };
   }
 
-  // Returns the new review log's id.
-  function createReviewLog({ wordId, sessionId, reviewedAt, grade, answer = null, cardBefore = null, cardAfter }) {
+  // direction: the direction of the answer that created the log (default uk_nl). Returns the new review log's id.
+  function createReviewLog({
+    wordId, sessionId, reviewedAt, grade, direction = 'uk_nl', answer = null, cardBefore = null, cardAfter,
+  }) {
     const insertResult = insertReviewLogStatement.run({
       wordId,
       sessionId,
       reviewedAt,
       grade,
+      direction,
       answer,
       cardBefore,
       cardAfter,
@@ -328,9 +377,16 @@ export function createPracticeRepository({ database }) {
     return Number(insertResult.lastInsertRowid);
   }
 
-  // The log that still counts for the word in the session, or null.
-  function findReviewLog({ sessionId, wordId }) {
-    return selectReviewLogStatement.get({ sessionId, wordId }) ?? null;
+  // The first answer in the other direction: its grade is the log's second grade, and the card is replaced by the one
+  // graded with the worse of the two grades.
+  function updateReviewLogSecondGrade({ reviewLogId, secondGrade, cardAfter }) {
+    updateReviewLogSecondGradeStatement.run({ reviewLogId, secondGrade, cardAfter });
+  }
+
+  // The word's latest log that still counts and was reviewed since sinceTimestamp (ms), or null. Any session counts: a
+  // round of the day may be graded in another session (a new tab, a new round, MCP).
+  function findLatestReviewLogSince({ wordId, sinceTimestamp }) {
+    return selectLatestReviewLogSinceStatement.get({ wordId, sinceTimestamp }) ?? null;
   }
 
   // Word ids graded in the session by logs that still count.
@@ -343,12 +399,12 @@ export function createPracticeRepository({ database }) {
     updateReviewLogsSupersededStatement.run({ timestamp });
   }
 
-  // Counts review logs (each one is a first grade) with reviewed_at >= timestamp. Every grade is present.
+  // Counts review logs (one per word and session) by session grade since timestamp. Every grade is present.
   function countFirstGradesSince(timestamp) {
     const countRows = selectFirstGradeCountsStatement.all({ timestamp });
     return {
       ...EMPTY_GRADE_COUNTS,
-      ...Object.fromEntries(countRows.map(countRow => [countRow.grade, countRow.grade_count])),
+      ...Object.fromEntries(countRows.map(countRow => [countRow.session_grade, countRow.grade_count])),
     };
   }
 
@@ -368,6 +424,7 @@ export function createPracticeRepository({ database }) {
     listCountingAnswers,
     listDeckWordIds,
     listDeckAnswersForWords,
+    listAnsweredDirectionsSince,
     listAnswerTimesBetween,
     updateWordPriority,
     updateWordFrequencyRank,
@@ -375,7 +432,8 @@ export function createPracticeRepository({ database }) {
     countWordsDueBefore,
     countIntroducedOnByPriority,
     createReviewLog,
-    findReviewLog,
+    findLatestReviewLogSince,
+    updateReviewLogSecondGrade,
     listWordIdsReviewedInSession,
     markReviewLogsSuperseded,
     countFirstGradesSince,

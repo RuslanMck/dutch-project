@@ -1,10 +1,12 @@
 // Phrase practice business rules: the batch (the session's phrase set, practice-set.js: due phrases first, New phrases
-// in the room left), grading a phrase once per session and the phrase statistics.
-// Phrases use the word scheduler and day boundary, with no word errors and no priorities. Publishes 'phrases' after
-// each grade.
+// in the room left), grading a phrase once per direction and session and the phrase statistics.
+// Every phrase is practised in two directions (practice-direction.js): a set's phrase is finished once both are
+// answered. Phrases use the word scheduler and day boundary, with no word errors and no priorities. Publishes
+// 'phrases' after each grade.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { deriveLearningStatus, describeCardState, parseCard, serializeCard } from './fsrs-scheduling.js';
 import { findOpenSet, mapToStoredSet, openPracticeSet, planSetRoom } from './practice-set.js';
+import { PRACTICE_DIRECTIONS, UK_TO_NL_DIRECTION, findWorseGrade } from './practice-direction.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 
 export function createPhrasePracticeService({
@@ -18,19 +20,23 @@ export function createPhrasePracticeService({
   // The phrases to practise now: the session's set, at most new_per_day phrases. The open set's phrases not finished
   // yet, or the next set: phrases due today (most overdue first, the ones graded in this session left out), then the
   // oldest New phrases in the room left. A planned set is pinned at once, so the phrases shown are the set. maxReviews
-  // limits the reviews returned.
+  // limits the reviews returned. Each phrase lists the directions_left of the set.
   function getPhraseBatch({ sessionId, maxReviews }) {
     const settings = practiceSettings.readActiveSettings();
     const timestamp = clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     const phrases = phrasePracticeRepository.listPracticePhrases();
     const plan = runInTransaction(() => pinPhraseSet({ settings, today, sessionId, timestamp }));
+    const mapToSetPhrase = phrase => ({
+      ...mapToPracticePhrase(phrase),
+      directions_left: findDirectionsLeft(plan.answeredDirectionsByPhraseId, phrase.id),
+    });
     const reviewPhrases = plan.phrases.filter(phrase => phrase.fsrs_card !== null);
     const newPhrases = plan.phrases.filter(phrase => phrase.fsrs_card === null);
     return {
       session_id: sessionId,
-      reviews: (maxReviews === undefined ? reviewPhrases : reviewPhrases.slice(0, maxReviews)).map(mapToPracticePhrase),
-      new_phrases: newPhrases.map(mapToPracticePhrase),
+      reviews: (maxReviews === undefined ? reviewPhrases : reviewPhrases.slice(0, maxReviews)).map(mapToSetPhrase),
+      new_phrases: newPhrases.map(mapToSetPhrase),
       counts: {
         set_size: settings.newPerDay,
         set_phrases: plan.phrases.length,
@@ -44,18 +50,23 @@ export function createPhrasePracticeService({
     };
   }
 
-  // Grades a phrase's first answer in a session and returns its new state. The whole grade is one transaction.
-  function gradePhrase({ phraseId, grade, sessionId }) {
+  // Grades a phrase's answer in one direction of a session and returns its new state. The whole grade is one
+  // transaction.
+  function gradePhrase({ phraseId, grade, sessionId, direction = UK_TO_NL_DIRECTION }) {
     const settings = practiceSettings.readActiveSettings();
-    const gradeResult = runInTransaction(() => gradePhraseInTransaction({ settings, phraseId, grade, sessionId }));
+    const gradeResult = runInTransaction(() =>
+      gradePhraseInTransaction({ settings, phraseId, grade, sessionId, direction }),
+    );
     changeEventBus.publishChange('phrases');
     return gradeResult;
   }
 
-  function gradePhraseInTransaction({ settings, phraseId, grade, sessionId }) {
+  // The phrase's answer: a counting answer of the same session and direction is refused (409). Otherwise it is stored,
+  // and the phrase's review log of the day (any session) decides the case: none → the first FSRS grade; a log whose
+  // other direction is not answered → the second direction; otherwise a repeat, stored with no FSRS change.
+  function gradePhraseInTransaction({ settings, phraseId, grade, sessionId, direction }) {
     const phrase = getPhraseRowOrThrow(phraseId);
-    const gradedLog = phrasePracticeRepository.findPhraseReviewLog({ sessionId, phraseId });
-    if (gradedLog) {
+    if (phrasePracticeRepository.findPhraseAnswer({ sessionId, phraseId, direction })) {
       throw new ConflictError(`phrase ${phraseId} was already graded in session ${sessionId}`);
     }
     const timestamp = clock.now();
@@ -65,35 +76,108 @@ export function createPhrasePracticeService({
     if (plan.isOpen && phrase.fsrs_card === null && !plan.phrases.some(setPhrase => setPhrase.id === phraseId)) {
       throw new ConflictError(`phrase ${phraseId} is not in the current set: finish the set first`);
     }
+    phrasePracticeRepository.createPhraseAnswer({ phraseId, sessionId, direction, answeredAt: timestamp, grade });
+    const gradedLog = phrasePracticeRepository.findLatestPhraseReviewLogSince({
+      phraseId,
+      sinceTimestamp: findStartOfDay(today, settings.timeZone),
+    });
+    if (!gradedLog) {
+      gradeFirstDirection({ settings, phrase, grade, sessionId, direction, timestamp });
+    } else if (direction !== gradedLog.direction && gradedLog.second_grade === null) {
+      gradeSecondDirection({ settings, phrase, gradedLog, grade, timestamp });
+    }
+    const gradedPhrase = getPhraseRowOrThrow(phraseId);
+    const cardAfter = parseCard(gradedPhrase.fsrs_card);
+    return {
+      phrase: mapToGradedPhrase(gradedPhrase, settings.timeZone),
+      grade,
+      direction,
+      state: describeCardState(cardAfter),
+      status: gradedPhrase.status,
+      interval_days: Math.max(1, cardAfter.scheduled_days),
+      next_due_on: formatCalendarDateInTimeZone(gradedPhrase.due_at, settings.timeZone),
+    };
+  }
+
+  // The first grade of the phrase today: FSRS from the card, and the review log that the other direction builds on. The
+  // phrase comes back tomorrow whatever its interval: its other direction is still to be answered. The card keeps its
+  // own due day for the second direction.
+  function gradeFirstDirection({ settings, phrase, grade, sessionId, direction, timestamp }) {
+    const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     const cardBefore = parseCard(phrase.fsrs_card);
-    const { card: cardAfter } = fsrsScheduler.gradeCard(cardBefore, grade, timestamp);
-    // The due time is the start of the calendar day the interval lands on, as for words.
-    const intervalDays = Math.max(1, cardAfter.scheduled_days);
-    const dueAt = findStartOfDay(addDaysToCalendarDate(today, intervalDays), settings.timeZone);
-    cardAfter.due = new Date(dueAt);
-    const learningStatus = deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
-    const cardAfterJson = serializeCard(cardAfter);
-    phrasePracticeRepository.updatePhraseSchedule(phraseId, {
+    const { cardAfterJson, learningStatus } = scheduleCard({ settings, cardBefore, grade, timestamp });
+    phrasePracticeRepository.updatePhraseSchedule(phrase.id, {
       fsrsCard: cardAfterJson,
-      dueAt,
+      dueAt: findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone),
       introducedOn: cardBefore === null ? today : phrase.introduced_on,
       learningStatus,
     });
     phrasePracticeRepository.createPhraseReviewLog({
-      phraseId,
+      phraseId: phrase.id,
       sessionId,
       reviewedAt: timestamp,
       grade,
       cardBefore: serializeCard(cardBefore),
       cardAfter: cardAfterJson,
+      direction,
     });
+  }
+
+  // The answer in the other direction of the day: the log keeps the second grade. When it is worse than the grade the
+  // card was graded with, FSRS grades the card again from its card before with the worse grade, on the day of the
+  // first grade, and the card and the log's card after are replaced. Otherwise the phrase is due on its card's day
+  // (tomorrow at the earliest), as a word is.
+  function gradeSecondDirection({ settings, phrase, gradedLog, grade, timestamp }) {
+    const gradedWith = gradedLog.grade;
+    const worseGrade = findWorseGrade(gradedWith, grade);
+    if (worseGrade === gradedWith) {
+      const card = parseCard(phrase.fsrs_card);
+      const tomorrowStart = findStartOfDay(
+        addDaysToCalendarDate(formatCalendarDateInTimeZone(timestamp, settings.timeZone), 1),
+        settings.timeZone,
+      );
+      phrasePracticeRepository.updatePhraseSchedule(phrase.id, {
+        fsrsCard: phrase.fsrs_card,
+        dueAt: card ? Math.max(tomorrowStart, new Date(card.due).getTime()) : tomorrowStart,
+        introducedOn: phrase.introduced_on,
+        learningStatus: phrase.status,
+      });
+      phrasePracticeRepository.updatePhraseReviewLogSecondGrade(gradedLog.id, {
+        secondGrade: grade,
+        cardAfter: gradedLog.card_after,
+      });
+      return;
+    }
+    const { cardAfterJson, dueAt, learningStatus } = scheduleCard({
+      settings,
+      cardBefore: parseCard(gradedLog.card_before),
+      grade: worseGrade,
+      timestamp: gradedLog.reviewed_at,
+    });
+    phrasePracticeRepository.updatePhraseSchedule(phrase.id, {
+      fsrsCard: cardAfterJson,
+      dueAt,
+      introducedOn: phrase.introduced_on,
+      learningStatus,
+    });
+    phrasePracticeRepository.updatePhraseReviewLogSecondGrade(gradedLog.id, {
+      secondGrade: grade,
+      cardAfter: cardAfterJson,
+    });
+  }
+
+  // FSRS grades cardBefore (null = New) at timestamp. Returns the card as JSON, its due time (the start of the calendar
+  // day the interval lands on, as for words) and its learning status.
+  function scheduleCard({ settings, cardBefore, grade, timestamp }) {
+    const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
+    const { card: cardAfter } = fsrsScheduler.gradeCard(cardBefore, grade, timestamp);
+    const intervalDays = Math.max(1, cardAfter.scheduled_days);
+    const dueAt = findStartOfDay(addDaysToCalendarDate(today, intervalDays), settings.timeZone);
+    cardAfter.due = new Date(dueAt);
     return {
-      phrase: mapToGradedPhrase(getPhraseRowOrThrow(phraseId), settings.timeZone),
-      grade,
-      state: describeCardState(cardAfter),
-      status: learningStatus,
-      interval_days: intervalDays,
-      next_due_on: formatCalendarDateInTimeZone(dueAt, settings.timeZone),
+      cardAfterJson: serializeCard(cardAfter),
+      dueAt,
+      learningStatus: deriveLearningStatus(cardAfter, settings.learnedThresholdDays),
     };
   }
 
@@ -121,20 +205,22 @@ export function createPhrasePracticeService({
     };
   }
 
-  // The open set's phrases not finished yet (New, or still due today), or the next set planned now. Returns
-  // { isOpen, phrases, overdueCount, tomorrowStart }.
+  // The open set's phrases not finished yet (a New phrase, a phrase due today, or one not answered in both directions),
+  // or the next set planned now. Returns { isOpen, phrases, overdueCount, tomorrowStart, answeredDirectionsByPhraseId }.
+  // The directions answered count from the open set's opened_at only; a new set has none.
   function planPhraseSet({ settings, today, phrases, gradedPhraseIds }) {
     const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
     const overdueCount = phrases.filter(phrase => isDueBefore(phrase, findStartOfDay(today, settings.timeZone))).length;
     const phraseById = new Map(phrases.map(phrase => [phrase.id, phrase]));
+    const answeredDirectionsByPhraseId = findAnsweredDirectionsOfOpenSet({ settings, today });
     const openSet = findOpenSet({
       storedSet: settings.phraseSet,
       today,
-      isPending: phraseId => isPhrasePending(phraseById.get(phraseId), tomorrowStart),
+      isPending: phraseId => isPhrasePending(phraseById.get(phraseId), answeredDirectionsByPhraseId.get(phraseId)),
     });
     if (openSet) {
       const pendingPhrases = openSet.pendingIds.map(phraseId => phraseById.get(phraseId));
-      return { isOpen: true, phrases: pendingPhrases, overdueCount, tomorrowStart };
+      return { isOpen: true, phrases: pendingPhrases, overdueCount, tomorrowStart, answeredDirectionsByPhraseId };
     }
     const duePhraseIds = phrases
       .filter(phrase => isDueBefore(phrase, tomorrowStart) && !gradedPhraseIds.has(phrase.id))
@@ -147,7 +233,21 @@ export function createPhrasePracticeService({
       phrases: [...oldIds.map(phraseId => phraseById.get(phraseId)), ...newPhrases],
       overdueCount,
       tomorrowStart,
+      answeredDirectionsByPhraseId: new Map(),
     };
+  }
+
+  // The directions answered since the open set was opened, by phrase id (a Map of Sets). Empty when no set is open today.
+  function findAnsweredDirectionsOfOpenSet({ settings, today }) {
+    const answeredDirectionsByPhraseId = new Map();
+    if (!settings.phraseSet || settings.phraseSet.openedOn !== today) return answeredDirectionsByPhraseId;
+    for (const { phrase_id: phraseId, direction } of phrasePracticeRepository.listPhraseDirectionsAnsweredSince(
+      settings.phraseSet.openedAt,
+    )) {
+      if (!answeredDirectionsByPhraseId.has(phraseId)) answeredDirectionsByPhraseId.set(phraseId, new Set());
+      answeredDirectionsByPhraseId.get(phraseId).add(direction);
+    }
+    return answeredDirectionsByPhraseId;
   }
 
   // The open set, or the next set planned and pinned now (when it has phrases). isOpen says it was open already. Runs
@@ -175,9 +275,16 @@ export function createPhrasePracticeService({
   return Object.freeze({ getPhraseBatch, gradePhrase, calculatePhraseStatistics });
 }
 
-// A phrase of the set is not finished while it is New or still due today. A deleted phrase is.
-function isPhrasePending(phrase, tomorrowStart) {
-  return !!phrase && (phrase.fsrs_card === null || isDueBefore(phrase, tomorrowStart));
+// A phrase of the set is not finished while it is New, or it has no answer yet in one of the directions. A deleted
+// phrase is finished.
+function isPhrasePending(phrase, answeredDirections = new Set()) {
+  return !!phrase && PRACTICE_DIRECTIONS.some(direction => !answeredDirections.has(direction));
+}
+
+// The directions of a phrase with no answer since the set was opened, in PRACTICE_DIRECTIONS order.
+function findDirectionsLeft(answeredDirectionsByPhraseId, phraseId) {
+  const answeredDirections = answeredDirectionsByPhraseId.get(phraseId) ?? new Set();
+  return PRACTICE_DIRECTIONS.filter(direction => !answeredDirections.has(direction));
 }
 
 // A phrase is due before a timestamp when its card has a due time that is earlier than it (New phrases have none).

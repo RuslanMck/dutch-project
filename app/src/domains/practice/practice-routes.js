@@ -28,6 +28,7 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
       grade: gradeInput.grade,
       answer: gradeInput.answer,
       sessionId: gradeInput.session_id,
+      direction: gradeInput.direction,
     }));
   });
 
@@ -45,6 +46,7 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
       phraseId: gradeInput.phrase_id,
       grade: gradeInput.grade,
       sessionId: gradeInput.session_id,
+      direction: gradeInput.direction,
     }));
   });
 

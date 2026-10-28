@@ -81,16 +81,29 @@ test('calculateStreak: counts back from yesterday while today has no answer yet,
   assert.equal(calculateStreak(answersOn(['2026-10-25']), '2026-10-27', TIME_ZONE).current, 0);
 });
 
-test('findLearnedMoments: a word leaving the deck is learned; a review answered right outside the deck is not', () => {
+test('findLearnedMoments: a word is learned when both directions have left the deck; a lapse learned again counts once', () => {
   const deckAnswers = [
-    { word_id: 1, answered_at: 1, required_correct_after: 2 },
-    { word_id: 1, answered_at: 2, required_correct_after: null },
-    { word_id: 1, answered_at: 3, required_correct_after: null },
-    { word_id: 2, answered_at: 4, required_correct_after: null },
-    { word_id: 1, answered_at: 5, required_correct_after: 3 },
-    { word_id: 1, answered_at: 6, required_correct_after: null },
+    { word_id: 1, direction: 'uk_nl', answered_at: 1, required_correct_after: 2, is_first_answer_ever: true },
+    { word_id: 1, direction: 'nl_uk', answered_at: 2, required_correct_after: 2 },
+    { word_id: 1, direction: 'uk_nl', answered_at: 3, required_correct_after: null },
+    { word_id: 1, direction: 'nl_uk', answered_at: 4, required_correct_after: null },
+    { word_id: 1, direction: 'nl_uk', answered_at: 5, required_correct_after: 3 },
+    { word_id: 1, direction: 'nl_uk', answered_at: 6, required_correct_after: null },
   ];
-  assert.deepEqual(findLearnedMoments(deckAnswers), [{ word_id: 1, at: 2 }]);
+  assert.deepEqual(findLearnedMoments(deckAnswers), [{ word_id: 1, at: 4 }]);
+});
+
+test('findLearnedMoments: one direction out is not learned yet; a review answered right outside the deck is not', () => {
+  const deckAnswers = [
+    { word_id: 1, direction: 'uk_nl', answered_at: 1, required_correct_after: 2, is_first_answer_ever: true },
+    { word_id: 1, direction: 'nl_uk', answered_at: 2, required_correct_after: 2 },
+    { word_id: 1, direction: 'uk_nl', answered_at: 3, required_correct_after: null },
+    { word_id: 2, direction: 'uk_nl', answered_at: 4, required_correct_after: null },
+    { word_id: 3, direction: 'uk_nl', answered_at: 5, required_correct_after: 2 },
+    { word_id: 3, direction: 'uk_nl', answered_at: 6, required_correct_after: null },
+    { word_id: 1, direction: 'nl_uk', answered_at: 7, required_correct_after: null },
+  ];
+  assert.deepEqual(findLearnedMoments(deckAnswers), [{ word_id: 3, at: 6 }, { word_id: 1, at: 7 }]);
 });
 
 test('calculateActivity reads the answers, started and learned words from the database', () => {
@@ -103,8 +116,11 @@ test('calculateActivity reads the answers, started and learned words from the da
   context.practiceService.gradeWord({ wordId: kat.id, grade: 'good', sessionId: 's1' });
   currentTime += 20_000;
   context.practiceService.gradeWord({ wordId: kat.id, grade: 'good', sessionId: 's1' });
+  // The Dutch-to-Ukrainian direction leaves the deck too, at the same moment: the word is learned then.
+  context.practiceService.gradeWord({ wordId: kat.id, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
+  context.practiceService.gradeWord({ wordId: kat.id, grade: 'good', sessionId: 's1', direction: 'nl_uk' });
   const activity = context.statisticsService.calculateActivity({ period: 'day' });
-  assert.equal(activity.totals.answers, 2);
+  assert.equal(activity.totals.answers, 4);
   assert.equal(activity.totals.active_seconds, 20);
   assert.equal(activity.totals.new_words, 1);
   assert.equal(activity.totals.learned_words, 1);

@@ -97,7 +97,7 @@ New domain folder `src/domains/practice/` (with `README.md`). Pure modules have 
 | `priority-calculation.js` | pure | `parseChapterNumber(sectionCode)` → integer or null. `calculatePriority({ priorityOverride, chapterNumber, frequencyRank, currentChapter })` → 1–3 (rules in §1). `compareQueueOrder(first, second)` for `{ priority, chapterNumber, frequencyRank, id }` (§1). `calculateFrequencyRank(dutchText, findRankByForm)`: lowercase, drop a leading `de `/`het `, strip punctuation `?!.,;:()"'…`; one token → its rank or null; several tokens → the largest (rarest) rank of the tokens, or null when any token is unranked. |
 | `new-word-allocation.js` | pure | `allocateNewWords({ candidatesByPriority, introducedTodayByPriority, newPerDay, tierQuota })` → ordered array of chosen candidates. Remaining = newPerDay − all introduced today. Each priority first gets min(its quota − introduced today in it, available). Leftover slots go to P1, then P2, then P3. Never more than remaining. Candidates in each list are already in queue order. Output order: P1 picks, then P2, then P3. |
 | `new-word-planning.js` | service (reads only) | `createNewWordPlanner({ practiceRepository })` → `{ planNewWords({ settings, today, gradedWordIds }), assertExtraNewWordsAllowed({ newWordPlan }), countExtraNewWordsOn(settings, calendarDate) }`. `planNewWords` returns `{ overdueCount, isBlocked, offeredCandidates, introducedTodayCount, newTodayRemainingCount, remainingByPriority }` (the backlog gate of §10.1 and the allowance with the extra words). |
-| `practice-repository.js` | SQL | Settings: `listSettings()` → `{ name: parsedJsonValue }`; `saveSetting(name, value)` (JSON.stringify, upsert). Cards: `listPracticeWords()` → all words with `id, nl, uk, article, kind, section_code, status, fsrs_card, due_at, introduced_on, frequency_rank, priority_override, priority, error_count` (from `v_words`); `findPracticeWordById(wordId)`; `updateWordSchedule(wordId, { fsrsCard, dueAt, introducedOn, learningStatus, updatedAt })`; `updateWordPriority(wordId, { priority, priorityOverride })` (priorityOverride undefined = leave as is); `updateWordFrequencyRank(wordId, frequencyRank)`; `listDueWordIds(beforeTimestamp)` ordered by `due_at` ascending; `countIntroducedOnByPriority(calendarDate)` → `{1: n, 2: n, 3: n}`; review logs: `createReviewLog({...})`, `findReviewLog(sessionId, wordId)`, `listWordIdsReviewedInSession(sessionId)` (both count only logs with `superseded_at` NULL), `markReviewLogsSuperseded(timestamp)` (reset, §13.2), `countFirstGradesSince(timestamp)` → `{ again, hard, good }`. |
+| `practice-repository.js` | SQL | Settings: `listSettings()` → `{ name: parsedJsonValue }`; `saveSetting(name, value)` (JSON.stringify, upsert). Cards: `listPracticeWords()` → all words with `id, nl, uk, article, kind, section_code, status, fsrs_card, due_at, introduced_on, frequency_rank, priority_override, priority, error_count` (from `v_words`); `findPracticeWordById(wordId)`; `updateWordSchedule(wordId, { fsrsCard, dueAt, introducedOn, learningStatus, updatedAt })`; `updateWordPriority(wordId, { priority, priorityOverride })` (priorityOverride undefined = leave as is); `updateWordFrequencyRank(wordId, frequencyRank)`; `listDueWordIds(beforeTimestamp)` ordered by `due_at` ascending; `countIntroducedOnByPriority(calendarDate)` → `{1: n, 2: n, 3: n}`; review logs: `createReviewLog({...})`, `findLatestReviewLogSince({ wordId, sinceTimestamp })` (the word's latest log of the day, any session), `listWordIdsReviewedInSession(sessionId)` (count only logs with `superseded_at` NULL), `markReviewLogsSuperseded(timestamp)` (reset, §13.2), `countFirstGradesSince(timestamp)` → `{ again, hard, good }`. |
 | `frequency-repository.js` | SQL | `replaceAllFrequencies(entries)` (delete all, insert), `upsertFrequencies(entries)`, `findRankByForm(wordForm)` → rank or null, `countFrequencies()`. |
 | `practice-settings.js` | service | `createPracticeSettings({ practiceRepository })` → `{ readSettings(), saveCurrentChapter(chapter), isFsrsActive(), markFsrsMigrated(timestamp) }`. `readSettings` returns camelCase `{ currentChapter, newPerDay, tierQuota: {1,2,3}, desiredRetention, learnedThresholdDays, timeZone, fsrsMigratedAt }`. |
 | `priority-service.js` | service | `createPriorityService({ practiceRepository, frequencyRepository, practiceSettings, runInTransaction, changeEventBus })`: `recalculatePriorities({ wordIds } = {})` (all words when no ids; writes `priority`), `assignNewWordRanking(wordIds)` (frequency rank + priority for just-added words; runs inside the caller's transaction, no event), `setWordPriority(wordId, priorityOrNull)`, `setCurrentChapter(chapter)` (save, recalc all, return preview), `previewPriorities({ chapter })` (no writes; `{ chapter, counts: {1,2,3}, unranked_count, examples: {1: [...], 2: [...], 3: [...]} }` over New words, 10 examples each in queue order `{ id, nl, uk, section, frequency_rank }`), `importFrequencyList(entries, { shouldReplaceExisting })` (writes table, re-ranks every word, recalculates priorities; returns `{ imported, words_ranked, words_unranked }`). Publishes `'words'`. |
@@ -413,7 +413,7 @@ setting `extra_new_words` from §10 is no longer read. `reset_practice` clears b
   `add_extra_new_words` appends nothing and saves nothing.
 - **Reset and sessions (migration 005).** A reset sets `superseded_at` (ms) on every review log that still counts, in
   its transaction (`markReviewLogsSuperseded`, and `markPhraseReviewLogsSuperseded`); the logs stay as history. Session
-  look-ups (`listWordIdsReviewedInSession`, `findReviewLog`, and the phrase equivalents) count only logs whose
+  look-ups (`listWordIdsReviewedInSession`, `findLatestReviewLogSince`, and the phrase equivalents) count only logs whose
   `superseded_at` is NULL, so a reset in the middle of a web session is a real fresh start. The one-grade rule is a
   partial unique index: `unique_index_review_logs_on_session_id_and_word_id ON review_logs(session_id, word_id) WHERE
   superseded_at IS NULL`, and the same for `phrase_review_logs`. A second grade of an item in a session is refused by
@@ -527,3 +527,118 @@ session is one set of at most 10 cards, never 11 or 14, and skipped days never p
   the answers since `opened_at`; «Наступний набір» loads the next one. The overdue gate line and «Хочете ще 10 нових
   слів?» are gone, with `POST /api/practice/extra-new-words` and the MCP tool `add_extra_new_words`.
 
+
+## 19. Two-way practice: every card in both directions (28.10.2026)
+
+The learner's rule: a word is learned only when it can be translated both ways. A set stays at most 10 cards, but it
+is practised in two rounds: **round 1 `uk_nl`** (the Ukrainian is shown, the Dutch is typed, as before) and then
+**round 2 `nl_uk`** (the Dutch is shown with its article, the Ukrainian is typed). Phrases get the same two rounds
+(self-graded). Shared constants: `src/domains/practice/practice-direction.js` (`UK_TO_NL_DIRECTION`,
+`NL_TO_UK_DIRECTION`, `PRACTICE_DIRECTIONS`, `findOtherDirection`, `findWorseGrade`). Schema:
+`migrations/008-add-two-way-practice.sql`.
+
+### 19.1 Learning deck per direction (`learning-deck.js`)
+
+- The existing deck columns are the `uk_nl` direction; `deck_reverse_required_correct`, `deck_reverse_correct_count`,
+  `deck_reverse_entered_by_lapse` are `nl_uk`. The rules of 14 apply to each direction unchanged (2 right answers to
+  start, a mistake adds one up to 6, right answers already given are kept).
+- `readDeckPositions(wordRow)` → `{ uk_nl: position|null, nl_uk: position|null }`.
+- `applyAnswerToDecks({ deckPositions, direction, grade, isFirstAnswerEver })` → `{ deckPositions, hasEnteredDeck,
+  hasLearnedDirection, hasLearned }`. On the word's first answer ever (it was New) **both** directions enter: the
+  answered one gets the answer applied as in `applyAnswerToDeck`, the other starts at `{ requiredCorrect: 2,
+  correctCount: 0, isLapse: false }`. Otherwise only the answered direction moves (`applyAnswerToDeck` with
+  `isFirstAnswerEver: false`, so a mistake outside the deck is a lapse into that direction, a right answer outside it
+  stays outside). `hasLearnedDirection`: the answered direction was in the deck and left it now. `hasLearned`:
+  `hasLearnedDirection` and the other direction is not in the deck either (the word leaves the deck).
+- `describeDeckPositions(deckPositions)` → the `deck` field every adapter shows:
+  `{ in_deck, times_left, uk_nl: describeDeckPosition(...), nl_uk: describeDeckPosition(...) }` where `in_deck` is
+  either direction in the deck and `times_left` the sum. The grade response adds `has_learned` (the word) and
+  `has_learned_direction` at the top level of `deck`. Keep `applyAnswerToDeck`, `describeDeckPosition`,
+  `readDeckPosition` (it reads `uk_nl`), add `readReverseDeckPosition`.
+- A word is "in the deck" (repository queries: deck words, due reviews exclude deck words, counts, clear) when either
+  direction is.
+
+### 19.2 Grading a word (`practice-service.js`)
+
+`gradeWord({ wordId, grade, answer, sessionId, direction = 'uk_nl' })`. In one transaction:
+
+1. `reviewLog` = the word's latest review log that still counts and was reviewed today (since `findStartOfDay(today,
+   timeZone)`, `findLatestReviewLogSince`), in whatever session it was graded. A round of the day may be answered in
+   another session (a new tab, «Почати знову», MCP), so the session does not decide the case.
+2. **No log today** → the first FSRS grade of the day, as today (set pinning and the 409 for a New word outside the
+   open set stay): FSRS from the card, the deck via `applyAnswerToDecks`, review log with `direction` and this session
+   id, deck answer with `direction` and `is_first_in_session = 1`, a word error when not good. The word is due
+   **tomorrow**, whatever its FSRS interval: its other direction is still to be answered, and a review word that is not
+   in the deck must come back for the other direction too (the learner's rule: a learned word gets both rounds at its
+   review). The FSRS card keeps its own due day for the second direction.
+3. **Log today, `direction` differs from `log.direction` and `log.second_grade` is null** → the second direction's first
+   answer: the deck moves in `direction`; the log's `second_grade` is set; when `findWorseGrade(log.grade, grade)` is
+   worse than the grade the log's card was graded with, FSRS is graded again from the log's `card_before` with the
+   worse grade (the due day of the first answer), the word card and the log's `card_after` are replaced. A word error
+   is recorded when not good (the typed Ukrainian is the wrong answer). Deck answer `is_first_in_session = 0` (the flag
+   stays "the answer that created the log"). The due day: tomorrow when a direction is in the deck, otherwise the card's
+   own due day (tomorrow at the earliest). A card reset to New meanwhile (no card) is due tomorrow.
+4. **Otherwise** → a repeat (the same direction today, from any session, or the log's other direction already answered):
+   only the deck moves in `direction` (as today).
+- The review log is one per word and session (unique index): a first grade in a session that already has a log for the
+  word from an earlier day fails. The web client starts a new session id each calendar day.
+- Status `learning` while in the deck.
+- Response adds `direction`; `is_repeat` is true only in case 4; `deck` is the 19.1 shape with `has_learned` and
+  `has_learned_direction`.
+- Statistics and the struggling words use the session grade `worse(grade, second_grade)` of a log (SQL `CASE`).
+- `rebuildLearningDeck` rebuilds the `uk_nl` direction only (review logs with `direction = 'uk_nl'` plus `uk_nl`
+  repeats) and leaves `nl_uk` as stored.
+- Statistics: the learned moment of a word (`findLearnedMoments`) is the answer after which neither direction is in the
+  deck, when one was before. A direction never entered counts as out. The first answer of a New word enters the other
+  direction too (`is_first_answer_ever`, from the review log of the same moment).
+
+### 19.3 Sets and rounds (`word-set-planning.js`, `practice-set.js`)
+
+- A card of an open set is **finished** when it is in neither deck direction and has a counting answer in **both**
+  directions since the set's `opened_at` (words: `deck_answers`; phrases: `phrase_answers`). A deleted card is
+  finished. A New card is pending (no answers).
+- The batch returns each card with `directions_left`: the directions whose deck position is not null or that have no
+  answer since `opened_at`, in `PRACTICE_DIRECTIONS` order. A freshly planned set has both for every card.
+- Planning the next set is unchanged (deck words first, then due reviews, then New in the room left), with "deck" =
+  either direction.
+- Round summary (`round-summary.js`): answers carry `direction`; a direction's answers end at the one that finished it
+  (`required_correct_after` null). A word `is_learned` when both directions finished in the round. Each word adds
+  `mistakes: { uk_nl, nl_uk }`. `is_complete` and `finished_in_session_id` follow from that.
+
+### 19.4 Phrases (`phrase-practice-service.js`, `phrase-practice-repository.js`)
+
+`gradePhrase({ phraseId, grade, sessionId, direction = 'uk_nl' })`: a counting `phrase_answers` row for (session,
+phrase, direction) → 409 as today. Otherwise insert it, then the phrase's latest review log of today (any session, as in
+19.2, `findLatestPhraseReviewLogSince`) decides the case: no log → FSRS as today, log with `direction`, `due_at` tomorrow
+(the card keeps its own due day); a log whose other direction is not answered (`second_grade` null) → `second_grade`,
+the card graded again from `card_before` when the worse grade is worse, and `due_at` the card's due day (tomorrow at the
+earliest); otherwise a repeat of the day: the `phrase_answers` row only, no FSRS change. A phrase is finished in an open
+set per 19.3. The batch gives `directions_left`. The reset supersedes `phrase_answers` too.
+
+### 19.5 HTTP, MCP and docs
+
+- `direction` (`'uk_nl' | 'nl_uk'`, optional, default `uk_nl`) on `POST` grade for words and phrases and on the MCP
+  tools `grade_practice_word` and `grade_phrase`. Batch responses carry `directions_left` per card. MCP instructions
+  and `docs/CLAUDE_PROJECT_INSTRUCTIONS.md`: Claude asks round 1 (Ukrainian → Dutch) for every card of the set, then
+  round 2 (Dutch → Ukrainian) in a new order, grading each with its direction.
+
+### 19.6 Web
+
+- Words (Практика): the session keeps `direction` (current round) and the round queue; round 1 is the batch's cards
+  with `uk_nl` left, round 2 those with `nl_uk` left. A round with no cards is skipped. Inside a round the 5 active
+  words rotate as now (`advanceWindowedQueue`, using `schedule.deck[direction].in_deck`). The progress line names the
+  round: `Раунд 1 з 2 · UA → NL · Залишилось: 7 · вчимо 5`. When round 1 empties, round 2 starts with
+  `orderNextRound(words, lastWordId)` (shuffled; the first card is never the card just answered, so a word never comes
+  straight back in the other direction) and the message `Раунд 2: NL → UA`. When round 2 empties, the round summary /
+  next set works as in 18.
+- Round 2 card: the Dutch with its article is shown, the placeholder asks for Ukrainian. `gradeReverseTranslationAnswer
+  (word, input)` in `logic.js`: empty → not counted (`Напиши відповідь українською`); `dnk` or «Не знаю» → again;
+  `normalizeAnswerText(input) === normalizeAnswerText(word.uk)` → good; anything else → again with
+  `✗ Правильно: <uk>` and `canOverride: true`. No fuzzy matching (the learner's choice). When `canOverride`, the
+  grade is **not posted yet**: «Я мав рацію» posts `good` (message `✓ Зараховано`), Enter / «Далі» posts `again` and
+  moves on. Round 1 checking is unchanged.
+- The tally and the answered set are kept per direction (`${direction}:${id}`).
+- Phrases (Картки → Фрази): round 1 shows the Ukrainian and reveals the Dutch, round 2 the reverse; the front
+  selector applies to word cards only. Grades post with `direction`; the same round order rule; the count line names
+  the round.
+- Round summary screen: each word shows its mistakes per direction (`UA→NL: 1 · NL→UA: 0`).

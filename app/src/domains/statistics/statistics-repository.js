@@ -1,4 +1,15 @@
 // Read-only counting queries across the collections, for the statistics report. No business rules.
+
+// The grade a review log counts for in its session: the worse of its first grade and its second one (second_grade is
+// NULL until the other direction is answered).
+function sessionGradeSql(logTableName) {
+  return `CASE
+      WHEN 'again' IN (${logTableName}.grade, ${logTableName}.second_grade) THEN 'again'
+      WHEN 'hard' IN (${logTableName}.grade, ${logTableName}.second_grade) THEN 'hard'
+      ELSE 'good'
+    END`;
+}
+
 export function createStatisticsRepository({ database }) {
   const selectWordCountsByStatusStatement = database.prepare(`
     SELECT status, COUNT(*) AS word_count
@@ -23,7 +34,8 @@ export function createStatisticsRepository({ database }) {
     SELECT deck_answers.word_id AS item_id, deck_answers.grade, deck_answers.answered_at
     FROM deck_answers
     UNION ALL
-    SELECT review_logs.word_id AS item_id, review_logs.grade, review_logs.reviewed_at AS answered_at
+    SELECT review_logs.word_id AS item_id, ${sessionGradeSql('review_logs')} AS grade,
+      review_logs.reviewed_at AS answered_at
     FROM review_logs
     WHERE NOT EXISTS (
       SELECT 1
@@ -33,7 +45,7 @@ export function createStatisticsRepository({ database }) {
     )
   `);
   const selectPhraseAnswersStatement = database.prepare(`
-    SELECT phrase_review_logs.phrase_id AS item_id, phrase_review_logs.grade,
+    SELECT phrase_review_logs.phrase_id AS item_id, ${sessionGradeSql('phrase_review_logs')} AS grade,
       phrase_review_logs.reviewed_at AS answered_at
     FROM phrase_review_logs
   `);
@@ -43,8 +55,17 @@ export function createStatisticsRepository({ database }) {
     FROM review_logs
     WHERE review_logs.card_before IS NULL AND review_logs.superseded_at IS NULL
   `);
+  // is_first_answer_ever: the answer is the word's first, as New, which puts both directions in the deck (only the
+  // answered direction has a deck answer).
   const selectCountingDeckAnswersStatement = database.prepare(`
-    SELECT deck_answers.word_id, deck_answers.answered_at, deck_answers.required_correct_after
+    SELECT deck_answers.word_id, deck_answers.direction, deck_answers.answered_at,
+      deck_answers.required_correct_after,
+      EXISTS (
+        SELECT 1
+        FROM review_logs
+        WHERE review_logs.word_id = deck_answers.word_id AND review_logs.reviewed_at = deck_answers.answered_at
+          AND review_logs.card_before IS NULL AND review_logs.superseded_at IS NULL
+      ) AS is_first_answer_ever
     FROM deck_answers
     WHERE deck_answers.superseded_at IS NULL
   `);
@@ -63,7 +84,8 @@ export function createStatisticsRepository({ database }) {
   }
 
   function listCountingDeckAnswers() {
-    return selectCountingDeckAnswersStatement.all();
+    return selectCountingDeckAnswersStatement.all()
+      .map(answer => ({ ...answer, is_first_answer_ever: answer.is_first_answer_ever === 1 }));
   }
 
   function listWordNames() {

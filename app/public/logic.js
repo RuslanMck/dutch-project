@@ -12,11 +12,12 @@ export function normalise(value) {
   return String(value ?? '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-// Form of an answer used for comparison: normalise, typographic quotes -> ', punctuation dropped, spaces collapsed.
-// "hoe gaat het?" and "hoe gaat het" compare equal; "'s ochtends" and "’s ochtends" too.
+// Form of an answer used for comparison: normalise, typographic quotes and the Ukrainian apostrophe (ʼ, backtick) -> ',
+// punctuation dropped, spaces collapsed. "hoe gaat het?" and "hoe gaat het" compare equal; "'s ochtends" and "’s ochtends"
+// too; "імʼя" and "ім'я" too.
 export function normalizeAnswerText(value) {
   return normalise(value)
-    .replace(/[’‘]/g, "'")
+    .replace(/[’‘ʼ`]/g, "'")
     .replace(/[?!.,;:…"()]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -129,6 +130,22 @@ export function gradeTranslationAnswer(word, input) {
   return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
 }
 
+// «Не знаю» in the reverse round (the Dutch is shown, the Ukrainian is wanted): the right answer is shown, graded again.
+export function revealReverseTranslationAnswer(word) {
+  return { counted: true, grade: 'again', message: `✗ Правильно: ${word.uk}` };
+}
+
+// Reverse round (19.6): the learner types the Ukrainian for a Dutch word. Only the same text after normalizeAnswerText
+// is right; there is no fuzzy match. A wrong answer is 'again' with canOverride: the learner may still say it was right
+// («Я мав рацію»), and the client holds the grade until then or until «Далі».
+export function gradeReverseTranslationAnswer(word, input) {
+  const normalizedInput = normalizeAnswerText(input);
+  if (!normalizedInput) return { counted: false, grade: null, message: 'Напиши відповідь українською' };
+  if (normalizedInput === 'dnk') return revealReverseTranslationAnswer(word);
+  if (normalizedInput === normalizeAnswerText(word.uk)) return { counted: true, grade: 'good', message: '✓ Правильно' };
+  return { counted: true, grade: 'again', message: `✗ Правильно: ${word.uk}`, canOverride: true };
+}
+
 // Practice rotates among the first ACTIVE_WINDOW_SIZE words of the queue only; the rest wait their turn.
 export const ACTIVE_WINDOW_SIZE = 5;
 
@@ -160,6 +177,64 @@ export function shuffle(items, random = Math.random) {
 export function formatQueueProgress(queueLength, windowSize = ACTIVE_WINDOW_SIZE) {
   const leftText = `Залишилось: ${queueLength}`;
   return queueLength > windowSize ? `${leftText} · вчимо ${windowSize}` : leftText;
+}
+
+// A set is practised in two rounds (19.6): round 1 shows the Ukrainian, round 2 the Dutch.
+export const ROUND_DIRECTIONS = Object.freeze(['uk_nl', 'nl_uk']);
+const ROUND_NAMES = Object.freeze({ uk_nl: 'UA → NL', nl_uk: 'NL → UA' });
+
+// The key of one answer: a card is answered once in each direction.
+export function answerKey(direction, id) {
+  return `${direction}:${id}`;
+}
+
+// The progress line of a round: "Раунд 1 з 2 · UA → NL · Залишилось: 7 · вчимо 5". A queue that does not rotate
+// (phrases) passes windowSize Infinity, so no "вчимо" part.
+export function formatRoundProgress({ direction, queueLength, windowSize = ACTIVE_WINDOW_SIZE }) {
+  const roundNumber = ROUND_DIRECTIONS.indexOf(direction) + 1;
+  return `Раунд ${roundNumber} з ${ROUND_DIRECTIONS.length} · ${ROUND_NAMES[direction]} · `
+    + formatQueueProgress(queueLength, windowSize);
+}
+
+// The message when a round starts: "Раунд 2: NL → UA".
+export function formatRoundStart(direction) {
+  const roundNumber = ROUND_DIRECTIONS.indexOf(direction) + 1;
+  return `Раунд ${roundNumber}: ${ROUND_NAMES[direction]}`;
+}
+
+// The cards of a set waiting in each round. A card waits in every direction it has left (directions_left) and is not
+// answered in that direction in this session. Reviews stay before new cards; order shuffles each part (orderWords).
+export function splitIntoRounds({ reviews, newCards, answered, order = cards => cards }) {
+  const rounds = {};
+  for (const direction of ROUND_DIRECTIONS) {
+    const isWaiting = card => card.directions_left.includes(direction) && !answered.has(answerKey(direction, card.id));
+    rounds[direction] = [...order(reviews.filter(isWaiting)), ...order(newCards.filter(isWaiting))];
+  }
+  return rounds;
+}
+
+// The round that starts when the current queue is empty: the first direction in ROUND_DIRECTIONS with waiting cards.
+// Round 2 after round 1 is ordered by orderNextRound. Returns { direction, queue, waiting } or null when no round is left.
+export function planNextRound({ direction, waiting }, lastAnsweredId, random = Math.random) {
+  const nextDirection = ROUND_DIRECTIONS.find(candidate => waiting[candidate].length);
+  if (!nextDirection) return null;
+  const isAfterFirstRound = direction === 'uk_nl' && nextDirection === 'nl_uk';
+  const cards = waiting[nextDirection];
+  return {
+    direction: nextDirection,
+    queue: isAfterFirstRound ? orderNextRound(cards, lastAnsweredId, random) : [...cards],
+    waiting: { ...waiting, [nextDirection]: [] },
+  };
+}
+
+// Round 2 order: a shuffled copy in which the first card is never lastWordId (when there are 2+ cards), so a word
+// answered last in round 1 never comes straight back in the other direction. The one passed in is not changed.
+export function orderNextRound(words, lastWordId, random = Math.random) {
+  const shuffled = shuffle(words, random);
+  if (shuffled.length < 2 || shuffled[0].id !== lastWordId) return shuffled;
+  const swapIndex = 1 + Math.floor(random() * (shuffled.length - 1));
+  [shuffled[0], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[0]];
+  return shuffled;
 }
 
 // The struggling-words drill ("Важкі слова"): the front word leaves the queue when it is typed right (grade good);
@@ -209,12 +284,24 @@ export function buildNextReviewLine({ intervalDays, status, errorCount }) {
   return `${reviewText} · ${formatLearningStatus(status)} · помилок: ${errorCount ?? 0}`;
 }
 
-// The line under the practice message, from a grade_word result: the right answers the word still needs in this
-// session, the word learned just now (0 left), or a review answered right (it leaves the session).
-export function buildDeckLine({ deck, intervalDays }) {
+// The line under the practice message, from a grade_word result. deck is the response's deck: uk_nl and nl_uk (each with
+// in_deck and times_left), has_learned and has_learned_direction. direction is the round just answered.
+// The word learned: its next review. The answered direction learned, the other still in the deck: "UA → NL вивчено ✓ —
+// далі NL → UA". The answered direction still in the deck: the right answers left. Answered right while the other
+// direction is still in the deck, or its round still to come in this set (isOtherRoundLeft): "Правильно ✓ — далі …",
+// with no review date. Both directions out: "Повторено ✓".
+export function buildDeckLine({ direction, deck, intervalDays, isOtherRoundLeft = false }) {
+  const otherDirection = findOtherDirection(direction);
   if (deck?.has_learned) return `Вивчено ✓ — наступне повторення: ${formatDaysAway(intervalDays)}`;
-  if (deck?.in_deck) return `Повторень до вивчення: ${deck.times_left}`;
+  if (deck?.has_learned_direction) return `${ROUND_NAMES[direction]} вивчено ✓ — далі ${ROUND_NAMES[otherDirection]}`;
+  if (deck?.[direction]?.in_deck) return `Повторень до вивчення: ${deck[direction].times_left}`;
+  if (deck?.[otherDirection]?.in_deck || isOtherRoundLeft) return `Правильно ✓ — далі ${ROUND_NAMES[otherDirection]}`;
   return `Повторено ✓ — наступне повторення: ${formatDaysAway(intervalDays)}`;
+}
+
+// The other round of a word: nl_uk for uk_nl and the reverse.
+function findOtherDirection(direction) {
+  return ROUND_DIRECTIONS.find(candidate => candidate !== direction);
 }
 
 // "2026-10-25" -> "25.10" for the words table. Empty when there is no date (a new word has no next review).
@@ -315,7 +402,7 @@ export function buildRoundSummaryView(round) {
     ukrainian: word.uk,
     difficulty: word.difficulty,
     difficultyLabel: DIFFICULTY_LABELS[word.difficulty],
-    detail: `відповідей: ${word.answer_count} · ${word.mistake_count} ${pluralize(word.mistake_count, MISTAKE_WORDS)}`,
+    detail: `відповідей: ${word.answer_count} · UA→NL: ${word.mistakes?.uk_nl ?? 0} · NL→UA: ${word.mistakes?.nl_uk ?? 0}`,
   }));
   return { title: 'Вітаємо! Набір завершено 🎉', stats, hardestText, words };
 }

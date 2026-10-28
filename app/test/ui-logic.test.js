@@ -29,6 +29,15 @@ import {
   shuffle,
   formatStrugglingDrillButton,
   buildStrugglingDrillEnd,
+  gradeReverseTranslationAnswer,
+  revealReverseTranslationAnswer,
+  orderNextRound,
+  formatRoundProgress,
+  formatRoundStart,
+  answerKey,
+  splitIntoRounds,
+  planNextRound,
+  ROUND_DIRECTIONS,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -238,6 +247,9 @@ test('normalizeAnswerText drops punctuation, maps typographic quotes, collapses 
   assert.equal(normalizeAnswerText('’s ochtends'), "'s ochtends");
   assert.equal(normalizeAnswerText("‘s ochtends"), "'s ochtends");
   assert.equal(normalizeAnswerText("'s ochtends"), "'s ochtends");
+  assert.equal(normalizeAnswerText('ім’я'), "ім'я");
+  assert.equal(normalizeAnswerText('імʼя'), "ім'я");
+  assert.equal(normalizeAnswerText('ім`я'), "ім'я");
 });
 
 test('gradeTranslationAnswer: question mark on the expected word is ignored, so the answer is good', () => {
@@ -368,12 +380,51 @@ test('buildStrugglingDrillEnd: first-try count out of all words, and the schedul
 
 test('the deck line says the right answers still needed, a word learned just now, or a review answered right', async () => {
   const { buildDeckLine } = await import('../public/logic.js');
-  const inDeck = { in_deck: true, required_correct: 4, correct_count: 1, times_left: 3, has_learned: false };
-  assert.equal(buildDeckLine({ deck: inDeck, intervalDays: 1 }), 'Повторень до вивчення: 3');
-  const learned = { in_deck: false, required_correct: null, correct_count: 0, times_left: 0, has_learned: true };
-  assert.match(buildDeckLine({ deck: learned, intervalDays: 6 }), /^Вивчено ✓ — наступне повторення: /);
-  const outside = { in_deck: false, required_correct: null, correct_count: 0, times_left: 0, has_learned: false };
-  assert.match(buildDeckLine({ deck: outside, intervalDays: 30 }), /^Повторено ✓ — наступне повторення: /);
+  const position = (inDeck, timesLeft) => ({ in_deck: inDeck, times_left: timesLeft });
+  const deckWith = ({ uk, nl, hasLearned = false, hasLearnedDirection = false }) => ({
+    in_deck: uk.in_deck || nl.in_deck,
+    times_left: uk.times_left + nl.times_left,
+    uk_nl: uk,
+    nl_uk: nl,
+    has_learned: hasLearned,
+    has_learned_direction: hasLearnedDirection,
+  });
+  const inDeck = deckWith({ uk: position(true, 3), nl: position(true, 2) });
+  assert.equal(buildDeckLine({ direction: 'uk_nl', deck: inDeck, intervalDays: 1 }), 'Повторень до вивчення: 3');
+  assert.equal(buildDeckLine({ direction: 'nl_uk', deck: inDeck, intervalDays: 1 }), 'Повторень до вивчення: 2');
+  const learned = deckWith({ uk: position(false, 0), nl: position(false, 0), hasLearned: true, hasLearnedDirection: true });
+  assert.match(buildDeckLine({ direction: 'nl_uk', deck: learned, intervalDays: 6 }), /^Вивчено ✓ — наступне повторення: /);
+  const outside = deckWith({ uk: position(false, 0), nl: position(false, 0) });
+  assert.match(buildDeckLine({ direction: 'uk_nl', deck: outside, intervalDays: 30 }), /^Повторено ✓ — наступне повторення: /);
+  // A review answered right in round 1 with its round 2 still to come: no review date yet.
+  assert.equal(buildDeckLine({ direction: 'uk_nl', deck: outside, intervalDays: 1, isOtherRoundLeft: true }),
+    'Правильно ✓ — далі NL → UA');
+});
+
+test('the deck line names the direction still to go when one direction is learned or answered right', async () => {
+  const { buildDeckLine } = await import('../public/logic.js');
+  const position = (inDeck, timesLeft) => ({ in_deck: inDeck, times_left: timesLeft });
+  // UA → NL just learned, NL → UA still in the deck.
+  const ukLearned = {
+    in_deck: true, times_left: 2, uk_nl: position(false, 0), nl_uk: position(true, 2),
+    has_learned: false, has_learned_direction: true,
+  };
+  assert.equal(buildDeckLine({ direction: 'uk_nl', deck: ukLearned, intervalDays: 1 }),
+    'UA → NL вивчено ✓ — далі NL → UA');
+  // NL → UA just learned, UA → NL still in the deck.
+  const nlLearned = {
+    in_deck: true, times_left: 1, uk_nl: position(true, 1), nl_uk: position(false, 0),
+    has_learned: false, has_learned_direction: true,
+  };
+  assert.equal(buildDeckLine({ direction: 'nl_uk', deck: nlLearned, intervalDays: 1 }),
+    'NL → UA вивчено ✓ — далі UA → NL');
+  // A review answered right in UA → NL while NL → UA is still in the deck: no review date.
+  const reviewRight = {
+    in_deck: true, times_left: 2, uk_nl: position(false, 0), nl_uk: position(true, 2),
+    has_learned: false, has_learned_direction: false,
+  };
+  assert.equal(buildDeckLine({ direction: 'uk_nl', deck: reviewRight, intervalDays: 6 }), 'Правильно ✓ — далі NL → UA');
+  assert.doesNotMatch(buildDeckLine({ direction: 'uk_nl', deck: reviewRight, intervalDays: 6 }), /повторення/);
 });
 
 test('advanceWindowedQueue: a word not yet learned comes back after the other four active words, not the waiting ones', () => {
@@ -458,7 +509,8 @@ test('buildRoundSummaryView: totals, the hardest word, the paused span only when
   ]);
   assert.equal(view.hardestText, 'Найважче слово: laten — залишати (3 помилки)');
   assert.deepEqual(view.words[1], {
-    dutch: 'de kat', ukrainian: 'кіт', difficulty: 'easy', difficultyLabel: 'легко', detail: 'відповідей: 2 · 0 помилок',
+    dutch: 'de kat', ukrainian: 'кіт', difficulty: 'easy', difficultyLabel: 'легко',
+    detail: 'відповідей: 2 · UA→NL: 0 · NL→UA: 0',
   });
   const smooth = buildRoundSummaryView({ ...round, hardest_word_id: null, finished_at: 300_000 });
   assert.equal(smooth.stats.length, 4);
@@ -508,4 +560,114 @@ test('formatActivityRange and buildStreakTiles', () => {
     'Останні 7 днів: 21.10.2026 – 27.10.2026');
   assert.deepEqual(buildStreakTiles({ current: 3, longest: 5, is_today_practised: false }).map(tile => tile.value),
     ['3 дні', '5 днів']);
+});
+
+const kat = { nl: 'kat', uk: 'кіт', article: 'de' };
+
+test('gradeReverseTranslationAnswer: empty input is not counted', () => {
+  assert.deepEqual(gradeReverseTranslationAnswer(kat, '   '),
+    { counted: false, grade: null, message: 'Напиши відповідь українською' });
+});
+
+test('gradeReverseTranslationAnswer: the Ukrainian text is right, ignoring case and punctuation', () => {
+  assert.deepEqual(gradeReverseTranslationAnswer(kat, 'кіт'), { counted: true, grade: 'good', message: '✓ Правильно' });
+  assert.equal(gradeReverseTranslationAnswer(kat, '  КІТ! ').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer({ nl: 'vlees', uk: 'м’ясо' }, "м'ясо").grade, 'good');
+});
+
+test('gradeReverseTranslationAnswer: the Ukrainian apostrophe ʼ and a backtick count as the usual apostrophe', () => {
+  const name = { nl: 'naam', uk: "ім'я" };
+  assert.equal(gradeReverseTranslationAnswer(name, 'імʼя').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(name, 'ім`я').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(name, 'ім’я').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(name, 'імя').grade, 'again');
+});
+
+test('gradeReverseTranslationAnswer: a wrong answer is again, shows the right one and may be overruled', () => {
+  for (const input of ['кит', 'котик', 'кіта']) {
+    assert.deepEqual(gradeReverseTranslationAnswer(kat, input),
+      { counted: true, grade: 'again', message: '✗ Правильно: кіт', canOverride: true }, input);
+  }
+});
+
+test('gradeReverseTranslationAnswer: dnk reveals the answer and is again without the override', () => {
+  assert.deepEqual(gradeReverseTranslationAnswer(kat, 'DNK'), revealReverseTranslationAnswer(kat));
+  assert.deepEqual(revealReverseTranslationAnswer(kat), { counted: true, grade: 'again', message: '✗ Правильно: кіт' });
+  assert.equal(gradeReverseTranslationAnswer(kat, 'dnk').canOverride, undefined);
+});
+
+test('orderNextRound: a shuffled copy whose first card is never the last answered word', () => {
+  const cards = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const original = [...cards];
+  for (let seed = 0; seed < 30; seed += 1) {
+    const order = orderNextRound(cards, 1, () => (seed % 7) / 7);
+    assert.notEqual(order[0].id, 1);
+    assert.deepEqual(order.map(card => card.id).sort(), [1, 2, 3]);
+  }
+  assert.deepEqual(cards, original);
+  assert.deepEqual(orderNextRound(cards, 2, () => 0).map(card => card.id), [3, 2, 1]);
+  assert.deepEqual(orderNextRound([{ id: 1 }], 1), [{ id: 1 }]);
+});
+
+test('formatRoundProgress and formatRoundStart name the round', () => {
+  assert.equal(formatRoundProgress({ direction: 'uk_nl', queueLength: 7 }),
+    'Раунд 1 з 2 · UA → NL · Залишилось: 7 · вчимо 5');
+  assert.equal(formatRoundProgress({ direction: 'nl_uk', queueLength: 3 }), 'Раунд 2 з 2 · NL → UA · Залишилось: 3');
+  assert.equal(formatRoundProgress({ direction: 'nl_uk', queueLength: 9, windowSize: Infinity }),
+    'Раунд 2 з 2 · NL → UA · Залишилось: 9');
+  assert.equal(formatRoundStart('nl_uk'), 'Раунд 2: NL → UA');
+});
+
+test('answerKey keys an answer by direction and card', () => {
+  assert.equal(answerKey('uk_nl', 5), 'uk_nl:5');
+  assert.deepEqual(ROUND_DIRECTIONS, ['uk_nl', 'nl_uk']);
+});
+
+test('splitIntoRounds: a card waits in each direction it has left and is not answered there', () => {
+  const reviews = [
+    { id: 1, directions_left: ['uk_nl', 'nl_uk'] },
+    { id: 2, directions_left: ['nl_uk'] },
+  ];
+  const newCards = [{ id: 3, directions_left: ['uk_nl', 'nl_uk'] }];
+  const rounds = splitIntoRounds({ reviews, newCards, answered: new Set(['uk_nl:1']) });
+  assert.deepEqual(rounds.uk_nl.map(card => card.id), [3]);
+  assert.deepEqual(rounds.nl_uk.map(card => card.id), [1, 2, 3]);
+  // Reviews stay before new cards in each round, and the order function is applied to each part.
+  const reversed = splitIntoRounds({ reviews, newCards, answered: new Set(), order: cards => [...cards].reverse() });
+  assert.deepEqual(reversed.uk_nl.map(card => card.id), [1, 3]);
+  assert.deepEqual(reversed.nl_uk.map(card => card.id), [2, 1, 3]);
+});
+
+test('planNextRound: round 1, then round 2 shuffled away from the last answered word', () => {
+  const first = { id: 1 };
+  const second = { id: 2 };
+  const waiting = { uk_nl: [], nl_uk: [first, second] };
+  const next = planNextRound({ direction: 'uk_nl', waiting }, 1, () => 0);
+  assert.equal(next.direction, 'nl_uk');
+  assert.notEqual(next.queue[0].id, 1);
+  assert.deepEqual(next.waiting, { uk_nl: [], nl_uk: [] });
+  assert.deepEqual(waiting.nl_uk, [first, second]);
+});
+
+test('planNextRound: an empty round is skipped; the first round keeps its order', () => {
+  const card = { id: 7 };
+  const onlyReverse = planNextRound({ direction: 'uk_nl', waiting: { uk_nl: [], nl_uk: [card] } }, 3);
+  assert.equal(onlyReverse.direction, 'nl_uk');
+  assert.deepEqual(onlyReverse.queue, [card]);
+  const newSet = planNextRound({ direction: 'nl_uk', waiting: { uk_nl: [card], nl_uk: [] } }, 7);
+  assert.equal(newSet.direction, 'uk_nl');
+  assert.deepEqual(newSet.queue, [card]);
+  assert.equal(planNextRound({ direction: 'nl_uk', waiting: { uk_nl: [], nl_uk: [] } }, 7), null);
+});
+
+test('buildRoundSummaryView: mistakes per direction on each word', () => {
+  const round = {
+    words: [{
+      id: 1, nl: 'kat', uk: 'кіт', article: 'de', answer_count: 4, mistake_count: 1, difficulty: 'medium',
+      mistakes: { uk_nl: 1, nl_uk: 0 },
+    }],
+    total_count: 1, learned_count: 1, answer_count: 4, mistake_count: 1, hardest_word_id: 1,
+    started_at: 0, finished_at: 60_000, active_seconds: 60,
+  };
+  assert.equal(buildRoundSummaryView(round).words[0].detail, 'відповідей: 4 · UA→NL: 1 · NL→UA: 0');
 });
