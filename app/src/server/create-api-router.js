@@ -9,6 +9,7 @@ import { createPracticeRoutes } from '../domains/practice/practice-routes.js';
 import { createRuleRoutes } from '../domains/rules/rule-routes.js';
 import { createStatisticsRoutes } from '../domains/statistics/statistics-routes.js';
 import { createTextRoutes } from '../domains/texts/text-routes.js';
+import { createWordOrderRoutes } from '../domains/word-order/word-order-routes.js';
 import { createWordRoutes } from '../domains/words/word-routes.js';
 import { createRestErrorHandler } from '../http/rest-error-handler.js';
 
@@ -20,6 +21,7 @@ export function createApiRouter({
   ruleService,
   mistakeService,
   phraseService,
+  wordOrderService,
   textService,
   statisticsService,
   artifactExportService,
@@ -32,6 +34,7 @@ export function createApiRouter({
   apiRouter.use(createRuleRoutes({ ruleService }));
   apiRouter.use(createMistakeRoutes({ mistakeService }));
   apiRouter.use(createPhraseRoutes({ phraseService }));
+  apiRouter.use(createWordOrderRoutes({ wordOrderService }));
   apiRouter.use(createTextRoutes({ textService }));
   apiRouter.use(createStatisticsRoutes({ statisticsService }));
   apiRouter.use(createArtifactExportRoutes({ artifactExportService }));

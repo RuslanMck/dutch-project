@@ -1001,3 +1001,138 @@ button.danger {
   font-weight: 600;
   margin: 0;
 }
+
+/* 5 · word order («Порядок слів») */
+.word-order__progress {
+  margin: 0 0 4px;
+  min-height: 1.45em;
+}
+
+.word-order__uk {
+  margin: 4px 0 16px;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.word-order__answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  min-height: 124px;
+  padding: 10px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.word-order__answer[data-result="ok"] {
+  border: 2px solid var(--ok);
+}
+
+.word-order__answer[data-result="bad"] {
+  border: 2px solid var(--danger);
+}
+
+.word-order__hint {
+  margin: auto;
+  color: var(--muted);
+  text-align: center;
+}
+
+.word-order__pile {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Tiles are buttons, at least 44px tall, with a thicker bottom edge like the Duolingo tiles. */
+.word-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  padding: 8px 14px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: 4px solid var(--border);
+  border-radius: 12px;
+}
+
+.word-tile--answer {
+  background: var(--soft);
+  border-bottom-color: var(--accent);
+}
+
+.word-tile--pile:not(:disabled):active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+.word-tile--gap {
+  visibility: hidden;
+}
+
+.word-tile:disabled {
+  color: var(--text);
+  opacity: 1;
+  cursor: default;
+}
+
+.word-order__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.word-order__actions button {
+  flex: 1 1 0;
+  min-height: 52px;
+  font-size: 17px;
+}
+
+.word-order__sentences {
+  margin-top: 24px;
+}
+
+.word-order__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.word-order__tools button {
+  flex: 1 1 160px;
+}
+
+.word-order__box > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.word-order__box .list {
+  margin-top: 0;
+}
+
+.word-order__box .item > span {
+  align-self: center;
+  white-space: nowrap;
+  font-size: 14px;
+}

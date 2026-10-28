@@ -17,6 +17,7 @@ The app's data, business rules and their adapters, one folder per domain. Inside
 | `rules/` | Grammar rules, found by id or code. |
 | `mistakes/` | Mistake patterns and their cases. |
 | `phrases/` | Stable Dutch phrases with their context. |
+| `word-order/` | The word-order exercise: stored Dutch sentences (from MCP, a Markdown import or an LLM through OpenRouter), the shuffled set with distractor words, and the answers. |
 | `texts/` | Bilingual texts such as textbook dialogues. |
 | `sections/` | Textbook sections, created on demand by the other domains. |
 | `statistics/` | Counts across all collections. |

@@ -1,5 +1,6 @@
 // Builds every repository and service on one database connection. The server, the import script and the tests
-// all get their services from here, so they share one wiring.
+// all get their services from here, so they share one wiring. configuration is optional: without it (tests, scripts)
+// the OpenRouter client is simply not configured.
 import { createTransactionRunner } from '../database/run-in-transaction.js';
 import { createArtifactExportRepository } from '../domains/artifact-export/artifact-export-repository.js';
 import { createArtifactExportService } from '../domains/artifact-export/artifact-export-service.js';
@@ -27,11 +28,20 @@ import { createStatisticsRepository } from '../domains/statistics/statistics-rep
 import { createStatisticsService } from '../domains/statistics/statistics-service.js';
 import { createTextRepository } from '../domains/texts/text-repository.js';
 import { createTextService } from '../domains/texts/text-service.js';
+import { createWordOrderRepository } from '../domains/word-order/word-order-repository.js';
+import { createWordOrderService } from '../domains/word-order/word-order-service.js';
 import { createTopicRepository } from '../domains/words/topic-repository.js';
 import { createWordRepository } from '../domains/words/word-repository.js';
 import { createWordService } from '../domains/words/word-service.js';
+import { createOpenRouterClient } from '../integrations/openrouter-client.js';
 
-export function createDomainServices({ database, changeEventBus, clock, isFsrsFuzzEnabled = true }) {
+export function createDomainServices({
+  database,
+  changeEventBus,
+  clock,
+  isFsrsFuzzEnabled = true,
+  configuration = {},
+}) {
   const runInTransaction = createTransactionRunner({ database });
   const sharedDependencies = { runInTransaction, changeEventBus, clock };
 
@@ -98,6 +108,14 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
     practiceSettings,
     ...sharedDependencies,
   });
+  const wordOrderService = createWordOrderService({
+    wordOrderRepository: createWordOrderRepository({ database }),
+    openRouterClient: createOpenRouterClient({
+      apiKey: configuration.openRouterApiKey,
+      model: configuration.openRouterModel,
+    }),
+    ...sharedDependencies,
+  });
   const textService = createTextService({
     textRepository: createTextRepository({ database }),
     sectionService,
@@ -132,6 +150,7 @@ export function createDomainServices({ database, changeEventBus, clock, isFsrsFu
     ruleService,
     mistakeService,
     phraseService,
+    wordOrderService,
     textService,
     statisticsService,
     artifactExportService,

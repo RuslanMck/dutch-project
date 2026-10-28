@@ -40,6 +40,7 @@
       <button type="button" class="drawer__link" data-tab="practice">Практика</button>
       <button type="button" class="drawer__link" data-tab="cards">Картки</button>
       <button type="button" class="drawer__link" data-tab="phrases">Фрази</button>
+      <button type="button" class="drawer__link" data-tab="word-order">Порядок слів</button>
       <button type="button" class="drawer__link" data-tab="table">Таблиця</button>
       <button type="button" class="drawer__link" data-tab="rules">Правила</button>
       <button type="button" class="drawer__link" data-tab="texts">Тексти</button>
@@ -266,6 +267,46 @@
         <button class="primary wide" type="submit">Додати</button>
       </form>
       <ul id="phrases-list" class="list"></ul>
+    </section>
+
+    <!-- 5b · Порядок слів -->
+    <section id="tab-word-order" class="tab" data-tab="word-order" hidden>
+      <p id="word-order-progress" class="muted word-order__progress" aria-live="polite"></p>
+
+      <div id="word-order-empty" class="empty" hidden>
+        <p>Речень поки немає. Попроси Claude Project додати їх за промптом (docs/SENTENCE_GENERATION_PROMPT.md) або імпортуй .md-таблицю нижче.</p>
+      </div>
+
+      <div id="word-order-exercise" hidden>
+        <p id="word-order-uk" class="word-order__uk"></p>
+        <div id="word-order-answer" class="word-order__answer" aria-label="Відповідь"></div>
+        <div id="word-order-pile" class="word-order__pile"></div>
+        <p id="word-order-msg" class="msg" aria-live="polite"></p>
+        <div class="word-order__actions">
+          <button id="word-order-check" class="primary" type="button" disabled>Перевірити</button>
+          <button id="word-order-skip" type="button">Пропустити</button>
+          <button id="word-order-next" class="primary" type="button" hidden>Далі</button>
+        </div>
+      </div>
+
+      <section id="word-order-summary" class="practice-summary" aria-label="Підсумок" hidden>
+        <p id="word-order-result" class="practice-summary__text" role="status"></p>
+        <button id="word-order-more" class="primary practice-summary__struggling-button" type="button">Ще 10</button>
+      </section>
+
+      <section class="stats-card word-order__sentences" aria-labelledby="word-order-sentences-title">
+        <h2 id="word-order-sentences-title" class="stats-card__title">Речення (0)</h2>
+        <div class="word-order__tools">
+          <button id="word-order-generate" type="button" hidden>Згенерувати ще 20</button>
+          <button id="word-order-import-button" type="button">Імпорт .md</button>
+          <input id="word-order-file" type="file" accept=".md,text/markdown,text/plain" hidden>
+        </div>
+        <p id="word-order-import-msg" class="muted" role="status"></p>
+        <details id="word-order-list-box" class="word-order__box">
+          <summary>Список речень</summary>
+          <ul id="word-order-list" class="list"></ul>
+        </details>
+      </section>
     </section>
 
     <!-- 6 · Тексти -->

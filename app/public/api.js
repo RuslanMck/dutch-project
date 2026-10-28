@@ -41,6 +41,13 @@ export const deletePhrase = id => request('DELETE', `/api/phrases/${enc(id)}`);
 
 export const listTexts = () => request('GET', '/api/texts');
 
+export const getWordOrderSet = () => request('GET', '/api/word-order/set');
+export const answerWordOrder = (id, tiles) => request('POST', `/api/word-order/sentences/${enc(id)}/answer`, { tiles });
+export const listOrderSentences = () => request('GET', '/api/word-order/sentences');
+export const deleteOrderSentence = id => request('DELETE', `/api/word-order/sentences/${enc(id)}`);
+export const importOrderSentences = markdown => request('POST', '/api/word-order/import', { markdown });
+export const generateOrderSentences = count => request('POST', '/api/word-order/generate', { count });
+
 export const getPracticeBatch = sessionId => request('GET', `/api/practice/batch?session_id=${enc(sessionId)}`);
 export const gradePracticeWord = body => request('POST', '/api/practice/grades', body);
 export const getPracticeStats = () => request('GET', '/api/practice/stats');

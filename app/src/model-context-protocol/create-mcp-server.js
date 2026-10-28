@@ -8,6 +8,7 @@ import { registerPracticeTools } from '../domains/practice/practice-tools.js';
 import { registerRuleTools } from '../domains/rules/rule-tools.js';
 import { registerStatisticsTools } from '../domains/statistics/statistics-tools.js';
 import { registerTextTools } from '../domains/texts/text-tools.js';
+import { registerWordOrderTools } from '../domains/word-order/word-order-tools.js';
 import { registerWordTools } from '../domains/words/word-tools.js';
 import { MCP_INSTRUCTIONS } from './mcp-instructions.js';
 
@@ -22,6 +23,7 @@ export function createMcpServer({
   ruleService,
   mistakeService,
   phraseService,
+  wordOrderService,
   textService,
   statisticsService,
 }) {
@@ -39,6 +41,7 @@ export function createMcpServer({
   registerRuleTools({ mcpServer, ruleService, mistakeService });
   registerMistakeTools({ mcpServer, mistakeService });
   registerPhraseTools({ mcpServer, phraseService });
+  registerWordOrderTools({ mcpServer, wordOrderService });
   registerTextTools({ mcpServer, textService });
   return mcpServer;
 }

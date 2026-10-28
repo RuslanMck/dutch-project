@@ -14,7 +14,7 @@ const clock = createSystemClock();
 const database = createDatabaseConnection({ databasePath: configuration.databasePath });
 runDatabaseMigrations({ database, clock });   // before accepting requests
 const changeEventBus = createChangeEventBus({ clock });
-const services = createDomainServices({ database, changeEventBus, clock });
+const services = createDomainServices({ database, changeEventBus, clock, configuration });
 const application = createApplication({ configuration, services, changeEventBus, clock });
 
 application.listen(configuration.port, () => console.log(`dutch-app listening on :${configuration.port}`));

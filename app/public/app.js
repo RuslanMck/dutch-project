@@ -3,6 +3,19 @@
 import * as api from './api.js';
 import {
   advanceDrillQueue,
+  buildWordOrderCheckView,
+  chooseFirstPileFocus,
+  chooseFocusAfterPlace,
+  chooseFocusAfterReturn,
+  createWordOrderState,
+  formatImportResult,
+  formatSentenceStats,
+  formatWordOrderProgress,
+  formatWordOrderSummary,
+  placeTile,
+  readAnswerTiles,
+  returnTile,
+  skipSentenceInSet,
   advanceWindowedQueue,
   answerKey,
   formatQueueProgress,
@@ -35,7 +48,7 @@ import {
   revealTranslationAnswer,
 } from './logic.js';
 
-const TABS = ['table', 'cards', 'practice', 'rules', 'phrases', 'texts', 'stats'];
+const TABS = ['table', 'cards', 'practice', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -131,6 +144,16 @@ const ui = {
   struggling: createStrugglingDrill('idle'),
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
+// Порядок слів. status: idle (not loaded yet) | ready (an exercise is on screen) | done (summary) | empty (no sentences).
+// sentences: the set on screen; index: its sentence on screen; exercise: createWordOrderState of that sentence;
+// checked: the server's answer for it once «Перевірити» is done; results: is_correct of each answered sentence
+// (skipped sentences are not in it); checking: the «Перевірити» request is in flight (only this locks the exercise);
+// busy: the list tool in flight ('generate' | 'import' | 'delete' | ''); loadingMore: «Ще 10» is in flight;
+// list: every stored sentence, newest first. loaded: the set has been fetched at least once (live changes refetch only then).
+const wordOrder = {
+  loaded: false, status: 'idle', canGenerate: false, sentences: [], index: 0, exercise: null,
+  checked: null, results: [], checking: false, busy: '', loadingMore: false, list: [],
+};
 let memorySession = null;          // { sessionId, calendarDate } used when sessionStorage is blocked
 
 // ---------- helpers ----------
@@ -198,6 +221,7 @@ const RENDER = {
   practice: renderPractice,
   rules: renderRules,
   phrases: renderPhrases,
+  'word-order': renderWordOrderLive,
   texts: renderTexts,
   stats: renderStats,
 };
@@ -222,6 +246,7 @@ function showTab(name) {
   if (ui.tab === 'practice') ensureFsrsSession();
   if (ui.tab === 'cards') ensureCardsBatch();
   if (ui.tab === 'stats') loadStats();
+  if (ui.tab === 'word-order') refreshWordOrderIfNeeded();
   render();
 }
 
@@ -334,12 +359,22 @@ function handleChartBarSelect(event, { isToggle }) {
 // ---------- delete confirmation (one dialog for every word) ----------
 
 // onConfirm runs only after the learner presses "Видалити" in the dialog.
-let pendingWordDelete = null;
+let pendingConfirm = null;
 
 function askDeleteWord(word, onConfirm) {
-  pendingWordDelete = { onConfirm };
-  $('delete-dialog-text').textContent = `Ви впевнені, що хочете видалити слово "${word.nl}"? ` +
-    'Історію повторень і лічильник помилок цього слова теж буде видалено.';
+  askConfirm({
+    title: 'Видалити слово?',
+    text: `Ви впевнені, що хочете видалити слово "${word.nl}"? ` +
+      'Історію повторень і лічильник помилок цього слова теж буде видалено.',
+    onConfirm,
+  });
+}
+
+// The shared delete dialog with its own title and text; only "Видалити" runs onConfirm.
+function askConfirm({ title, text, onConfirm }) {
+  pendingConfirm = { onConfirm };
+  $('delete-dialog-title').textContent = title;
+  $('delete-dialog-text').textContent = text;
   $('delete-dialog').showModal();
   $('delete-dialog-cancel').focus();
 }
@@ -1545,6 +1580,361 @@ function renderTexts() {
   </article>`).join('');
 }
 
+// ---------- 5b · Порядок слів ----------
+
+// The set on screen is not replaced by a refetch while the learner is in the middle of it (ready or done); only the
+// counts and the list follow. A new set starts when there is none yet, or on «Ще 10». Every fetch takes a number: a
+// refresh that started before a newer one already on screen is ignored, so an older poll cannot replace a newer set.
+let wordOrderFetchCount = 0;
+let wordOrderAppliedFetch = 0;
+
+function isWordOrderInProgress() {
+  return wordOrder.status === 'ready' || wordOrder.status === 'done';
+}
+
+function currentWordOrderSentence() {
+  return wordOrder.sentences[wordOrder.index] ?? null;
+}
+
+// Puts the fetched set on screen, unless a set is in progress and replace is off. Reads the state itself, so it is
+// called after the awaits. Returns true when the exercise was replaced.
+function applyWordOrderSet(set, { replace }) {
+  wordOrder.canGenerate = !!set.can_generate;
+  if (!replace && isWordOrderInProgress()) return false;
+  const sentences = Array.isArray(set.sentences) ? set.sentences : [];
+  Object.assign(wordOrder, {
+    sentences,
+    index: 0,
+    exercise: sentences.length ? createWordOrderState(sentences[0].tiles) : null,
+    checked: null,
+    results: [],
+    status: sentences.length ? 'ready' : 'empty',
+  });
+  return true;
+}
+
+// Fetches the set and the list, then shows them. Errors go to the notice line; the next visit tries again.
+async function refreshWordOrder({ replace = false } = {}) {
+  const fetchNo = ++wordOrderFetchCount;
+  try {
+    const [set, rows] = await Promise.all([api.getWordOrderSet(), api.listOrderSentences()]);
+    if (!replace && fetchNo < wordOrderAppliedFetch) return;
+    wordOrderAppliedFetch = Math.max(wordOrderAppliedFetch, fetchNo);
+    wordOrder.list = Array.isArray(rows) ? rows : [];
+    wordOrder.loaded = true;
+    if (applyWordOrderSet(set, { replace })) {
+      renderWordOrder();
+      return;
+    }
+  } catch (error) {
+    notice(error.message || 'Не вдалося завантажити речення');
+  }
+  renderWordOrderSentences();
+}
+
+// Used on the first visit, and on live changes once the set has been loaded (or while the tab is open).
+function refreshWordOrderIfNeeded() {
+  if (wordOrder.loaded || ui.tab === 'word-order') return refreshWordOrder();
+  return undefined;
+}
+
+// Runs a list write (generate, import or delete), one at a time. The sentences block shows it; the exercise is not locked.
+// Errors go to the notice line.
+async function changeSentences(busyKind, write) {
+  if (wordOrder.busy) {
+    notice('Зачекайте, поки завершиться попередня дія');
+    return null;
+  }
+  wordOrder.busy = busyKind;
+  renderWordOrderSentences();
+  let result = null;
+  try {
+    result = await write();
+  } catch (error) {
+    notice(error.message || 'Помилка');
+  }
+  wordOrder.busy = '';
+  await refreshWordOrder();
+  return result;
+}
+
+function makeWordTile(text, className) {
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = `word-tile ${className}`;
+  tile.textContent = text;
+  return tile;
+}
+
+function renderWordOrderExercise() {
+  const sentence = currentWordOrderSentence();
+  const { exercise, checked, checking } = wordOrder;
+  const isLocked = !!checked || checking;
+  const answerTiles = readAnswerTiles(exercise);
+
+  $('word-order-uk').textContent = sentence.uk;
+
+  const answerBox = $('word-order-answer');
+  answerBox.replaceChildren();
+  answerBox.dataset.result = checked ? (checked.is_correct ? 'ok' : 'bad') : '';
+  if (!answerTiles.length) {
+    const hint = document.createElement('p');
+    hint.className = 'word-order__hint';
+    hint.textContent = 'Натискай слова знизу';
+    answerBox.append(hint);
+  }
+  exercise.answer.forEach((pileIndex, position) => {
+    const tile = makeWordTile(exercise.pile[pileIndex].text, 'word-tile--answer');
+    tile.dataset.position = String(position);
+    tile.disabled = isLocked;
+    answerBox.append(tile);
+  });
+
+  // A used tile stays in the pile as an invisible copy of the same size, so the pile does not move.
+  const pileBox = $('word-order-pile');
+  pileBox.replaceChildren();
+  for (const tile of exercise.pile) {
+    if (tile.used) {
+      const gap = makeWordTile(tile.text, 'word-tile--gap');
+      gap.setAttribute('aria-hidden', 'true');
+      gap.tabIndex = -1;
+      gap.disabled = true;
+      pileBox.append(gap);
+    } else {
+      const button = makeWordTile(tile.text, 'word-tile--pile');
+      button.dataset.index = String(tile.index);
+      button.disabled = isLocked;
+      pileBox.append(button);
+    }
+  }
+
+  const msg = $('word-order-msg');
+  if (checked) {
+    const view = buildWordOrderCheckView(checked);
+    msg.textContent = view.text;
+    msg.className = `msg ${view.ok ? 'ok' : 'bad'}`;
+  } else {
+    msg.textContent = '';
+    msg.className = 'msg';
+  }
+
+  $('word-order-check').disabled = !answerTiles.length || isLocked;
+  $('word-order-check').hidden = !!checked;
+  $('word-order-skip').disabled = isLocked;
+  $('word-order-skip').hidden = !!checked;
+  $('word-order-next').hidden = !checked;
+}
+
+// The whole tab: the exercise, the summary and the sentences block.
+function renderWordOrder() {
+  const { status, sentences, index, results } = wordOrder;
+  const isReady = status === 'ready' && !!currentWordOrderSentence();
+  const isDone = status === 'done';
+
+  $('word-order-exercise').hidden = !isReady;
+  $('word-order-summary').hidden = !isDone;
+  $('word-order-empty').hidden = status !== 'empty';
+  $('word-order-progress').textContent = isReady ? formatWordOrderProgress(index + 1, sentences.length) : '';
+  if (isReady) renderWordOrderExercise();
+  if (isDone) {
+    // Skipped sentences are not in results, so the total is the number answered.
+    $('word-order-result').textContent = formatWordOrderSummary(results.filter(Boolean).length, results.length);
+  }
+  $('word-order-more').disabled = wordOrder.loadingMore;
+
+  renderWordOrderSentences();
+}
+
+// Live refreshes (SSE, poll, visibilitychange) during a set update only the sentences block: the tiles and the focus stay.
+function renderWordOrderLive() {
+  if (isWordOrderInProgress()) renderWordOrderSentences();
+  else renderWordOrder();
+}
+
+function renderWordOrderSentences() {
+  const { list, canGenerate, busy } = wordOrder;
+  $('word-order-sentences-title').textContent = `Речення (${list.length})`;
+
+  const generate = $('word-order-generate');
+  generate.hidden = !canGenerate;
+  generate.disabled = !!busy;
+  generate.textContent = busy === 'generate' ? 'Генерую…' : 'Згенерувати ще 20';
+  $('word-order-import-button').disabled = !!busy;
+
+  const box = $('word-order-list');
+  if (!list.length) {
+    box.innerHTML = '<li class="empty">Речень поки немає.</li>';
+    return;
+  }
+  box.replaceChildren(...list.map(sentence => {
+    const row = document.createElement('li');
+    row.className = 'item';
+    const main = document.createElement('div');
+    main.className = 'item-main';
+    const nl = document.createElement('div');
+    const bold = document.createElement('b');
+    bold.textContent = sentence.nl;
+    nl.append(bold);
+    const uk = document.createElement('div');
+    uk.textContent = sentence.uk;
+    main.append(nl, uk);
+    const stats = document.createElement('span');
+    stats.className = 'muted';
+    stats.textContent = formatSentenceStats(sentence);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.dataset.id = String(sentence.id);
+    del.setAttribute('aria-label', 'Видалити речення');
+    del.textContent = '×';
+    row.append(main, stats, del);
+    return row;
+  }));
+}
+
+// Moves the keyboard focus to the target the logic.js focus helpers chose; null leaves it where it is.
+function focusWordOrderTarget(target) {
+  if (!target) return;
+  if (target.kind === 'check') {
+    $('word-order-check').focus();
+  } else if (target.kind === 'pile') {
+    $('word-order-pile').querySelector(`button[data-index="${target.index}"]`)?.focus();
+  } else {
+    $('word-order-answer').querySelector(`button[data-position="${target.position}"]`)?.focus();
+  }
+}
+
+// After the sentence changes (next, skip, a replaced set): the first free pile tile, or «Ще 10» when the set is done.
+function focusAfterSentenceChange() {
+  if (wordOrder.status === 'done') {
+    $('word-order-more').focus();
+  } else if (wordOrder.exercise) {
+    focusWordOrderTarget(chooseFirstPileFocus(wordOrder.exercise));
+  }
+}
+
+// Puts the sentence at index on screen; past the last one the set is done.
+function showSentenceAt(index) {
+  wordOrder.index = index;
+  wordOrder.checked = null;
+  if (index >= wordOrder.sentences.length) {
+    wordOrder.status = 'done';
+    wordOrder.exercise = null;
+  } else {
+    wordOrder.exercise = createWordOrderState(wordOrder.sentences[index].tiles);
+  }
+}
+
+// Drops the sentence on screen from the set (skipped, or deleted meanwhile) and shows the next one. Not counted.
+function skipCurrentSentence() {
+  Object.assign(wordOrder, skipSentenceInSet(wordOrder));
+  showSentenceAt(wordOrder.index);
+}
+
+function handleWordOrderPileClick(event) {
+  const button = event.target.closest('button[data-index]');
+  if (!button || wordOrder.checked || wordOrder.checking) return;
+  const pileIndex = Number(button.dataset.index);
+  wordOrder.exercise = placeTile(wordOrder.exercise, pileIndex);
+  renderWordOrderExercise();
+  focusWordOrderTarget(chooseFocusAfterPlace(wordOrder.exercise, pileIndex));
+}
+
+function handleWordOrderAnswerClick(event) {
+  const button = event.target.closest('button[data-position]');
+  if (!button || wordOrder.checked || wordOrder.checking) return;
+  const position = Number(button.dataset.position);
+  wordOrder.exercise = returnTile(wordOrder.exercise, position);
+  renderWordOrderExercise();
+  focusWordOrderTarget(chooseFocusAfterReturn(wordOrder.exercise, position));
+}
+
+// Only this request locks the exercise. A sentence deleted meanwhile (404) is skipped with a notice.
+async function handleWordOrderCheck() {
+  const sentence = currentWordOrderSentence();
+  const tiles = readAnswerTiles(wordOrder.exercise);
+  if (!sentence || !tiles.length || wordOrder.checked || wordOrder.checking) return;
+  wordOrder.checking = true;
+  renderWordOrderExercise();
+  let result = null;
+  let isMissing = false;
+  try {
+    result = await api.answerWordOrder(sentence.id, tiles);
+  } catch (error) {
+    if (error.status === 404) isMissing = true;
+    else notice(error.message || 'Помилка');
+  }
+  wordOrder.checking = false;
+  // The set may have been replaced while the check was in flight: only the sentence still on screen takes the answer.
+  const isStillOnScreen = currentWordOrderSentence() === sentence;
+  if (isMissing && isStillOnScreen) {
+    skipCurrentSentence();
+    notice('Це речення вже видалено. Пропускаємо.');
+    renderWordOrder();
+    focusAfterSentenceChange();
+  } else if (result && isStillOnScreen) {
+    wordOrder.checked = result;
+    wordOrder.results.push(!!result.is_correct);
+    renderWordOrderExercise();
+    $('word-order-next').focus();
+  } else {
+    renderWordOrder();
+  }
+}
+
+// «Пропустити»: the sentence leaves the set without a result.
+function handleWordOrderSkip() {
+  if (!currentWordOrderSentence() || wordOrder.checked || wordOrder.checking) return;
+  skipCurrentSentence();
+  renderWordOrder();
+  focusAfterSentenceChange();
+}
+
+function handleWordOrderNext() {
+  if (!wordOrder.checked) return;
+  showSentenceAt(wordOrder.index + 1);
+  renderWordOrder();
+  focusAfterSentenceChange();
+}
+
+async function handleWordOrderMore() {
+  if (wordOrder.loadingMore) return;
+  wordOrder.loadingMore = true;
+  renderWordOrder();
+  await refreshWordOrder({ replace: true });
+  wordOrder.loadingMore = false;
+  renderWordOrder();
+  focusAfterSentenceChange();
+}
+
+async function handleWordOrderGenerate() {
+  const result = await changeSentences('generate', () => api.generateOrderSentences(20));
+  if (result) $('word-order-import-msg').textContent = formatImportResult(result);
+}
+
+async function handleWordOrderImport(event) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  $('word-order-import-msg').textContent = '';
+  const result = await changeSentences('import', async () => api.importOrderSentences(await file.text()));
+  if (result) $('word-order-import-msg').textContent = formatImportResult(result);
+}
+
+function handleWordOrderListClick(event) {
+  const button = event.target.closest('button[data-id]');
+  if (!button) return;
+  const id = Number(button.dataset.id);
+  const sentence = wordOrder.list.find(item => item.id === id);
+  if (!sentence) return;
+  askConfirm({
+    title: 'Видалити речення?',
+    text: `Видалити речення "${sentence.nl}"? Його відповіді теж буде видалено.`,
+    onConfirm: () => changeSentences('delete', () => api.deleteOrderSentence(id)),
+  });
+}
+
 // ---------- wiring ----------
 
 function bindEvents() {
@@ -1576,12 +1966,12 @@ function bindEvents() {
   const deleteDialog = $('delete-dialog');
   $('delete-dialog-cancel').addEventListener('click', () => deleteDialog.close());
   $('delete-dialog-confirm').addEventListener('click', () => {
-    const pending = pendingWordDelete;
-    pendingWordDelete = null;
+    const pending = pendingConfirm;
+    pendingConfirm = null;
     deleteDialog.close();
     pending?.onConfirm();
   });
-  deleteDialog.addEventListener('close', () => { pendingWordDelete = null; });
+  deleteDialog.addEventListener('close', () => { pendingConfirm = null; });
 
   // Таблиця
   $('word-form').addEventListener('submit', event => {
@@ -1728,6 +2118,18 @@ function bindEvents() {
       renderPhrases();
     }
   });
+
+  // Порядок слів
+  $('word-order-pile').addEventListener('click', handleWordOrderPileClick);
+  $('word-order-answer').addEventListener('click', handleWordOrderAnswerClick);
+  $('word-order-check').addEventListener('click', handleWordOrderCheck);
+  $('word-order-skip').addEventListener('click', handleWordOrderSkip);
+  $('word-order-next').addEventListener('click', handleWordOrderNext);
+  $('word-order-more').addEventListener('click', handleWordOrderMore);
+  $('word-order-generate').addEventListener('click', handleWordOrderGenerate);
+  $('word-order-import-button').addEventListener('click', () => $('word-order-file').click());
+  $('word-order-file').addEventListener('change', handleWordOrderImport);
+  $('word-order-list').addEventListener('click', handleWordOrderListClick);
 }
 
 // ---------- start ----------
@@ -1769,6 +2171,8 @@ function init() {
   showTab(saved);
   refresh(ALL_KEYS).catch(error => notice(error.message || 'Не вдалося завантажити дані'));
   api.subscribe(collection => {
+    if (collection === 'word-order' || collection === 'all') refreshWordOrderIfNeeded();
+    if (collection === 'word-order') return;
     refresh(KEYS_FOR[collection] || ALL_KEYS).catch(error => notice(error.message || 'Помилка оновлення'));
   });
 }

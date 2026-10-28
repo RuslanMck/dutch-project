@@ -417,6 +417,7 @@ export const TAB_TITLES = Object.freeze({
   practice: 'Практика',
   cards: 'Картки',
   phrases: 'Фрази',
+  'word-order': 'Порядок слів',
   table: 'Таблиця',
   rules: 'Правила',
   texts: 'Тексти',
@@ -602,4 +603,96 @@ export function buildOverviewTiles(stats) {
     { label: 'Фраз', value: String(stats.phrases), delta: null },
     { label: 'Повторити сьогодні', value: String(stats.fsrs.due_today), delta: null },
   ];
+}
+
+// ---------- word-order exercise («Порядок слів») ----------
+
+// The pile holds the shuffled tiles; a tile keeps its place in the pile while it is used. answer lists pile indexes in
+// the order the learner tapped them. Every function returns a new state; the old one is not changed.
+export function createWordOrderState(tiles) {
+  return {
+    pile: tiles.map((text, index) => ({ index, text, used: false })),
+    answer: [],
+  };
+}
+
+// Tapping a pile tile moves it to the end of the answer line. A used or unknown tile changes nothing.
+export function placeTile(state, index) {
+  const tile = state.pile[index];
+  if (!tile || tile.used) return state;
+  return {
+    pile: state.pile.map(item => (item.index === index ? { ...item, used: true } : item)),
+    answer: [...state.answer, index],
+  };
+}
+
+// Tapping a tile in the answer line sends it back to its place in the pile. A bad position changes nothing.
+export function returnTile(state, answerPosition) {
+  if (!Number.isInteger(answerPosition) || answerPosition < 0 || answerPosition >= state.answer.length) return state;
+  const pileIndex = state.answer[answerPosition];
+  return {
+    pile: state.pile.map(item => (item.index === pileIndex ? { ...item, used: false } : item)),
+    answer: state.answer.filter((_, position) => position !== answerPosition),
+  };
+}
+
+// The Dutch words of the answer line, left to right (what the server checks).
+export function readAnswerTiles(state) {
+  return state.answer.map(pileIndex => state.pile[pileIndex].text);
+}
+
+// "Речення 3 з 10" (position is 1-based).
+export function formatWordOrderProgress(position, total) {
+  return `Речення ${position} з ${total}`;
+}
+
+// "Готово: 8 з 10 правильно".
+export function formatWordOrderSummary(correctCount, total) {
+  return `Готово: ${correctCount} з ${total} правильно`;
+}
+
+// The line under the answer after «Перевірити»: right is green, wrong shows the correct sentence.
+export function buildWordOrderCheckView({ is_correct: isCorrect, correct_nl: correctNl }) {
+  if (isCorrect) return { ok: true, text: 'Правильно ✓' };
+  return { ok: false, text: `Правильно: ${correctNl}` };
+}
+
+// "✓ 3 / 4" for a sentence answered four times, three of them right; "ще не відповідали" before the first answer.
+export function formatSentenceStats({ times_answered: answered = 0, times_correct: correct = 0 }) {
+  if (!answered) return 'ще не відповідали';
+  return `✓ ${correct} / ${answered}`;
+}
+
+// "Додано 3, пропущено 1" and, when the table had bad rows, "; рядків з помилками: 2".
+export function formatImportResult({ added = [], skipped = [], errors = [] }) {
+  const base = `Додано ${added.length}, пропущено ${skipped.length}`;
+  return errors.length ? `${base}; рядків з помилками: ${errors.length}` : base;
+}
+
+// The keyboard focus after a pile tile is placed: the pile tile at the same pile index if it is still free, else the
+// next free one after it, else «Перевірити».
+export function chooseFocusAfterPlace(state, pileIndex) {
+  const free = state.pile.find(tile => !tile.used && tile.index >= pileIndex);
+  return free ? { kind: 'pile', index: free.index } : { kind: 'check' };
+}
+
+// The keyboard focus after an answer tile goes back to the pile: the answer tile now at its position, else the last
+// one, else the first free pile tile (null when there is none).
+export function chooseFocusAfterReturn(state, position) {
+  if (position < state.answer.length) return { kind: 'answer', position };
+  if (state.answer.length) return { kind: 'answer', position: state.answer.length - 1 };
+  return chooseFirstPileFocus(state);
+}
+
+// The first free pile tile: where the focus goes at the start of a sentence (null when there is none).
+export function chooseFirstPileFocus(state) {
+  const free = state.pile.find(tile => !tile.used);
+  return free ? { kind: 'pile', index: free.index } : null;
+}
+
+// A sentence skipped (or deleted meanwhile) leaves the set; index keeps pointing at the next one, past the end when
+// none is left. Nothing is counted for it.
+export function skipSentenceInSet({ sentences, index }) {
+  const rest = sentences.filter((_, position) => position !== index);
+  return { sentences: rest, index: Math.min(index, rest.length) };
 }

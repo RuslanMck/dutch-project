@@ -12,6 +12,7 @@ Zod schemas for every shape that crosses a boundary: REST bodies, queries and pa
 | `rule-contracts.js` | Grammar rules: create, update, and lookup by id or code. |
 | `mistake-contracts.js` | Mistake patterns and cases: list filters, create a pattern, add a case, and log a mistake. |
 | `phrase-contracts.js` | Phrases: create one, add several, and list. |
+| `word-order-contracts.js` | Word-order sentences: add several, the answer tiles, the Markdown import, generation (count) and the list limit. |
 | `text-contracts.js` | Bilingual texts: create and update. |
 | `environment-contracts.js` | `environmentSchema`: the environment variables the app reads, with their defaults. |
 

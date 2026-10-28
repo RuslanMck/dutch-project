@@ -14,6 +14,7 @@ Numbered SQL files that build the SQLite schema. The runner applies them in name
 | `006-add-learning-deck.sql` | The learning deck: `words.deck_required_correct` (NULL = not in the deck) and `deck_correct_streak`, and `deck_answers`, one row per answer (repeats in a session too) with the position after it. Run `scripts/rebuild-learning-deck.js --apply` once after it. |
 | `007-count-deck-answers-and-entry.sql` | The deck counts right answers in total: renames `deck_correct_streak` to `deck_correct_count` (and `correct_streak_after` to `correct_count_after`), and adds `words.deck_entered_by_lapse` (only words that entered as New hold back the next session's new words). Run `scripts/rebuild-learning-deck.js --apply` after it. |
 | `008-add-two-way-practice.sql` | Two-way practice: `words.deck_reverse_*` columns for the nl_uk direction (the existing deck columns are uk_nl), `direction` on `deck_answers`, `direction` and `second_grade` on `review_logs` and `phrase_review_logs`, and `phrase_answers`, one counting answer per phrase, session and direction (existing phrase grades become uk_nl answers). |
+| `009-add-word-order-sentences.sql` | The word-order exercise: `order_sentences` (the Dutch and Ukrainian sentence, its optional rule, its source and a normalized key that makes repeats unique) and `order_sentence_answers`, one row per answer. |
 
 ## Conventions
 

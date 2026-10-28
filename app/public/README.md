@@ -14,3 +14,5 @@ Browser code and static files of the web app, served by Express without a build 
 | `app.css` | Styles for the app and login pages, with light and dark themes. |
 | `icon.svg` | App icon, used as the favicon and in the web manifest. |
 | `manifest.webmanifest` | Web app manifest, so the page can be installed on a phone home screen. |
+
+The «Порядок слів» tab (after «Фрази») is a Duolingo-style word-order exercise: the learner taps the shuffled Dutch words of a Ukrainian sentence into the answer line, checks it, and manages the stored sentences (generate, `.md` import, list with delete); its pure state and formatting helpers live in `logic.js`, its REST calls in `api.js`.

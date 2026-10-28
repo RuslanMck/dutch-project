@@ -30,6 +30,8 @@ export function parseEnvironmentConfiguration(environment, { shouldRequireSecret
     databasePath: variables.DB_PATH,
     backupDirectory: variables.BACKUP_DIR,
     backupRetentionCount: variables.BACKUP_KEEP,
+    openRouterApiKey: variables.OPENROUTER_API_KEY,
+    openRouterModel: variables.OPENROUTER_MODEL,
   });
 }
 

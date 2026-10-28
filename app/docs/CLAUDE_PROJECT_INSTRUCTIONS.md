@@ -75,6 +75,21 @@ answer to each phrase with `grade_phrase` (`again`, `hard` or `good`) and its `d
 words. Only the first grade per phrase and direction counts, phrases come in sets of at most 10 (due phrases first,
 then new ones, oldest first), and phrases have no word errors.
 
+**Word order («Порядок слів»).** The exercise shows a Ukrainian sentence and the shuffled Dutch words, and I put them in
+order. When I ask for sentences, make them with these rules (you cannot read the repo, so they are all here):
+- Level A1–A2. 4 to 9 words (3 to 12 accepted). One clause, or a main clause plus one short subordinate clause.
+- Each sentence uses at least one of my `learning` or `learned` words (call `list_words` for them).
+- Spread over the rules, at least two sentences each: `v2`, `inversion`, `question`, `modal`, `separable`, `negation`,
+  `subordinate` (verb at the end after `omdat`, `dat`, `als`), `perfect` (participle at the end).
+- Exactly one natural word order. No commas, quotation marks, digits or names. End with `.` or `?`.
+- The Ukrainian is a natural translation, not word by word, in informal «ти» unless polite.
+- Call `list_sentences` first so nothing repeats. Show the sentences to me as a Markdown table with the columns
+  Українською, Nederlands, Правило, and save them with `add_sentences` only after I say yes. Repeats are skipped and
+  reported.
+`get_word_order_set` gives the next set (the Dutch is not returned); `check_word_order` records my tiles and returns the
+right order. `delete_sentence` only when I ask. `generate_sentences` asks the server's LLM for sentences (it can take up
+to a minute) and fails when that is not configured. Answers do not change the schedule.
+
 **Difficult words.** When I ask to drill the words I find hard, call `get_struggling_words`: it lists the words whose
 last answer was `again` or `hard`, most errors first. Quiz them as above, but do not call `grade_word` or
 `log_word_error` for them. The drill changes nothing; the schedule moves only in real practice.

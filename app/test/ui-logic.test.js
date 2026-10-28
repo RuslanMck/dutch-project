@@ -38,6 +38,19 @@ import {
   splitIntoRounds,
   planNextRound,
   ROUND_DIRECTIONS,
+  createWordOrderState,
+  placeTile,
+  returnTile,
+  readAnswerTiles,
+  formatWordOrderProgress,
+  formatWordOrderSummary,
+  buildWordOrderCheckView,
+  formatSentenceStats,
+  formatImportResult,
+  chooseFocusAfterPlace,
+  chooseFocusAfterReturn,
+  chooseFirstPileFocus,
+  skipSentenceInSet,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -670,4 +683,130 @@ test('buildRoundSummaryView: mistakes per direction on each word', () => {
     started_at: 0, finished_at: 60_000, active_seconds: 60,
   };
   assert.equal(buildRoundSummaryView(round).words[0].detail, 'відповідей: 4 · UA→NL: 1 · NL→UA: 0');
+});
+
+// ---------- word-order exercise ----------
+
+test('createWordOrderState puts every tile in the pile, unused, with an empty answer line', () => {
+  const state = createWordOrderState(['de', 'man', 'loopt']);
+  assert.deepEqual(state.pile, [
+    { index: 0, text: 'de', used: false },
+    { index: 1, text: 'man', used: false },
+    { index: 2, text: 'loopt', used: false },
+  ]);
+  assert.deepEqual(state.answer, []);
+  assert.deepEqual(readAnswerTiles(state), []);
+});
+
+test('placeTile moves a pile tile to the end of the answer line and keeps its pile place', () => {
+  const start = createWordOrderState(['de', 'man', 'loopt']);
+  const once = placeTile(start, 2);
+  const twice = placeTile(once, 0);
+  assert.deepEqual(twice.answer, [2, 0]);
+  assert.deepEqual(readAnswerTiles(twice), ['loopt', 'de']);
+  assert.equal(twice.pile[2].used, true);
+  assert.equal(twice.pile[0].used, true);
+  assert.equal(twice.pile[1].used, false);
+  assert.equal(twice.pile[0].text, 'de', 'the placed tile keeps its text and place in the pile');
+  assert.deepEqual(start.answer, [], 'the old state is not changed');
+});
+
+test('placeTile ignores a used tile, an unknown index and leaves the state as it was', () => {
+  const state = placeTile(createWordOrderState(['a', 'b']), 0);
+  assert.equal(placeTile(state, 0), state);
+  assert.equal(placeTile(state, 5), state);
+  assert.equal(placeTile(state, -1), state);
+});
+
+test('returnTile sends an answer tile back to its own place in the pile', () => {
+  let state = createWordOrderState(['de', 'man', 'loopt', 'hond']);
+  state = placeTile(state, 3);
+  state = placeTile(state, 1);
+  state = placeTile(state, 0);
+  // answer is [3, 1, 0]; returning the middle tile (man) leaves [3, 0].
+  const back = returnTile(state, 1);
+  assert.deepEqual(back.answer, [3, 0]);
+  assert.equal(back.pile[1].used, false);
+  assert.deepEqual(readAnswerTiles(back), ['hond', 'de']);
+  assert.deepEqual(readAnswerTiles(state), ['hond', 'man', 'de'], 'the old state is not changed');
+});
+
+test('returnTile ignores a position outside the answer line', () => {
+  const state = placeTile(createWordOrderState(['a', 'b']), 1);
+  assert.equal(returnTile(state, 1), state);
+  assert.equal(returnTile(state, -1), state);
+  assert.equal(returnTile(state, 0.5), state);
+});
+
+test('duplicate words keep their own pile places, so each copy can be placed and returned', () => {
+  let state = createWordOrderState(['de', 'huis', 'de']);
+  state = placeTile(state, 2);
+  state = placeTile(state, 0);
+  assert.deepEqual(readAnswerTiles(state), ['de', 'de']);
+  // answer is [2, 0]; returning position 0 frees pile index 2 and leaves the first 'de' in the answer line.
+  state = returnTile(state, 0);
+  assert.equal(state.pile[2].used, false);
+  assert.equal(state.pile[0].used, true);
+  assert.deepEqual(readAnswerTiles(state), ['de']);
+});
+
+test('formatWordOrderProgress and formatWordOrderSummary', () => {
+  assert.equal(formatWordOrderProgress(3, 10), 'Речення 3 з 10');
+  assert.equal(formatWordOrderSummary(8, 10), 'Готово: 8 з 10 правильно');
+});
+
+test('buildWordOrderCheckView shows green for a right answer and the correct sentence for a wrong one', () => {
+  assert.deepEqual(buildWordOrderCheckView({ is_correct: true, correct_nl: 'Ik woon hier.' }),
+    { ok: true, text: 'Правильно ✓' });
+  assert.deepEqual(buildWordOrderCheckView({ is_correct: false, correct_nl: 'Ik woon hier.' }),
+    { ok: false, text: 'Правильно: Ik woon hier.' });
+});
+
+test('formatSentenceStats reads the answer counts', () => {
+  assert.equal(formatSentenceStats({ times_answered: 4, times_correct: 3 }), '✓ 3 / 4');
+  assert.equal(formatSentenceStats({ times_answered: 0, times_correct: 0 }), 'ще не відповідали');
+  assert.equal(formatSentenceStats({}), 'ще не відповідали');
+});
+
+test('formatImportResult counts added and skipped sentences and bad rows', () => {
+  assert.equal(formatImportResult({ added: [{}, {}, {}], skipped: [{}] }), 'Додано 3, пропущено 1');
+  assert.equal(formatImportResult({ added: [], skipped: [], errors: ['рядок 2: порожнє'] }),
+    'Додано 0, пропущено 0; рядків з помилками: 1');
+});
+
+test('chooseFocusAfterPlace keeps the pile index if free, else the next free tile, else «Перевірити»', () => {
+  let state = createWordOrderState(['a', 'b', 'c']);
+  state = placeTile(state, 0);
+  assert.deepEqual(chooseFocusAfterPlace(state, 0), { kind: 'pile', index: 1 });
+  state = placeTile(state, 1);
+  state = placeTile(state, 2);
+  assert.deepEqual(chooseFocusAfterPlace(state, 2), { kind: 'check' });
+});
+
+test('chooseFocusAfterReturn focuses the answer tile at the position, else the last one, else the pile', () => {
+  let state = createWordOrderState(['a', 'b', 'c']);
+  state = placeTile(placeTile(placeTile(state, 0), 1), 2);
+  // answer is [0, 1, 2]; returning position 1 leaves [0, 2]: the tile now at position 1 is 'c'.
+  const middle = returnTile(state, 1);
+  assert.deepEqual(chooseFocusAfterReturn(middle, 1), { kind: 'answer', position: 1 });
+  // returning the last tile: position 2 is past the end, so the new last tile is focused.
+  const last = returnTile(state, 2);
+  assert.deepEqual(chooseFocusAfterReturn(last, 2), { kind: 'answer', position: 1 });
+  // returning the only tile: no answer left, so the first free pile tile is focused.
+  const only = returnTile(placeTile(createWordOrderState(['a', 'b']), 1), 0);
+  assert.deepEqual(chooseFocusAfterReturn(only, 0), { kind: 'pile', index: 0 });
+});
+
+test('chooseFirstPileFocus picks the first free pile tile, null when none is free', () => {
+  const state = placeTile(createWordOrderState(['a', 'b']), 0);
+  assert.deepEqual(chooseFirstPileFocus(state), { kind: 'pile', index: 1 });
+  assert.equal(chooseFirstPileFocus(createWordOrderState([])), null);
+});
+
+test('skipSentenceInSet drops the sentence on screen and points at the next one', () => {
+  const sentences = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  assert.deepEqual(skipSentenceInSet({ sentences, index: 1 }), { sentences: [{ id: 1 }, { id: 3 }], index: 1 });
+  assert.deepEqual(skipSentenceInSet({ sentences, index: 2 }), { sentences: [{ id: 1 }, { id: 2 }], index: 2 });
+  assert.deepEqual(skipSentenceInSet({ sentences: [{ id: 1 }], index: 0 }), { sentences: [], index: 0 });
+  assert.deepEqual(sentences, [{ id: 1 }, { id: 2 }, { id: 3 }], 'the old set is not changed');
 });
