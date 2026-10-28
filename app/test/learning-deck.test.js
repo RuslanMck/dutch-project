@@ -76,7 +76,6 @@ test('yesterday 9 wrong and 1 right: today the 10 deck words come back and no ne
 
   assert.equal(nextDay.reviews.length, 10, 'the session goes on: the 9 missed words and the 1 right once');
   assert.equal(nextDay.new_words.length, 0);
-  assert.equal(nextDay.counts.deck_size, 10);
   assert.equal(nextDay.counts.deck_words, 10);
   assert.deepEqual(nextDay.reviews.map(word => word.deck.times_left).sort(), [1, 3, 3, 3, 3, 3, 3, 3, 3, 3]);
 });
@@ -97,7 +96,7 @@ test('every answer counts: a word missed and repeated in the session moves towar
   assert.equal(context.practiceService.calculatePracticeStatistics().deck_size, 0);
 });
 
-test('the session lasts until all its words are learned; then the next 10 new words come at once', () => {
+test('the set lasts until all its words are learned; then the next 10 new words come at once', () => {
   const { context } = createMigratedContext(25);
   const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 'day-1' });
   for (const word of firstBatch.new_words) {
@@ -117,11 +116,11 @@ test('the session lasts until all its words are learned; then the next 10 new wo
 
   context.practiceService.gradeWord({ wordId: nextDay.reviews[9].id, grade: 'good', sessionId: 'day-2' });
   const nextSession = context.practiceService.getPracticeBatch({ sessionId: 'day-2' });
-  assert.equal(nextSession.counts.deck_size, 0);
+  assert.equal(nextSession.counts.deck_words, 0);
   assert.equal(nextSession.new_words.length, 10, 'the next session starts at once, the same day');
 });
 
-test('a review answered wrong joins the session without holding back its new words', () => {
+test('a review answered wrong stays in its set until learned; the new words come in the next set', () => {
   const { context, wordIds } = createMigratedContext(12);
   const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
   for (const word of firstBatch.new_words) {
@@ -140,7 +139,13 @@ test('a review answered wrong joins the session without holding back its new wor
   const afterLapse = context.practiceService.getPracticeBatch({ sessionId: 's2' });
   assert.equal(afterLapse.reviews[0].id, later.reviews[0].id, 'the lapse is in the session');
   assert.equal(afterLapse.reviews[0].deck.times_left, 3);
-  assert.equal(afterLapse.new_words.length, wordIds.length - 10, 'the new words still come');
+  assert.equal(afterLapse.reviews.length, 1, 'the other reviews are finished');
+  assert.equal(afterLapse.new_words.length, 0, 'the set was full of reviews');
+  for (let answer = 0; answer < 3; answer += 1) {
+    context.practiceService.gradeWord({ wordId: later.reviews[0].id, grade: 'good', sessionId: 's2' });
+  }
+  const nextSet = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+  assert.equal(nextSet.new_words.length, wordIds.length - 10, 'the next set has room for the new words');
 });
 
 test('the deck rebuild replays the counting review logs; a dry run writes nothing', () => {

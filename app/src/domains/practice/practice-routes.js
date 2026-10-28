@@ -3,7 +3,6 @@
 import express from 'express';
 
 import {
-  addExtraNewWordsInputSchema,
   gradePhraseInputSchema,
   gradeWordInputSchema,
   practiceBatchQuerySchema,
@@ -49,12 +48,7 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
     }));
   });
 
-  practiceRouter.post('/practice/extra-new-words', (request, response) => {
-    const extraInput = addExtraNewWordsInputSchema.parse(readRequestBody(request));
-    response.json(practiceService.addExtraNewWords({ count: extraInput.count }));
-  });
-
-  // Read only: the summary of the current round of new words.
+  // Read only: the summary of the current set.
   practiceRouter.get('/practice/round-summary', (request, response) => {
     response.json(practiceService.getRoundSummary());
   });

@@ -46,7 +46,6 @@ export const gradePracticeWord = body => request('POST', '/api/practice/grades',
 export const getPracticeStats = () => request('GET', '/api/practice/stats');
 export const getPhraseBatch = sessionId => request('GET', `/api/practice/phrases/batch?session_id=${enc(sessionId)}`);
 export const gradePracticePhrase = body => request('POST', '/api/practice/phrases/grades', body);
-export const addExtraNewWords = body => request('POST', '/api/practice/extra-new-words', body);
 export const getStrugglingWords = () => request('GET', '/api/practice/struggling-words');
 export const getRoundSummary = () => request('GET', '/api/practice/round-summary');
 export const getStats = () => request('GET', '/api/stats');

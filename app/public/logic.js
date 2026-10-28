@@ -129,13 +129,6 @@ export function gradeTranslationAnswer(word, input) {
   return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
 }
 
-// The "Хочете ще 10 нових слів?" button of the practice summary: only while the gate is open and New words remain
-// today.
-export function canOfferExtraNewWords({ newWordsBlocked, newRemainingByPriority }) {
-  const newRemainingCount = Object.values(newRemainingByPriority ?? {}).reduce((total, count) => total + count, 0);
-  return newWordsBlocked !== true && newRemainingCount > 0;
-}
-
 // Practice rotates among the first ACTIVE_WINDOW_SIZE words of the queue only; the rest wait their turn.
 export const ACTIVE_WINDOW_SIZE = 5;
 
@@ -324,7 +317,7 @@ export function buildRoundSummaryView(round) {
     difficultyLabel: DIFFICULTY_LABELS[word.difficulty],
     detail: `відповідей: ${word.answer_count} · ${word.mistake_count} ${pluralize(word.mistake_count, MISTAKE_WORDS)}`,
   }));
-  return { title: 'Вітаємо! Усі нові слова вивчено 🎉', stats, hardestText, words };
+  return { title: 'Вітаємо! Набір завершено 🎉', stats, hardestText, words };
 }
 
 function formatDutch(word) {

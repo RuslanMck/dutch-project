@@ -1,5 +1,6 @@
-// Phrase practice against an in-memory database and a fake clock: the refusal before the migration, the 5 New phrases
-// a day, grading once per session, the due dates, the Amsterdam day boundary, the list fields and the statistics.
+// Phrase practice against an in-memory database and a fake clock: the refusal before the migration, the set of at
+// most 10 phrases, grading once per session, the due dates, the Amsterdam day boundary, the list fields and the
+// statistics.
 // Fuzz is off, so due dates are exact.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -78,22 +79,24 @@ test('the phrase batch and grades are refused before the FSRS migration, and not
   assert.equal(row.status, 'new');
 });
 
-test('the batch offers at most 5 new phrases a day, oldest first', () => {
+test('a set offers at most 10 new phrases, oldest first', () => {
   const context = createPhraseContext();
-  const phraseIds = addPhrases(context, makeNames('Zin', 7));
+  const phraseIds = addPhrases(context, makeNames('Zin', 12));
   activatePractice(context);
 
   const batch = context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
 
-  assert.deepEqual(batch.new_phrases.map(phrase => phrase.id), phraseIds.slice(0, 5));
+  assert.deepEqual(batch.new_phrases.map(phrase => phrase.id), phraseIds.slice(0, 10));
   assert.deepEqual(batch.reviews, []);
   assert.deepEqual(batch.counts, {
+    set_size: 10,
+    set_phrases: 10,
+    set_new_phrases: 10,
+    is_set_open: false,
     due: 0,
     overdue: 0,
     introduced_today: 0,
-    new_today_remaining: 5,
     new_remaining: 2,
-    new_phrases_blocked: false,
   });
   assert.deepEqual(batch.new_phrases[0], {
     id: phraseIds[0],
@@ -105,9 +108,9 @@ test('the batch offers at most 5 new phrases a day, oldest first', () => {
   });
 });
 
-test('after two new phrases are graded, the next session offers 3 more and leaves the graded ones out', () => {
+test('after two new phrases are graded, the next session keeps the set and leaves the graded ones out', () => {
   const context = createPhraseContext();
-  const phraseIds = addPhrases(context, makeNames('Zin', 7));
+  const phraseIds = addPhrases(context, makeNames('Zin', 12));
   activatePractice(context);
   context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
   context.phrasePracticeService.gradePhrase({ phraseId: phraseIds[0], grade: 'good', sessionId: 's1' });
@@ -115,15 +118,10 @@ test('after two new phrases are graded, the next session offers 3 more and leave
 
   const nextBatch = context.phrasePracticeService.getPhraseBatch({ sessionId: 's2' });
 
-  assert.deepEqual(nextBatch.new_phrases.map(phrase => phrase.id), phraseIds.slice(2, 5));
-  assert.deepEqual(nextBatch.counts, {
-    due: 0,
-    overdue: 0,
-    introduced_today: 2,
-    new_today_remaining: 3,
-    new_remaining: 2,
-    new_phrases_blocked: false,
-  });
+  assert.deepEqual(nextBatch.new_phrases.map(phrase => phrase.id), phraseIds.slice(2, 10));
+  assert.equal(nextBatch.counts.is_set_open, true);
+  assert.equal(nextBatch.counts.introduced_today, 2);
+  assert.equal(nextBatch.counts.new_remaining, 2);
 });
 
 test('good, hard and again give due dates in that order, and each result says when it is due next', () => {
@@ -224,20 +222,20 @@ test('a phrase due at the start of tomorrow in Amsterdam waits for tomorrow, eve
   assert.deepEqual(nextDayBatch.reviews.map(phrase => phrase.id), [justBeforeId, startOfTomorrowId]);
 });
 
-test('a grade late in the evening counts for that Amsterdam day; after midnight only the block\'s leftovers come', () => {
+test('a grade late in the evening counts for that Amsterdam day; after midnight a fresh set is planned', () => {
   const context = createPhraseContext('2026-10-24T23:30:00+02:00');
-  const phraseIds = addPhrases(context, makeNames('Zin', 6));
+  const phraseIds = addPhrases(context, makeNames('Zin', 12));
   activatePractice(context);
   context.phrasePracticeService.gradePhrase({ phraseId: phraseIds[0], grade: 'good', sessionId: 's1' });
 
   assert.equal(readPhraseRow(context, phraseIds[0]).introduced_on, '2026-10-24');
-  assert.equal(context.phrasePracticeService.getPhraseBatch({ sessionId: 's2' }).counts.new_today_remaining, 4);
+  assert.equal(context.phrasePracticeService.getPhraseBatch({ sessionId: 's2' }).counts.set_phrases, 9);
 
   context.clock.moveTo('2026-10-25T00:10:00+02:00');
   const nextDayBatch = context.phrasePracticeService.getPhraseBatch({ sessionId: 's3' });
   assert.equal(nextDayBatch.counts.introduced_today, 0);
-  assert.equal(nextDayBatch.counts.new_today_remaining, 4, 'the unfinished block carries over: no fresh 5');
-  assert.deepEqual(nextDayBatch.new_phrases.map(phrase => phrase.id), phraseIds.slice(1, 5));
+  assert.equal(nextDayBatch.counts.is_set_open, false);
+  assert.deepEqual(nextDayBatch.new_phrases.map(phrase => phrase.id), phraseIds.slice(1, 11));
 });
 
 test('a phrase graded again at 00:30 on the 25-hour day 2026-10-25 is due at the start of 2026-10-26', () => {
@@ -280,7 +278,9 @@ test('the statistics count due and tomorrow\'s phrases, introductions, New phras
     overdue: 0,
     introduced_today: 2,
     new_remaining: 2,
-    new_phrases_blocked: false,
+    set_size: 10,
+    set_phrases_left: 2,
+    is_set_open: true,
     states: { new: 2, learning: 0, review: 2, relearning: 0 },
   });
   assert.deepEqual(context.practiceService.calculatePracticeStatistics().phrases, statistics);
@@ -308,33 +308,19 @@ test('the phrase list shows status and the day a phrase is due, null while New',
   assert.equal(listedById[gradedId].nl, 'gegradeerd', 'existing fields keep their names');
 });
 
-test('overdue phrases hold back new phrases; grading the last overdue one unlocks them in the session', () => {
+test('an overdue phrase takes a place in the set before the new phrases; it no longer holds them back', () => {
   const context = createPhraseContext();
   const [overdueId, newId] = addPhrases(context, ['oud', 'nieuw']);
   activatePractice(context);
   schedulePhrase(context, overdueId, Date.parse('2026-10-22T08:00:00Z'));
 
-  const blocked = context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
-  assert.deepEqual(blocked.new_phrases, []);
-  assert.deepEqual(blocked.counts, {
-    due: 1,
-    overdue: 1,
-    introduced_today: 0,
-    new_today_remaining: 1,
-    new_remaining: 1,
-    new_phrases_blocked: true,
-  });
-  assert.equal(context.phrasePracticeService.calculatePhraseStatistics().new_phrases_blocked, true);
-
-  context.phrasePracticeService.gradePhrase({ phraseId: overdueId, grade: 'good', sessionId: 's1' });
-  const unlocked = context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
-  assert.deepEqual(unlocked.new_phrases.map(phrase => phrase.id), [newId]);
-  assert.equal(unlocked.counts.overdue, 0);
-  assert.equal(unlocked.counts.new_phrases_blocked, false);
-  assert.equal(context.phrasePracticeService.calculatePhraseStatistics().new_phrases_blocked, false);
+  const batch = context.phrasePracticeService.getPhraseBatch({ sessionId: 's1' });
+  assert.deepEqual(batch.reviews.map(phrase => phrase.id), [overdueId]);
+  assert.deepEqual(batch.new_phrases.map(phrase => phrase.id), [newId]);
+  assert.equal(batch.counts.overdue, 1);
 });
 
-test('a phrase graded again today is due tomorrow, so it does not hold back the new phrases', () => {
+test('a phrase graded again today is due tomorrow, so it is finished for today\'s sets', () => {
   const context = createPhraseContext();
   const [overdueId] = addPhrases(context, ['oud', 'nieuw']);
   activatePractice(context);
@@ -344,6 +330,6 @@ test('a phrase graded again today is due tomorrow, so it does not hold back the 
   const batch = context.phrasePracticeService.getPhraseBatch({ sessionId: 's2' });
 
   assert.equal(batch.counts.overdue, 0);
-  assert.equal(batch.counts.new_phrases_blocked, false);
+  assert.deepEqual(batch.reviews, []);
   assert.equal(batch.new_phrases.length, 1);
 });

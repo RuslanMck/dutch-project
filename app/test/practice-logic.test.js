@@ -14,12 +14,12 @@ import {
   serializeCard,
 } from '../src/domains/practice/fsrs-scheduling.js';
 import {
-  countExtraItemsToday,
-  mapFromStoredBlock,
-  mapToStoredBlock,
-  openIntakeBlock,
-  resolveIntakeBlock,
-} from '../src/domains/practice/intake-block.js';
+  findOpenSet,
+  mapFromStoredSet,
+  mapToStoredSet,
+  openPracticeSet,
+  planSetRoom,
+} from '../src/domains/practice/practice-set.js';
 import { allocateNewWords, calculateNewWordAllowance } from '../src/domains/practice/new-word-allocation.js';
 import {
   addDaysToCalendarDate,
@@ -406,72 +406,26 @@ test('allocateNewWords: a block of 10 after a block of 10 gives another 7, 2, 1'
   assert.deepEqual(countByPriority(selectedWords), [7, 2, 1]);
 });
 
-test('resolveIntakeBlock: no stored block means no block is open, so the day count is allocated', () => {
-  const block = resolveIntakeBlock({ storedBlock: null, today: '2026-10-26', newItemIds: new Set([1, 2]) });
-  assert.equal(block.isFresh, true);
-  assert.equal(block.openedOn, '2026-10-26');
-  assert.deepEqual(block.itemIds, []);
-  assert.deepEqual(block.leftoverIds, []);
+test('planSetRoom: old cards first, without repeats, up to the set size; new cards get the room left', () => {
+  assert.deepEqual(planSetRoom({ oldIds: [4, 5, 4, 6], setSize: 10 }), { oldIds: [4, 5, 6], room: 7 });
+  assert.deepEqual(planSetRoom({ oldIds: [], setSize: 10 }), { oldIds: [], room: 10 });
+  const manyOld = Array.from({ length: 18 }, (_, index) => index + 1);
+  assert.deepEqual(planSetRoom({ oldIds: manyOld, setSize: 10 }), { oldIds: manyOld.slice(0, 10), room: 0 });
 });
 
-test('resolveIntakeBlock: an unfinished block from an earlier day offers exactly its pinned items still New', () => {
-  const storedBlock = { openedOn: '2026-10-25', itemIds: [1, 2, 3, 4, 5] };
-  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([2, 4, 5, 9]) });
-  assert.equal(block.isFresh, false);
-  assert.equal(block.openedOn, '2026-10-25');
-  assert.deepEqual(block.leftoverIds, [2, 4, 5], 'the started item 1 and the unpinned 9 are not leftovers');
+test('findOpenSet: a set opened today stays open while an item is pending, in pinned order', () => {
+  const storedSet = openPracticeSet({ today: '2026-10-28', openedAt: 1000, itemIds: [3, 1, 2] });
+  const openSet = findOpenSet({ storedSet, today: '2026-10-28', isPending: itemId => itemId !== 1 });
+  assert.deepEqual(openSet.pendingIds, [3, 2]);
+  assert.equal(findOpenSet({ storedSet, today: '2026-10-28', isPending: () => false }), null, 'all finished');
+  assert.equal(findOpenSet({ storedSet, today: '2026-10-29', isPending: () => true }), null, 'a later day');
+  assert.equal(findOpenSet({ storedSet: null, today: '2026-10-28', isPending: () => true }), null);
 });
 
-test('resolveIntakeBlock: a pinned item that is no longer New (started or deleted) counts as done', () => {
-  const storedBlock = { openedOn: '2026-10-25', itemIds: [1, 2, 3] };
-  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([3]) });
-  assert.deepEqual(block.leftoverIds, [3]);
-  assert.equal(block.isFresh, false);
-});
-
-test('resolveIntakeBlock: a finished block from an earlier day gives way to a fresh allocation', () => {
-  const storedBlock = { openedOn: '2026-10-25', itemIds: [1, 2] };
-  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([7]) });
-  assert.equal(block.isFresh, true);
-  assert.equal(block.openedOn, '2026-10-26');
-  assert.deepEqual(block.itemIds, []);
-});
-
-test('resolveIntakeBlock: a block opened today stays once finished, so no fresh block opens the same day', () => {
-  const storedBlock = { openedOn: '2026-10-26', itemIds: [1, 2, 3] };
-  const block = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set([8]) });
-  assert.equal(block.isFresh, false);
-  assert.deepEqual(block.itemIds, [1, 2, 3]);
-  assert.deepEqual(block.leftoverIds, []);
-});
-
-test('resolveIntakeBlock: the stored extra count passes through; a fresh block has none', () => {
-  const storedBlock = { openedOn: '2026-10-26', itemIds: [1, 2], extraCount: 10 };
-  const openBlock = resolveIntakeBlock({ storedBlock, today: '2026-10-26', newItemIds: new Set() });
-  assert.equal(openBlock.extraCount, 10);
-  const freshBlock = resolveIntakeBlock({ storedBlock: null, today: '2026-10-26', newItemIds: new Set([1]) });
-  assert.equal(freshBlock.extraCount, 0);
-});
-
-test('mapFromStoredBlock: a block saved before items were pinned reads as finished, with no items or extras', () => {
-  const oldBlock = mapFromStoredBlock({ opened_on: '2026-10-25', size: 10, introduced_at_open: { 1: 4, 2: 0, 3: 0 } });
-  assert.deepEqual(oldBlock, { openedOn: '2026-10-25', itemIds: [], extraCount: 0 });
-  const block = resolveIntakeBlock({ storedBlock: oldBlock, today: '2026-10-26', newItemIds: new Set([1]) });
-  assert.equal(block.isFresh, true);
-  assert.equal(mapFromStoredBlock(null), null);
-});
-
-test('mapToStoredBlock and mapFromStoredBlock round-trip the pinned items and the extra count', () => {
-  const block = openIntakeBlock({ today: '2026-10-26', itemIds: [3, 1, 2], extraCount: 2 });
-  const saved = mapToStoredBlock(block);
-  assert.deepEqual(saved, { opened_on: '2026-10-26', item_ids: [3, 1, 2], extra_count: 2 });
-  assert.deepEqual(mapFromStoredBlock(saved), block);
-  const savedWithoutExtras = mapFromStoredBlock({ opened_on: '2026-10-26', item_ids: [3] });
-  assert.equal(savedWithoutExtras.extraCount, 0, 'saved without extra_count');
-});
-
-test('countExtraItemsToday: only a block opened today counts its extra new words', () => {
-  assert.equal(countExtraItemsToday({ block: { openedOn: '2026-10-26', extraCount: 10 }, today: '2026-10-26' }), 10);
-  assert.equal(countExtraItemsToday({ block: { openedOn: '2026-10-25', extraCount: 10 }, today: '2026-10-26' }), 0);
-  assert.equal(countExtraItemsToday({ block: { openedOn: '2026-10-26', extraCount: 0 }, today: '2026-10-26' }), 0);
+test('mapToStoredSet and mapFromStoredSet round-trip; a stored value without item_ids reads as no set', () => {
+  const practiceSet = openPracticeSet({ today: '2026-10-28', openedAt: 1234, itemIds: [7, 8] });
+  assert.deepEqual(mapToStoredSet(practiceSet), { opened_on: '2026-10-28', opened_at: 1234, item_ids: [7, 8] });
+  assert.deepEqual(mapFromStoredSet(mapToStoredSet(practiceSet)), practiceSet);
+  assert.equal(mapFromStoredSet({ opened_on: '2026-10-28' }), null);
+  assert.equal(mapFromStoredSet(null), null);
 });

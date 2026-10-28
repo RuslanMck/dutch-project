@@ -182,7 +182,7 @@ test('the batch offers at most 10 new words, split 7, 2 and 1 by priority', () =
   assert.deepEqual(batch.reviews, []);
   assert.equal(batch.counts.due, 0);
   assert.equal(batch.counts.introduced_today, 0);
-  assert.equal(batch.counts.new_today_remaining, 10);
+  assert.equal(batch.counts.set_words, 10);
   assert.deepEqual(batch.counts.new_remaining_by_priority, { 1: 2, 2: 2, 3: 2 });
 });
 
@@ -197,7 +197,7 @@ test('an empty priority gives its slots to priority 1 first, then 2 and 3', () =
   assert.deepEqual(countByPriority(batch.new_words), { 1: 8, 2: 2, 3: 0 });
 });
 
-test('after 4 new words are graded, the next batch in a new session offers 6', () => {
+test('after 4 new words are graded, a new session keeps the set: the 4 started words and the 6 others', () => {
   const context = createPracticeContext();
   addPriorityMix(context, { p1Count: 9, p2Count: 4, p3Count: 3 });
   migrate(context);
@@ -210,8 +210,8 @@ test('after 4 new words are graded, the next batch in a new session offers 6', (
   const secondBatch = context.practiceService.getPracticeBatch({ sessionId: 'session-2' });
 
   assert.equal(secondBatch.new_words.length, 6);
+  assert.deepEqual(secondBatch.reviews.map(word => word.id).sort(), [...gradedWordIds].sort());
   assert.equal(secondBatch.counts.introduced_today, 4);
-  assert.equal(secondBatch.counts.new_today_remaining, 6);
   assert.ok(secondBatch.new_words.every(word => !gradedWordIds.includes(word.id)));
 });
 
@@ -419,7 +419,7 @@ test('practice_stats counts due words, introductions, states and the good share'
   assert.equal(stats.due_today, 1);
   assert.equal(stats.due_tomorrow, 2, 'both new words are in the learning deck, so both are due tomorrow');
   assert.equal(stats.deck_size, 2);
-  assert.equal(stats.deck_free_slots, 0, 'the session\'s new words are not learned yet');
+  assert.equal(stats.set_size, 10);
   assert.equal(stats.introduced_today, 2, 'migrated words count as introduced the day before');
   assert.deepEqual(stats.new_remaining_by_priority, { 1: 0, 2: 0, 3: 0 });
   assert.equal(stats.states.new, 0);

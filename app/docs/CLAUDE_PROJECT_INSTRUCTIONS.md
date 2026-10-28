@@ -58,25 +58,19 @@ from `practice_stats`).
 learned; closing the app or waiting a day keeps the progress. A new word needs 2 right answers in the session; each
 `again` or `hard` adds one more, up to 6, and keeps the right answers already given. Every answer counts, repeats too.
 Then the word is learned and follows its spaced-repetition schedule. A review I answer right is done for the session;
-one I get wrong joins it and needs 3. The next 10 new words come as soon as all the session's new words are learned,
-the same day too.
+one I get wrong joins it and needs 3.
 
-**Backlog and extra words.** New words come 10 at a time, when the session's new words are learned: words offered but
-not started stay my only new words on later days until all of them are started, so skipped days never add more. New
-words also wait while any word is overdue. When `counts.new_words_blocked` is true, say so in one line and carry on
-with the reviews; once the overdue words are graded, call `get_practice_batch` again with the same `session_id` to get
-the new words. Today's words are done when `get_practice_batch` with the same `session_id` returns no new words,
-`counts.new_words_blocked` is false, `counts.overdue` is 0 and `counts.new_remaining_by_priority` still has words.
-Then ask me "ще 10 нових слів?". On a yes, call `add_extra_new_words` (`count` 10 unless I say otherwise), then
-`get_practice_batch` again with the same `session_id`. It is refused while words are overdue or today's new words are
-not all used up yet. `reset_practice` starts my practice over (every word and phrase back to New, history kept): only
-when I ask for it, dry run first.
+**Sets.** A session is one set of at most 10 words, never more. Old words fill it first (words I am still learning,
+then reviews due today, most overdue first); new words fill only the room left, so after a hard day a set may hold no
+new words, and skipped days never pile up more than 10. When the set is done, `get_practice_batch` with the same
+`session_id` gives the next set; ask me before starting it. `reset_practice` starts my practice over (every word and
+phrase back to New, history kept): only when I ask for it, dry run first.
 
 **Phrase practice (FSRS).** I also score phrases myself in the web app's Картки tab (again / hard / good). When I ask
 to practise phrases, you can run a session too: call `get_phrase_batch` with a new `session_id` and grade the first
 answer to each phrase with `grade_phrase` (`again`, `hard` or `good`), as for words. Only the first grade per phrase
-counts, there are at most 5 new phrases a day, oldest first, no new phrase while a phrase is overdue
-(`counts.new_phrases_blocked`), and phrases have no word errors.
+counts, phrases come in sets of at most 10 (due phrases first, then new ones, oldest first), and phrases have no word
+errors.
 
 **Difficult words.** When I ask to drill the words I find hard, call `get_struggling_words`: it lists the words whose
 last answer was `again` or `hard`, most errors first. Quiz them as above, but do not call `grade_word` or

@@ -15,7 +15,6 @@ import {
   formatDaysAway,
   formatLearningStatus,
   buildNextReviewLine,
-  canOfferExtraNewWords,
   formatShortDate,
   advanceDrillQueue,
   advanceWindowedQueue,
@@ -365,14 +364,6 @@ test('buildStrugglingDrillEnd: first-try count out of all words, and the schedul
   });
   assert.equal(buildStrugglingDrillEnd({ correctFirstTimeCount: 0, totalCount: 2 }).resultText,
     'Тренування завершено: правильно з першого разу 0 з 2.');
-});
-
-test('canOfferExtraNewWords: only while the gate is open and New words remain today', () => {
-  assert.equal(canOfferExtraNewWords({ newWordsBlocked: false, newRemainingByPriority: { 1: 0, 2: 2, 3: 0 } }), true);
-  assert.equal(canOfferExtraNewWords({ newWordsBlocked: false, newRemainingByPriority: { 1: 0, 2: 0, 3: 0 } }), false);
-  assert.equal(canOfferExtraNewWords({ newWordsBlocked: true, newRemainingByPriority: { 1: 4, 2: 0, 3: 0 } }), false);
-  assert.equal(canOfferExtraNewWords({ newWordsBlocked: false, newRemainingByPriority: {} }), false);
-  assert.equal(canOfferExtraNewWords({ newWordsBlocked: undefined, newRemainingByPriority: undefined }), false);
 });
 
 test('the deck line says the right answers still needed, a word learned just now, or a review answered right', async () => {

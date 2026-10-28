@@ -1,5 +1,5 @@
-// Practice reset: every word and phrase back to New, today's extra words cleared, history kept; afterwards the batch
-// holds only the day's 10 new words, and skipped days do not make the list grow.
+// Practice reset: every word and phrase back to New, the practice sets cleared, history kept; afterwards the batch
+// is a set of 10 new words, and skipped days do not make the list grow.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -79,7 +79,6 @@ test('after a reset every word and phrase is New, history is kept, and today hol
   assert.equal(batch.reviews.length, 0);
   assert.equal(batch.new_words.length, 10);
   assert.equal(batch.counts.overdue, 0);
-  assert.equal(batch.counts.new_words_blocked, false);
 });
 
 test('after a reset, skipping days never makes the list grow beyond the words actually started', () => {
@@ -98,10 +97,10 @@ test('after a reset, skipping days never makes the list grow beyond the words ac
   const afterSkippedDays = context.practiceService.getPracticeBatch({ sessionId: 'much-later' });
   assert.equal(afterSkippedDays.reviews.length, 10, 'only the 10 started words come back');
   assert.equal(afterSkippedDays.new_words.length, 0, 'no new words while the 10 started words fill the deck');
-  assert.equal(afterSkippedDays.counts.deck_free_slots, 0);
+  assert.equal(afterSkippedDays.counts.set_words, 10);
 });
 
-test('a reset clears today\'s extra new words', () => {
+test('a reset clears the pinned word set', () => {
   const context = createMigratedContext();
   context.clock.moveTo(MORNING_IN_AMSTERDAM);
   context.practiceResetService.resetPractice({ isDryRun: false });
@@ -109,12 +108,11 @@ test('a reset clears today\'s extra new words', () => {
   for (const word of batch.new_words) {
     context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
   }
-  context.practiceService.addExtraNewWords({ count: 10 });
-  assert.equal(context.practiceSettings.readSettings().newWordBlock.itemIds.length, 20);
+  assert.equal(context.practiceSettings.readSettings().wordSet.itemIds.length, 10);
 
   context.practiceResetService.resetPractice({ isDryRun: false });
 
-  assert.equal(context.practiceSettings.readSettings().newWordBlock, null);
+  assert.equal(context.practiceSettings.readSettings().wordSet, null);
 });
 
 test('reset mid-session: words and phrases graded earlier in session S are offered again and can be graded', () => {

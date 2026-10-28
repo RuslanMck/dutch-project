@@ -501,3 +501,29 @@ finished, and reviews join the session.
 - **Page.** Tiles with the comparison, the bar chart (tap a bar for its numbers), the streak, the hardest words and the
   vocabulary now from `GET /api/stats` («Запам’ятовано надовго» is the learned status: next review 21+ days away).
 
+## 18. Practice sets: at most 10 cards a session (28.10.2026)
+
+Replaces the backlog gate (10.1), the intake blocks (12, 13.2) and the extra new words. The learner's rule: one
+session is one set of at most 10 cards, never 11 or 14, and skipped days never pile up more.
+
+- **Terms.** A *card* is one word (or phrase). A *set* is the cards of one session, at most `new_per_day` (10), for
+  words and phrases alike. An *old card* is a word still in the learning deck (unfinished from the last set) or a
+  review due today, overdue ones included. A *new card* has never been practised.
+- **Filling.** Old cards first: deck words, then reviews due today, most overdue first (those graded in this session
+  left out). New cards fill only the room left (10 − old), by the priority quota 7, 2, 1 scaled to the room. So 0 old
+  gives 10 new, 4 old give 6 new, 10 or more old give no new card; old cards past the tenth wait for the next set.
+  Phrases: due phrases first (most overdue), then the oldest New phrases.
+- **Pinning.** The batch that plans a set stores it at once (`word_set` / `phrase_set` in `practice_settings`:
+  `{ opened_on, opened_at, item_ids }`), so the cards shown are the set; a first answer with no set open pins one too.
+  While open, the batch returns only the set's cards not finished yet; nothing joins it, and a first answer to a New
+  card outside it is refused (409), so the cap holds for MCP grading too. The batch tools are therefore not read-only. A
+  word is finished once it is not New, not in the deck and not due today (learned, or a review answered right); a
+  phrase once it is not New and not due today (graded). A deleted card is finished.
+- **The next set.** When every card is finished, the same call (same session id) plans the next set the same day. A
+  set from an earlier day is not reopened: its deck words come first in the new day's set, then that day's reviews,
+  then new words.
+- **Client.** The queue holds one set; the 5 active words (16) rotate inside it. When the queue runs out and this
+  session finished the set, «Вітаємо! Набір завершено» shows the round summary (16), now of the set's cards and only
+  the answers since `opened_at`; «Наступний набір» loads the next one. The overdue gate line and «Хочете ще 10 нових
+  слів?» are gone, with `POST /api/practice/extra-new-words` and the MCP tool `add_extra_new_words`.
+

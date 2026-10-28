@@ -1,7 +1,6 @@
-// Practice business rules: the batch of reviews and new words (with the backlog gate, the intake block, the learning
-// deck's free slots and the extra new words), grading a word (FSRS for the first answer in a session, the learning deck
-// for every answer), the one-time migration to FSRS, the deck rebuild, the struggling words and the practice
-// statistics. Publishes 'words' after each write.
+// Practice business rules: the batch (the session's word set: old words first, new words in the room left), grading
+// a word (FSRS for the first answer in a session, the learning deck for every answer), the one-time migration to
+// FSRS, the deck rebuild, the struggling words, the round summary of the set and the practice statistics. Publishes 'words' after each write.
 import { ConflictError, NotFoundError } from '../../errors/domain-errors.js';
 import { mapBlankTextToNull } from '../blank-text.js';
 import {
@@ -11,9 +10,9 @@ import {
   parseCard,
   serializeCard,
 } from './fsrs-scheduling.js';
-import { countExtraItemsToday, mapToStoredBlock, openIntakeBlock } from './intake-block.js';
 import { applyAnswerToDeck, describeDeckPosition, readDeckPosition, replayDeckAnswers } from './learning-deck.js';
 import { planMigration, summarizeMigration } from './migration-planning.js';
+import { mapToStoredSet, openPracticeSet } from './practice-set.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 import { summarizeRound } from './round-summary.js';
 
@@ -26,7 +25,7 @@ const MILLISECONDS_PER_DAY = 24 * 3600_000;
 
 export function createPracticeService({
   practiceRepository,
-  newWordPlanner,
+  wordSetPlanner,
   practiceSettings,
   priorityService,
   wordService,
@@ -36,63 +35,36 @@ export function createPracticeService({
   changeEventBus,
   clock,
 }) {
-  // The words to practise now: the learning deck's words (the current session: each stays until it is learned, across
-  // days and session ids), then reviews due before tomorrow outside the deck (most overdue first), then the New words
-  // on offer. New words wait while any review is overdue. Due reviews already graded in this session are left out.
+  // The words to practise now: the session's set (practice-set.js), at most new_per_day words. The open set's words
+  // not finished yet, or the next set: the learning deck's words, then reviews due today (most overdue first, the ones
+  // graded in this session left out), then New words in the room left. reviews are the words with a card, new_words
+  // the New ones. A planned set is pinned at once, so the words shown are the set. maxReviews limits the reviews
+  // returned.
   function getPracticeBatch({ sessionId, maxReviews }) {
     const settings = practiceSettings.readActiveSettings();
-    const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
+    const timestamp = clock.now();
+    const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
-    const deckWordIds = practiceRepository.listDeckWordIds();
-    const dueWordIds = listWordIdsDueToday(today, settings.timeZone).filter(wordId => !gradedWordIds.has(wordId));
-    const sessionWordIds = [...deckWordIds, ...dueWordIds];
-    const reviewWordIds = maxReviews === undefined ? sessionWordIds : sessionWordIds.slice(0, maxReviews);
-    const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds });
+    const plan = runInTransaction(() => pinWordSet({ settings, today, gradedWordIds, timestamp }));
+    const setWordRows = plan.wordIds.map(getPracticeWordRowOrThrow);
+    const reviewRows = setWordRows.filter(wordRow => wordRow.fsrs_card !== null);
+    const newRows = setWordRows.filter(wordRow => wordRow.fsrs_card === null);
     return {
       session_id: sessionId,
-      reviews: reviewWordIds.map(wordId => mapToPracticeWord(getPracticeWordRowOrThrow(wordId))),
-      new_words: newWordPlan.offeredCandidates.map(candidate => mapToPracticeWord(candidate.word)),
+      reviews: (maxReviews === undefined ? reviewRows : reviewRows.slice(0, maxReviews)).map(mapToPracticeWord),
+      new_words: newRows.map(mapToPracticeWord),
       counts: {
-        due: dueWordIds.length,
-        deck_words: deckWordIds.length,
-        overdue: newWordPlan.overdueCount,
-        introduced_today: newWordPlan.introducedTodayCount,
-        new_today_remaining: newWordPlan.newTodayRemainingCount,
-        new_remaining_by_priority: newWordPlan.remainingByPriority,
-        new_words_blocked: newWordPlan.isBlocked,
-        deck_size: newWordPlan.deckSize,
-        deck_free_slots: newWordPlan.deckFreeSlotCount,
+        set_size: settings.newPerDay,
+        set_words: setWordRows.length,
+        set_new_words: newRows.length,
+        is_set_open: plan.isOpen,
+        due: listWordIdsDueToday(today, settings.timeZone).length,
+        deck_words: practiceRepository.countDeckWords(),
+        overdue: plan.overdueCount,
+        introduced_today: countIntroducedToday(today),
+        new_remaining_by_priority: wordSetPlanner.countNewWordsOutside(plan.wordIds),
       },
     };
-  }
-
-  // Adds count extra New words to the intake block of today. Refused while a word is overdue, and while the block
-  // is not finished (its words are not all started). Extra words left unstarted carry over like any unfinished block.
-  function addExtraNewWords({ count }) {
-    const settings = practiceSettings.readActiveSettings();
-    const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
-    const addResult = runInTransaction(() => {
-      const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
-      newWordPlanner.assertExtraNewWordsAllowed({ newWordPlan });
-      const extraWordIds = newWordPlanner.planExtraNewWordIds({
-        settings,
-        count,
-        blockWordIds: newWordPlan.block.itemIds,
-      });
-      const extendedBlock = openIntakeBlock({
-        today: newWordPlan.block.openedOn,
-        itemIds: [...newWordPlan.block.itemIds, ...extraWordIds],
-        extraCount: newWordPlan.block.extraCount + extraWordIds.length,
-      });
-      // Nothing to add (no New words are left): the block stays as it is.
-      if (extraWordIds.length > 0) practiceSettings.saveNewWordBlock(mapToStoredBlock(extendedBlock));
-      return {
-        extra_new_words_today: countExtraItemsToday({ block: extendedBlock, today }),
-        new_today_remaining: extraWordIds.length,
-      };
-    });
-    changeEventBus.publishChange('words');
-    return addResult;
   }
 
   // Grades an answer. The first answer to a word in a session updates its FSRS card and is logged as a review (again
@@ -111,6 +83,12 @@ export function createPracticeService({
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     if (practiceRepository.findReviewLog({ sessionId, wordId })) {
       return gradeRepeatInTransaction({ settings, word, grade, sessionId, timestamp, today });
+    }
+    const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
+    const plan = pinWordSet({ settings, today, gradedWordIds, timestamp });
+    // A set is 10 words at most: a New word outside the open set waits for a later set.
+    if (plan.isOpen && word.fsrs_card === null && !plan.wordIds.includes(wordId)) {
+      throw new ConflictError(`word ${wordId} is not in the current set: finish the set first`);
     }
     const cardBefore = parseCard(word.fsrs_card);
     const { card: cardAfter } = fsrsScheduler.gradeCard(cardBefore, grade, timestamp);
@@ -132,7 +110,6 @@ export function createPracticeService({
       : deriveLearningStatus(cardAfter, settings.learnedThresholdDays);
     const cardAfterJson = serializeCard(cardAfter);
     const wrongAnswer = mapBlankTextToNull(answer);
-    if (cardBefore === null) saveIntakeBlockOnFirstStart({ settings, today });
     practiceRepository.updateWordSchedule(wordId, {
       fsrsCard: cardAfterJson,
       dueAt: scheduledDueAt,
@@ -286,15 +263,16 @@ export function createPracticeService({
     return { words, count: words.length };
   }
 
-  // The current round: the words of the intake block (the session's new words, extra ones too), each with its answers
-  // and mistakes, and the time from the first answer to the last. Null when no block was pinned or nothing was answered.
+  // The current round: the words of the pinned set, each with its answers since the set opened and its mistakes, and
+  // the time from the first answer to the last. Null when no set was pinned or nothing was answered.
   function getRoundSummary() {
     const settings = practiceSettings.readActiveSettings();
-    const block = settings.newWordBlock;
-    if (!block || !block.itemIds.length) return { round: null };
-    const words = block.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId)).filter(Boolean)
+    const practiceSet = settings.wordSet;
+    if (!practiceSet || !practiceSet.itemIds.length) return { round: null };
+    const words = practiceSet.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId)).filter(Boolean)
       .map(mapToPracticeWord);
-    const answers = practiceRepository.listDeckAnswersForWords(words.map(word => word.id));
+    const answers = practiceRepository.listDeckAnswersForWords(words.map(word => word.id))
+      .filter(answer => answer.answered_at >= practiceSet.openedAt);
     if (!answers.length) return { round: null };
     const answerTimes = practiceRepository.listAnswerTimesBetween({
       startedAt: answers[0].answered_at,
@@ -318,17 +296,17 @@ export function createPracticeService({
       stateCounts[describeCardState(parseCard(word.fsrs_card))] += 1;
       if (word.fsrs_card === null) newCounts[word.priority] += 1;
     }
-    const newWordPlan = newWordPlanner.planNewWords({ settings, today, gradedWordIds: new Set() });
+    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds: new Set() });
     return {
       due_today: listWordIdsDueToday(today, settings.timeZone).length,
       due_tomorrow: words.filter(word => word.due_at !== null && word.due_at >= tomorrowStart
         && word.due_at < dayAfterTomorrowStart).length,
-      overdue: newWordPlan.overdueCount,
-      introduced_today: newWordPlan.introducedTodayCount,
-      new_words_blocked: newWordPlan.isBlocked,
-      deck_size: newWordPlan.deckSize,
-      deck_free_slots: newWordPlan.deckFreeSlotCount,
-      extra_new_words_today: newWordPlan.extraNewWordsToday,
+      overdue: plan.overdueCount,
+      introduced_today: countIntroducedToday(today),
+      deck_size: practiceRepository.countDeckWords(),
+      set_size: settings.newPerDay,
+      set_words_left: plan.wordIds.length,
+      is_set_open: plan.isOpen,
       new_remaining_by_priority: newCounts,
       states: stateCounts,
       good_share_7_days: calculateGoodShareSince(today, SHORT_GOOD_SHARE_DAY_COUNT, settings.timeZone),
@@ -337,17 +315,20 @@ export function createPracticeService({
     };
   }
 
-  // The first New word started in a fresh allocation (a new session) pins that allocation as the block: its leftovers
-  // stay on offer, on later days too, until all are started.
-  function saveIntakeBlockOnFirstStart({ settings, today }) {
-    const { isFreshAllocation, allocatedCandidates } = newWordPlanner.planNewWords({
-      settings,
-      today,
-      gradedWordIds: new Set(),
-    });
-    if (!isFreshAllocation) return;
-    const pinnedBlock = openIntakeBlock({ today, itemIds: allocatedCandidates.map(candidate => candidate.id) });
-    practiceSettings.saveNewWordBlock(mapToStoredBlock(pinnedBlock));
+  // The open set, or the next set planned and pinned now (when it has words). isOpen says it was open already. Runs
+  // inside a transaction.
+  function pinWordSet({ settings, today, gradedWordIds, timestamp }) {
+    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds });
+    if (!plan.isOpen && plan.wordIds.length) {
+      const practiceSet = openPracticeSet({ today, openedAt: timestamp, itemIds: plan.wordIds });
+      practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
+    }
+    return plan;
+  }
+
+  function countIntroducedToday(today) {
+    const countByPriority = practiceRepository.countIntroducedOnByPriority(today);
+    return Object.values(countByPriority).reduce((total, count) => total + count, 0);
   }
 
   // Word ids due before the start of tomorrow, overdue ones included: the words due today, most overdue first.
@@ -380,7 +361,6 @@ export function createPracticeService({
 
   return Object.freeze({
     getPracticeBatch,
-    addExtraNewWords,
     gradeWord,
     migrateToFsrs,
     rebuildLearningDeck,

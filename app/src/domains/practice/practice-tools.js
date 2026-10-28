@@ -1,7 +1,6 @@
 // MCP adapter for the practice: registers the practice tools. Arguments are parsed by the MCP SDK with the practice
 // contracts; each tool calls the practice, phrase practice or priority service.
 import {
-  addExtraNewWordsInputSchema,
   gradePhraseToolInputSchema,
   gradeWordToolInputSchema,
   importFrequencyListInputSchema,
@@ -29,16 +28,15 @@ export function registerPracticeTools({
 }) {
   registerJsonTool(mcpServer, 'get_practice_batch', {
     title: 'Get practice batch',
-    description: 'Words to practise now: the session\'s words first (the learning deck: each stays, across days, until '
-      + 'it is learned), then reviews due outside it (most overdue first), then new words. The next 10 new '
-      + 'words come only once every new word of the session is learned; then at once, on any day. New words '
-      + 'also wait while any review is overdue: counts.new_words_blocked is true then. Show each word by its '
-      + 'uk and ask for the Dutch; grade every answer with grade_word, repeats too, and ask a word again '
+    description: 'Words to practise now: one set of at most 10 words (counts.set_size). Old words fill it first: '
+      + 'words still being learned, then reviews due today (most overdue first); new words fill only the room '
+      + 'left, so a set can be 10 new, 6 new and 4 old, or 10 old. A set stays until each word is learned or '
+      + 'answered right that day; then the same call with the same session_id gives the next set. Show each word '
+      + 'by its uk and ask for the Dutch; grade every answer with grade_word, repeats too, and ask a word again '
       + 'until grade_word says it is no longer in the deck. Returns {session_id, reviews, new_words, counts '
       + '(with deck_size)}, each word {id, uk, nl, article, kind, state, priority, deck {in_deck, '
       + 'required_correct, correct_count, times_left}}.',
     inputSchema: practiceBatchToolInputSchema.shape,
-    annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, ({ session_id: sessionId, max_reviews: maxReviews }) => practiceService.getPracticeBatch({
     sessionId,
     maxReviews,
@@ -66,13 +64,13 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'get_phrase_batch', {
     title: 'Get phrase batch',
-    description: 'Phrases to practise now for one session: phrase reviews that are due (most overdue first) and at '
-      + 'most 5 new phrases a day, oldest first. No new phrase is offered while a phrase is overdue '
-      + '(counts.new_phrases_blocked). Show each phrase by its uk and ask for the Dutch; grade the first '
+    description: 'Phrases to practise now: one set of at most 10 phrases. Due phrases fill it first (most overdue '
+      + 'first), new phrases (oldest first) only the room left; once every phrase of the set is graded, the same '
+      + 'call with the same session_id gives the next set. Show each phrase by its uk and ask for the Dutch; grade '
+      + 'the first '
       + 'answer with grade_phrase. Returns {session_id, reviews, new_phrases, counts}, each phrase {id, nl, uk, '
       + 'context, state, status}.',
     inputSchema: practiceBatchToolInputSchema.shape,
-    annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, ({ session_id: sessionId, max_reviews: maxReviews }) => phrasePracticeService.getPhraseBatch({
     sessionId,
     maxReviews,
@@ -90,16 +88,6 @@ export function registerPracticeTools({
     grade,
     sessionId,
   }));
-
-  registerJsonTool(mcpServer, 'add_extra_new_words', {
-    title: 'Add extra new words',
-    description: 'Give the learner more new words today, on top of the regular 10, when they ask for more (for example '
-      + 'after today\'s words are done: offer "ще 10 нових слів?"). Adds count (1 to 50, default 10) for today only; '
-      + 'it resets tomorrow. Refused while any word is overdue or the regular new words of today are not used up yet. '
-      + 'After a success, call get_practice_batch again with the same session_id to get the words. Returns '
-      + '{extra_new_words_today, new_today_remaining}.',
-    inputSchema: addExtraNewWordsInputSchema.shape,
-  }, ({ count }) => practiceService.addExtraNewWords({ count }));
 
   registerJsonTool(mcpServer, 'set_current_chapter', {
     title: 'Set current chapter',
@@ -152,8 +140,8 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'reset_practice', {
     title: 'Reset practice',
-    description: 'Start the practice over: every word and phrase goes back to New and today\'s extra new words are '
-      + 'cleared, so the next batch holds only the day\'s new words. Review history and error counts are kept. '
+    description: 'Start the practice over: every word and phrase goes back to New and the practice sets are '
+      + 'cleared, so the next batch is a set of new words. Review history and error counts are kept. '
       + 'Use only '
       + 'when the learner asks for a fresh start. The default dry run only reports the counts; run with dry_run false '
       + 'after the learner agrees. Returns {dry_run, words_reset, phrases_reset}.',
@@ -163,12 +151,11 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'practice_stats', {
     title: 'Practice statistics',
-    description: 'Practice numbers: reviews due today and tomorrow, overdue words, whether new words are held back by '
-      + 'them (new_words_blocked), words introduced today, extra new words added today, New words waiting per '
+    description: 'Practice numbers: reviews due today and tomorrow, overdue words, words introduced today, the set '
+      + 'size and the words of the set still to practise (set_words_left, is_set_open), New words waiting per '
       + 'priority, words per state (new, learning, review, relearning) and the share of "good" grades over the last 7 '
       + 'and 30 days '
-      + '(null when there were none). The phrases key holds the same kind of numbers for phrases, with '
-      + 'new_phrases_blocked.',
+      + '(null when there were none). The phrases key holds the same kind of numbers for phrases.',
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
   }, () => practiceService.calculatePracticeStatistics());
 
