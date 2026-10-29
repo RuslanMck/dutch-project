@@ -41,7 +41,8 @@ export const deletePhrase = id => request('DELETE', `/api/phrases/${enc(id)}`);
 
 export const listTexts = () => request('GET', '/api/texts');
 
-export const getWordOrderSet = () => request('GET', '/api/word-order/set');
+// rules: the rules query value ("v2,inversion"); '' or missing asks for all rules.
+export const getWordOrderSet = rules => request('GET', rules ? `/api/word-order/set?rules=${enc(rules)}` : '/api/word-order/set');
 export const answerWordOrder = (id, tiles) => request('POST', `/api/word-order/sentences/${enc(id)}/answer`, { tiles });
 export const listOrderSentences = () => request('GET', '/api/word-order/sentences');
 export const deleteOrderSentence = id => request('DELETE', `/api/word-order/sentences/${enc(id)}`);

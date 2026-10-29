@@ -17,10 +17,41 @@ export const sentenceInputSchema = z.object({
   // Any value is accepted: a rule that is not one of the eight (or not text) becomes null, so it never fails the call.
   rule: z.unknown().transform(normalizeRule).describe('the word-order rule: v2, inversion, question, modal, separable, '
     + 'negation, subordinate or perfect; null when none fits'),
+  // Any value is accepted: a structure that does not fit the sentence is dropped with a warning, never a failed call.
+  structure: z.unknown().optional().describe('optional schema: the Dutch sentence split into ordered segments, each '
+    + '{ "text": "...", "role": "..." }; the texts joined by spaces are exactly the sentence words in order; roles such as '
+    + 'підмет, дієслово, модальне дієслово, допоміжне дієслово, інфінітив, дієприкметник, відокремлювана частина, '
+    + 'додаток, прикметник, час, місце, спосіб, причина, заперечення, сполучник, питальне слово, частка. Example for '
+    + '"Deze week ben ik jarig.": [{"text":"Deze week","role":"час"},{"text":"ben","role":"дієслово"},{"text":"ik","role":"підмет"},'
+    + '{"text":"jarig","role":"прикметник"}]'),
 });
 
 export const addSentencesInputSchema = z.object({
   sentences: z.array(sentenceInputSchema).min(1).max(200),
+});
+
+// Changes one saved sentence. Absent fields stay as they are; rule and structure accept null to clear them. The service
+// refuses a bad value (ValidationError) rather than dropping it.
+export const updateSentenceInputSchema = z.object({
+  uk: z.string().max(MAXIMUM_SENTENCE_LENGTH).optional().describe('the Ukrainian translation'),
+  rule: z.unknown().optional().describe('the rule (v2, inversion, question, modal, separable, negation, subordinate, '
+    + 'perfect), or null to clear it'),
+  structure: z.unknown().optional().describe('the schema: an array of { text, role } as in add_sentences, or null to '
+    + 'clear it'),
+});
+
+export const updateSentenceToolInputSchema = updateSentenceInputSchema.extend({
+  id: identifierSchema.describe('id of the sentence, from list_sentences'),
+});
+
+// The rules to practise: names and/or 'none'. Absent, empty or with no valid name = all sentences.
+export const getSetInputSchema = z.object({
+  rules: z.array(z.string().max(40)).optional().describe('only these rules: v2, inversion, question, modal, separable, '
+    + 'negation, subordinate, perfect, or none (sentences without a rule); absent, empty or only unknown names = all rules'),
+});
+
+export const sentenceSetQuerySchema = z.object({
+  rules: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 export const answerInputSchema = z.object({

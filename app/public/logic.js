@@ -664,9 +664,14 @@ export function formatSentenceStats({ times_answered: answered = 0, times_correc
 }
 
 // "Додано 3, пропущено 1" and, when the table had bad rows, "; рядків з помилками: 2".
-export function formatImportResult({ added = [], skipped = [], errors = [] }) {
-  const base = `Додано ${added.length}, пропущено ${skipped.length}`;
-  return errors.length ? `${base}; рядків з помилками: ${errors.length}` : base;
+// The result of an import or of generation: { added, updated, skipped, warnings, errors? }. The updated and the
+// warned counts appear only when there are some.
+export function formatImportResult({ added = [], updated = [], skipped = [], warnings = [], errors = [] }) {
+  const parts = [`Додано ${added.length}, пропущено ${skipped.length}`];
+  if (updated.length) parts.push(`оновлено ${updated.length}`);
+  if (warnings.length) parts.push(`схем відкинуто ${warnings.length}`);
+  if (errors.length) parts.push(`рядків з помилками: ${errors.length}`);
+  return parts.join('; ');
 }
 
 // The keyboard focus after a pile tile is placed: the pile tile at the same pile index if it is still free, else the
@@ -695,4 +700,87 @@ export function chooseFirstPileFocus(state) {
 export function skipSentenceInSet({ sentences, index }) {
   const rest = sentences.filter((_, position) => position !== index);
   return { sentences: rest, index: Math.min(index, rest.length) };
+}
+
+// ---------- word-order rule filter and sentence schema (spec §8) ----------
+
+// The rules of the filter in dropdown order; «none» is the sentences without a rule.
+export const WORD_ORDER_RULES = Object.freeze(['v2', 'inversion', 'question', 'modal', 'separable', 'negation', 'subordinate', 'perfect', 'none']);
+
+// The Ukrainian names of the rules (§8.2).
+export const RULE_LABELS = Object.freeze({
+  v2: 'Дієслово на 2-му місці',
+  inversion: 'Інверсія',
+  question: 'Питання',
+  modal: 'Модальне дієслово + інфінітив',
+  separable: 'Відокремлювані дієслова',
+  negation: 'niet / geen',
+  subordinate: 'Підрядне речення',
+  perfect: 'Минулий час (perfectum)',
+  none: 'Без правила',
+});
+
+// The name of a rule as shown on the page; null means no rule. An unknown name is shown as it is.
+export function ruleLabel(rule) {
+  const key = rule ?? 'none';
+  return Object.hasOwn(RULE_LABELS, key) ? RULE_LABELS[key] : String(rule);
+}
+
+// The summary of the dropdown: «Правила: усі» when every rule is chosen, else «Правила: 3 з 9».
+export function formatRuleFilterSummary(selected, all = WORD_ORDER_RULES) {
+  const chosen = all.filter(rule => selected.includes(rule));
+  if (chosen.length === all.length) return 'Правила: усі';
+  return `Правила: ${chosen.length} з ${all.length}`;
+}
+
+// The value of the rules parameter of GET /word-order/set: the chosen rules in the order of all, comma-separated.
+// '' when every rule is chosen (the parameter is then left out) and when none is (the caller makes no request then).
+export function buildRulesQuery(selected, all = WORD_ORDER_RULES) {
+  const chosen = all.filter(rule => selected.includes(rule));
+  if (!chosen.length || chosen.length === all.length) return '';
+  return chosen.join(',');
+}
+
+// Whether a fetched word-order result is applied. A replace (rule change, «Ще 10») applies unless a newer replace is
+// already applied, so a live refresh that resolved first does not drop it. A live refresh applies only when it is newer
+// than everything applied and than the latest requested replace (its rules may be the old ones).
+export function shouldApplyFetch({ fetchNo, replace, appliedFetch, appliedReplace, pendingReplace }) {
+  if (replace) return fetchNo > appliedReplace;
+  return fetchNo > appliedFetch && fetchNo > pendingReplace;
+}
+
+// The rules kept in localStorage, read back. Missing or unreadable text means all rules; unknown names are dropped.
+export function parseStoredRules(text, all = WORD_ORDER_RULES) {
+  if (typeof text !== 'string') return [...all];
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { return [...all]; }
+  if (!Array.isArray(parsed)) return [...all];
+  return all.filter(rule => parsed.includes(rule));
+}
+
+// The schema as text: "час > дієслово > підмет > прикметник"; '' when there is no schema.
+export function formatStructureLine(structure) {
+  if (!Array.isArray(structure)) return '';
+  return structure.map(segment => segment.role).join(' > ');
+}
+
+// The colour group of a schema role (the roles of §8.1 and «частка», which shares the adverbial colour; any other
+// role is «other»).
+const ROLE_COLOUR_GROUPS = Object.freeze({
+  subject: ['підмет'],
+  verb: ['дієслово', 'модальне дієслово', 'допоміжне дієслово', 'інфінітив', 'дієприкметник', 'відокремлювана частина'],
+  object: ['додаток'],
+  adverbial: ['час', 'місце', 'спосіб', 'причина', 'частка'],
+  negation: ['заперечення'],
+  connector: ['сполучник', 'питальне слово'],
+  adjective: ['прикметник'],
+});
+
+// The CSS class of a role's colour: role-subject, role-verb, …, role-other.
+export function roleColourClass(role) {
+  const name = String(role ?? '').trim().toLowerCase();
+  for (const [group, roles] of Object.entries(ROLE_COLOUR_GROUPS)) {
+    if (roles.includes(name)) return `role-${group}`;
+  }
+  return 'role-other';
 }

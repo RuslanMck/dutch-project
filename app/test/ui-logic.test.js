@@ -47,10 +47,19 @@ import {
   buildWordOrderCheckView,
   formatSentenceStats,
   formatImportResult,
+  shouldApplyFetch,
   chooseFocusAfterPlace,
   chooseFocusAfterReturn,
   chooseFirstPileFocus,
   skipSentenceInSet,
+  WORD_ORDER_RULES,
+  RULE_LABELS,
+  ruleLabel,
+  formatRuleFilterSummary,
+  buildRulesQuery,
+  parseStoredRules,
+  formatStructureLine,
+  roleColourClass,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -774,6 +783,36 @@ test('formatImportResult counts added and skipped sentences and bad rows', () =>
     'Додано 0, пропущено 0; рядків з помилками: 1');
 });
 
+test('formatImportResult also reports updated sentences and dropped schemas, and the generate result shape', () => {
+  assert.equal(formatImportResult({ added: [{}], updated: [{}, {}], skipped: [], warnings: [{}] }),
+    'Додано 1, пропущено 0; оновлено 2; схем відкинуто 1');
+  assert.equal(formatImportResult({ added: [{}], updated: [], skipped: [], warnings: [] }), 'Додано 1, пропущено 0');
+  assert.equal(formatImportResult({ added: [], updated: [{}], skipped: [{}], warnings: [], errors: ['x'] }),
+    'Додано 0, пропущено 1; оновлено 1; рядків з помилками: 1');
+  assert.equal(formatImportResult({}), 'Додано 0, пропущено 0');
+});
+
+test('shouldApplyFetch: a replace still applies when a later live refresh resolved first', () => {
+  // replace 1 requested, live 2 resolved first (applied), then replace 1 resolves.
+  const afterLive = { appliedFetch: 2, appliedReplace: 0, pendingReplace: 1 };
+  assert.equal(shouldApplyFetch({ fetchNo: 1, replace: true, ...afterLive }), true);
+});
+
+test('shouldApplyFetch: a replace is dropped only when a newer replace was already applied', () => {
+  assert.equal(shouldApplyFetch({ fetchNo: 1, replace: true, appliedFetch: 2, appliedReplace: 2, pendingReplace: 2 }), false);
+  assert.equal(shouldApplyFetch({ fetchNo: 2, replace: true, appliedFetch: 1, appliedReplace: 1, pendingReplace: 2 }), true);
+});
+
+test('shouldApplyFetch: a live refresh older than an applied live one is dropped', () => {
+  assert.equal(shouldApplyFetch({ fetchNo: 3, replace: false, appliedFetch: 4, appliedReplace: 0, pendingReplace: 0 }), false);
+  assert.equal(shouldApplyFetch({ fetchNo: 5, replace: false, appliedFetch: 4, appliedReplace: 0, pendingReplace: 0 }), true);
+});
+
+test('shouldApplyFetch: a live refresh started before a pending replace is dropped (its rules may be old)', () => {
+  assert.equal(shouldApplyFetch({ fetchNo: 2, replace: false, appliedFetch: 0, appliedReplace: 0, pendingReplace: 3 }), false);
+  assert.equal(shouldApplyFetch({ fetchNo: 4, replace: false, appliedFetch: 0, appliedReplace: 0, pendingReplace: 3 }), true);
+});
+
 test('chooseFocusAfterPlace keeps the pile index if free, else the next free tile, else «Перевірити»', () => {
   let state = createWordOrderState(['a', 'b', 'c']);
   state = placeTile(state, 0);
@@ -809,4 +848,68 @@ test('skipSentenceInSet drops the sentence on screen and points at the next one'
   assert.deepEqual(skipSentenceInSet({ sentences, index: 2 }), { sentences: [{ id: 1 }, { id: 2 }], index: 2 });
   assert.deepEqual(skipSentenceInSet({ sentences: [{ id: 1 }], index: 0 }), { sentences: [], index: 0 });
   assert.deepEqual(sentences, [{ id: 1 }, { id: 2 }, { id: 3 }], 'the old set is not changed');
+});
+
+// ---------- word-order rule filter and schema ----------
+
+test('WORD_ORDER_RULES lists the nine rules of the filter, each with a Ukrainian name', () => {
+  assert.equal(WORD_ORDER_RULES.length, 9);
+  assert.deepEqual(WORD_ORDER_RULES, ['v2', 'inversion', 'question', 'modal', 'separable', 'negation', 'subordinate', 'perfect', 'none']);
+  for (const rule of WORD_ORDER_RULES) assert.ok(RULE_LABELS[rule], rule);
+  assert.equal(RULE_LABELS.v2, 'Дієслово на 2-му місці');
+});
+
+test('ruleLabel names a rule, null as «Без правила», and keeps an unknown name as it is', () => {
+  assert.equal(ruleLabel('inversion'), 'Інверсія');
+  assert.equal(ruleLabel(null), 'Без правила');
+  assert.equal(ruleLabel('toString'), 'toString');
+});
+
+test('formatRuleFilterSummary says «усі» for every rule, else how many of nine', () => {
+  assert.equal(formatRuleFilterSummary(WORD_ORDER_RULES), 'Правила: усі');
+  assert.equal(formatRuleFilterSummary(['v2', 'none', 'modal']), 'Правила: 3 з 9');
+  assert.equal(formatRuleFilterSummary([]), 'Правила: 0 з 9');
+});
+
+test('buildRulesQuery lists the chosen rules in dropdown order, and nothing when all are chosen', () => {
+  assert.equal(buildRulesQuery(WORD_ORDER_RULES), '');
+  assert.equal(buildRulesQuery(['none', 'v2', 'inversion']), 'v2,inversion,none');
+  assert.equal(buildRulesQuery(['perfect']), 'perfect');
+  assert.equal(buildRulesQuery([]), '', 'none chosen: the caller makes no request');
+});
+
+test('parseStoredRules reads the saved choice, defaults to all, and drops unknown names', () => {
+  assert.deepEqual(parseStoredRules(null), WORD_ORDER_RULES);
+  assert.deepEqual(parseStoredRules('not json'), WORD_ORDER_RULES);
+  assert.deepEqual(parseStoredRules('{"v2":true}'), WORD_ORDER_RULES);
+  assert.deepEqual(parseStoredRules('["none","v2","bogus"]'), ['v2', 'none']);
+  assert.deepEqual(parseStoredRules('[]'), []);
+});
+
+test('formatStructureLine joins the roles with « > », and is empty without a schema', () => {
+  const structure = [
+    { text: 'Deze week', role: 'час' },
+    { text: 'ben', role: 'дієслово' },
+    { text: 'ik', role: 'підмет' },
+    { text: 'jarig', role: 'прикметник' },
+  ];
+  assert.equal(formatStructureLine(structure), 'час > дієслово > підмет > прикметник');
+  assert.equal(formatStructureLine(null), '');
+  assert.equal(formatStructureLine([]), '');
+});
+
+test('roleColourClass groups the 16 schema roles into a few colours, and other roles into role-other', () => {
+  assert.equal(roleColourClass('підмет'), 'role-subject');
+  assert.equal(roleColourClass('модальне дієслово'), 'role-verb');
+  assert.equal(roleColourClass('інфінітив'), 'role-verb');
+  assert.equal(roleColourClass('відокремлювана частина'), 'role-verb');
+  assert.equal(roleColourClass('додаток'), 'role-object');
+  assert.equal(roleColourClass('причина'), 'role-adverbial');
+  assert.equal(roleColourClass('заперечення'), 'role-negation');
+  assert.equal(roleColourClass('питальне слово'), 'role-connector');
+  assert.equal(roleColourClass('прикметник'), 'role-adjective');
+  assert.equal(roleColourClass(' Підмет '), 'role-subject');
+  assert.equal(roleColourClass('щось інше'), 'role-other');
+  assert.equal(roleColourClass(undefined), 'role-other');
+  assert.equal(roleColourClass('частка'), 'role-adverbial');
 });

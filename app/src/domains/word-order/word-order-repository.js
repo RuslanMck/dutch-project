@@ -7,19 +7,27 @@ const LATEST_ANSWER_SQL = `
     FROM order_sentence_answers
   )
 `;
+// A rule filter: all sentences (isAllRules = 1) or those whose rule name (COALESCE(rule, 'none')) is in rulesJson.
+const RULE_FILTER_SQL = "(@isAllRules = 1 OR COALESCE(rule, 'none') IN (SELECT value FROM json_each(@rulesJson)))";
 
 export function createWordOrderRepository({ database }) {
   const insertSentenceStatement = database.prepare(`
-    INSERT INTO order_sentences (nl, uk, rule, source, nl_key, added_at)
-    VALUES (@nl, @uk, @rule, @source, @nlKey, @addedAt)
+    INSERT INTO order_sentences (nl, uk, rule, source, nl_key, added_at, structure)
+    VALUES (@nl, @uk, @rule, @source, @nlKey, @addedAt, @structure)
     ON CONFLICT(nl_key) DO NOTHING
   `);
   const selectSentenceByIdStatement = database.prepare(`
-    SELECT id, nl, uk, rule, source, added_at FROM order_sentences WHERE id = @sentenceId
+    SELECT id, nl, uk, rule, source, added_at, structure FROM order_sentences WHERE id = @sentenceId
+  `);
+  const selectSentenceByNlKeyStatement = database.prepare(`
+    SELECT id, nl, uk, rule, source, added_at, structure FROM order_sentences WHERE nl_key = @nlKey
+  `);
+  const updateSentenceStatement = database.prepare(`
+    UPDATE order_sentences SET uk = @uk, rule = @rule, structure = @structure WHERE id = @sentenceId
   `);
   const deleteSentenceStatement = database.prepare('DELETE FROM order_sentences WHERE id = @sentenceId');
   const selectSentencesNewestFirstStatement = database.prepare(`
-    SELECT s.id, s.nl, s.uk, s.rule, s.source, s.added_at,
+    SELECT s.id, s.nl, s.uk, s.rule, s.source, s.added_at, s.structure,
       COALESCE(totals.times_answered, 0) AS times_answered,
       COALESCE(totals.times_correct, 0) AS times_correct,
       totals.last_answered_at
@@ -47,6 +55,7 @@ export function createWordOrderRepository({ database }) {
       LEFT JOIN latest_answers latest ON latest.sentence_id = s.id AND latest.recency = 1
     )
     SELECT id, nl, uk, rule FROM sentence_queue
+    WHERE ${RULE_FILTER_SQL}
     ORDER BY queue_group,
       CASE queue_group
         WHEN 0 THEN -last_answered_at
@@ -56,21 +65,36 @@ export function createWordOrderRepository({ database }) {
       random()
     LIMIT @limit
   `);
+  const countSentencesStatement = database.prepare(`
+    SELECT COUNT(*) AS total FROM order_sentences WHERE ${RULE_FILTER_SQL}
+  `);
+  const countSentencesByRuleStatement = database.prepare(`
+    SELECT COALESCE(rule, 'none') AS rule_name, COUNT(*) AS total FROM order_sentences GROUP BY rule_name
+  `);
   const selectVocabularyStatement = database.prepare('SELECT nl, status FROM words ORDER BY nl');
   const insertAnswerStatement = database.prepare(`
     INSERT INTO order_sentence_answers (sentence_id, answered_at, is_correct, answer)
     VALUES (@sentenceId, @answeredAt, @isCorrect, @answer)
   `);
-  const countSentencesStatement = database.prepare('SELECT COUNT(*) AS total FROM order_sentences');
 
   // Returns the new sentence's id, or null when a sentence with the same nl_key is already stored.
-  function insertSentence({ nl, uk, rule, source, nlKey, addedAt }) {
-    const insertResult = insertSentenceStatement.run({ nl, uk, rule, source, nlKey, addedAt });
+  // structure is the JSON text of the schema, or null.
+  function insertSentence({ nl, uk, rule, source, nlKey, addedAt, structure }) {
+    const insertResult = insertSentenceStatement.run({ nl, uk, rule, source, nlKey, addedAt, structure });
     return insertResult.changes === 0 ? null : Number(insertResult.lastInsertRowid);
   }
 
   function findSentenceById(sentenceId) {
     return selectSentenceByIdStatement.get({ sentenceId }) ?? null;
+  }
+
+  function findSentenceByNlKey(nlKey) {
+    return selectSentenceByNlKeyStatement.get({ nlKey }) ?? null;
+  }
+
+  // uk, rule and structure (JSON text or null) are written whole.
+  function updateSentence({ sentenceId, uk, rule, structure }) {
+    updateSentenceStatement.run({ sentenceId, uk, rule, structure });
   }
 
   function deleteSentence(sentenceId) {
@@ -81,8 +105,18 @@ export function createWordOrderRepository({ database }) {
     return selectSentencesNewestFirstStatement.all();
   }
 
-  function listSentencesForSet(limit) {
-    return selectSentencesForSetStatement.all({ limit });
+  // rules: null for every sentence, else the rule names (and 'none') to keep; an empty array keeps none.
+  function listSentencesForSet({ limit, rules }) {
+    return selectSentencesForSetStatement.all({ limit, ...ruleFilterParameters(rules) });
+  }
+
+  function countSentences({ rules = null } = {}) {
+    return countSentencesStatement.get(ruleFilterParameters(rules)).total;
+  }
+
+  // Each rule name ('none' included) with its number of sentences; names with no sentence are not returned.
+  function countSentencesByRule() {
+    return countSentencesByRuleStatement.all();
   }
 
   function listVocabulary() {
@@ -93,18 +127,21 @@ export function createWordOrderRepository({ database }) {
     insertAnswerStatement.run({ sentenceId, answeredAt, isCorrect: isCorrect ? 1 : 0, answer });
   }
 
-  function countSentences() {
-    return countSentencesStatement.get().total;
-  }
-
   return Object.freeze({
     insertSentence,
     findSentenceById,
+    findSentenceByNlKey,
+    updateSentence,
     deleteSentence,
     listSentencesNewestFirst,
     listSentencesForSet,
+    countSentences,
+    countSentencesByRule,
     listVocabulary,
     createAnswer,
-    countSentences,
   });
+}
+
+function ruleFilterParameters(rules) {
+  return { isAllRules: rules === null ? 1 : 0, rulesJson: JSON.stringify(rules ?? []) };
 }

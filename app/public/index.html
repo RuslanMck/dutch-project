@@ -271,10 +271,26 @@
 
     <!-- 5b · Порядок слів -->
     <section id="tab-word-order" class="tab" data-tab="word-order" hidden>
+      <details id="word-order-rules" class="word-order__rules">
+        <summary id="word-order-rules-summary">Правила: усі</summary>
+        <div class="word-order__rules-panel">
+          <div class="word-order__rules-tools">
+            <button id="word-order-rules-all" type="button">Усі</button>
+            <button id="word-order-rules-none" type="button">Жодного</button>
+          </div>
+          <ul id="word-order-rules-list" class="word-order__rules-list"></ul>
+        </div>
+      </details>
+
       <p id="word-order-progress" class="muted word-order__progress" aria-live="polite"></p>
 
       <div id="word-order-empty" class="empty" hidden>
-        <p>Речень поки немає. Попроси Claude Project додати їх за промптом (docs/SENTENCE_GENERATION_PROMPT.md) або імпортуй .md-таблицю нижче.</p>
+        <p id="word-order-empty-all">Речень поки немає. Попроси Claude Project додати їх за промптом (docs/SENTENCE_GENERATION_PROMPT.md) або імпортуй .md-таблицю нижче.</p>
+        <p id="word-order-empty-filter" hidden>За обраними правилами речень немає. Обери інші правила вище.</p>
+      </div>
+
+      <div id="word-order-norules" class="empty" hidden>
+        <p>Обери хоча б одне правило.</p>
       </div>
 
       <div id="word-order-exercise" hidden>
@@ -282,6 +298,11 @@
         <div id="word-order-answer" class="word-order__answer" aria-label="Відповідь"></div>
         <div id="word-order-pile" class="word-order__pile"></div>
         <p id="word-order-msg" class="msg" aria-live="polite"></p>
+        <div id="word-order-schema" class="word-order__schema" hidden>
+          <p id="word-order-rule" class="word-order__rule muted"></p>
+          <div id="word-order-schema-row" class="word-order__schema-row"></div>
+          <p id="word-order-schema-text" class="word-order__schema-text muted"></p>
+        </div>
         <div class="word-order__actions">
           <button id="word-order-check" class="primary" type="button" disabled>Перевірити</button>
           <button id="word-order-skip" type="button">Пропустити</button>

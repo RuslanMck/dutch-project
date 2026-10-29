@@ -12,10 +12,18 @@ import {
   formatSentenceStats,
   formatWordOrderProgress,
   formatWordOrderSummary,
+  buildRulesQuery,
+  formatRuleFilterSummary,
+  shouldApplyFetch,
+  formatStructureLine,
+  parseStoredRules,
   placeTile,
   readAnswerTiles,
   returnTile,
+  roleColourClass,
+  ruleLabel,
   skipSentenceInSet,
+  WORD_ORDER_RULES,
   advanceWindowedQueue,
   answerKey,
   formatQueueProgress,
@@ -144,7 +152,9 @@ const ui = {
   struggling: createStrugglingDrill('idle'),
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
-// Порядок слів. status: idle (not loaded yet) | ready (an exercise is on screen) | done (summary) | empty (no sentences).
+// Порядок слів. status: idle (not loaded yet) | ready (an exercise is on screen) | done (summary) | empty (no sentences
+// under the chosen rules) | norules (no rule chosen; no set is asked for).
+// rules: the chosen rule names (kept in localStorage); ruleCounts: rule_counts of the last set, null before the first.
 // sentences: the set on screen; index: its sentence on screen; exercise: createWordOrderState of that sentence;
 // checked: the server's answer for it once «Перевірити» is done; results: is_correct of each answered sentence
 // (skipped sentences are not in it); checking: the «Перевірити» request is in flight (only this locks the exercise);
@@ -153,7 +163,11 @@ const ui = {
 const wordOrder = {
   loaded: false, status: 'idle', canGenerate: false, sentences: [], index: 0, exercise: null,
   checked: null, results: [], checking: false, busy: '', loadingMore: false, list: [],
+  rules: [...WORD_ORDER_RULES], ruleCounts: null,
 };
+const WORD_ORDER_RULES_KEY = 'wordOrderRules';
+const wordOrderRuleItems = new Map();   // rule name -> { input, count } of the dropdown
+let wordOrderRulesTimer = 0;
 let memorySession = null;          // { sessionId, calendarDate } used when sessionStorage is blocked
 
 // ---------- helpers ----------
@@ -1583,10 +1597,13 @@ function renderTexts() {
 // ---------- 5b · Порядок слів ----------
 
 // The set on screen is not replaced by a refetch while the learner is in the middle of it (ready or done); only the
-// counts and the list follow. A new set starts when there is none yet, or on «Ще 10». Every fetch takes a number: a
-// refresh that started before a newer one already on screen is ignored, so an older poll cannot replace a newer set.
+// counts and the list follow. A new set starts when there is none yet, or on «Ще 10» / a rule change (a replace).
+// Every fetch takes a number; shouldApplyFetch (logic.js) decides which results are applied: a replace unless a newer
+// replace is applied, a live refresh only when it is newer than all applied ones and than the latest replace requested.
 let wordOrderFetchCount = 0;
 let wordOrderAppliedFetch = 0;
+let wordOrderAppliedReplace = 0;
+let wordOrderPendingReplace = 0;
 
 function isWordOrderInProgress() {
   return wordOrder.status === 'ready' || wordOrder.status === 'done';
@@ -1598,31 +1615,51 @@ function currentWordOrderSentence() {
 
 // Puts the fetched set on screen, unless a set is in progress and replace is off. Reads the state itself, so it is
 // called after the awaits. Returns true when the exercise was replaced.
-function applyWordOrderSet(set, { replace }) {
-  wordOrder.canGenerate = !!set.can_generate;
+// showSet is false when no rule is chosen: the set is then fetched for its rule_counts only, and is not shown.
+function applyWordOrderSet(set, { replace, showSet }) {
+  if (set) {
+    wordOrder.canGenerate = !!set.can_generate;
+    if (set.rule_counts) wordOrder.ruleCounts = set.rule_counts;
+  }
   if (!replace && isWordOrderInProgress()) return false;
-  const sentences = Array.isArray(set.sentences) ? set.sentences : [];
+  const sentences = showSet && set && Array.isArray(set.sentences) ? set.sentences : [];
   Object.assign(wordOrder, {
     sentences,
     index: 0,
     exercise: sentences.length ? createWordOrderState(sentences[0].tiles) : null,
     checked: null,
     results: [],
-    status: sentences.length ? 'ready' : 'empty',
+    status: !showSet ? 'norules' : sentences.length ? 'ready' : 'empty',
   });
   return true;
 }
 
-// Fetches the set and the list, then shows them. Errors go to the notice line; the next visit tries again.
+// Fetches the set (for the chosen rules; all rules when none is chosen, for the counts) and the list, then shows them.
+// Errors go to the notice line; the next visit tries again. A result that shouldApplyFetch rejects is ignored.
 async function refreshWordOrder({ replace = false } = {}) {
   const fetchNo = ++wordOrderFetchCount;
+  if (replace) wordOrderPendingReplace = fetchNo;
+  const hasRules = wordOrder.rules.length > 0;
+  const rulesQuery = buildRulesQuery(wordOrder.rules, WORD_ORDER_RULES);
   try {
-    const [set, rows] = await Promise.all([api.getWordOrderSet(), api.listOrderSentences()]);
-    if (!replace && fetchNo < wordOrderAppliedFetch) return;
+    const [set, rows] = await Promise.all([
+      api.getWordOrderSet(rulesQuery),
+      api.listOrderSentences(),
+    ]);
+    if (!shouldApplyFetch({
+      fetchNo,
+      replace,
+      appliedFetch: wordOrderAppliedFetch,
+      appliedReplace: wordOrderAppliedReplace,
+      pendingReplace: wordOrderPendingReplace,
+    })) return;
     wordOrderAppliedFetch = Math.max(wordOrderAppliedFetch, fetchNo);
+    if (replace) wordOrderAppliedReplace = fetchNo;
     wordOrder.list = Array.isArray(rows) ? rows : [];
     wordOrder.loaded = true;
-    if (applyWordOrderSet(set, { replace })) {
+    const isReplaced = applyWordOrderSet(set, { replace, showSet: hasRules });
+    renderWordOrderRules();
+    if (isReplaced) {
       renderWordOrder();
       return;
     }
@@ -1723,17 +1760,72 @@ function renderWordOrderExercise() {
   $('word-order-skip').disabled = isLocked;
   $('word-order-skip').hidden = !!checked;
   $('word-order-next').hidden = !checked;
+  renderWordOrderSchema(checked);
+}
+
+// The rule and the schema under the answer message: a row of boxes (Dutch above, role below) with « › » between, and
+// the text line. Only after «Перевірити», and only when the sentence has a schema; the next sentence hides it.
+function renderWordOrderSchema(checked) {
+  const structure = checked?.structure;
+  const hasSchema = Array.isArray(structure) && structure.length > 0;
+  const row = $('word-order-schema-row');
+  row.replaceChildren();
+  $('word-order-schema').hidden = !hasSchema;
+  if (!hasSchema) return;
+  $('word-order-rule').textContent = `Правило: ${ruleLabel(checked.rule)}`;
+  structure.forEach((segment, position) => {
+    if (position) {
+      const separator = document.createElement('span');
+      separator.className = 'word-order__sep';
+      separator.setAttribute('aria-hidden', 'true');
+      separator.textContent = '›';
+      row.append(separator);
+    }
+    const box = document.createElement('div');
+    box.className = `word-order__segment ${roleColourClass(segment.role)}`;
+    const text = document.createElement('span');
+    text.className = 'word-order__segment-text';
+    text.textContent = segment.text;
+    const role = document.createElement('span');
+    role.className = 'word-order__segment-role';
+    role.textContent = segment.role;
+    box.append(text, role);
+    row.append(box);
+  });
+  $('word-order-schema-text').textContent = formatStructureLine(structure);
+}
+
+// The dropdown: its summary, and each checkbox with its count (rules with no sentence are disabled).
+function renderWordOrderRules() {
+  const { rules, ruleCounts } = wordOrder;
+  $('word-order-rules-summary').textContent = formatRuleFilterSummary(rules, WORD_ORDER_RULES);
+  for (const rule of WORD_ORDER_RULES) {
+    const item = wordOrderRuleItems.get(rule);
+    if (!item) continue;
+    const count = ruleCounts ? (ruleCounts[rule] ?? 0) : null;
+    const checked = rules.includes(rule);
+    item.input.checked = checked;
+    // A rule with no sentence is disabled, unless it is chosen: the learner can always untick a chosen rule.
+    item.input.disabled = count === 0 && !checked;
+    item.count.textContent = count === null ? '' : `(${count})`;
+  }
 }
 
 // The whole tab: the exercise, the summary and the sentences block.
 function renderWordOrder() {
-  const { status, sentences, index, results } = wordOrder;
+  const { status, sentences, index, results, ruleCounts } = wordOrder;
   const isReady = status === 'ready' && !!currentWordOrderSentence();
   const isDone = status === 'done';
+  const isEmpty = status === 'empty';
+  // Empty under the chosen rules while other sentences exist: say so, instead of the hint about adding sentences.
+  const isFilteredOut = isEmpty && !!ruleCounts && Object.values(ruleCounts).some(count => count > 0);
 
   $('word-order-exercise').hidden = !isReady;
   $('word-order-summary').hidden = !isDone;
-  $('word-order-empty').hidden = status !== 'empty';
+  $('word-order-empty').hidden = !isEmpty;
+  $('word-order-empty-all').hidden = isFilteredOut;
+  $('word-order-empty-filter').hidden = !isFilteredOut;
+  $('word-order-norules').hidden = status !== 'norules';
   $('word-order-progress').textContent = isReady ? formatWordOrderProgress(index + 1, sentences.length) : '';
   if (isReady) renderWordOrderExercise();
   if (isDone) {
@@ -1935,6 +2027,51 @@ function handleWordOrderListClick(event) {
   });
 }
 
+// The dropdown's choice: saved, shown, and a new set loaded after a short pause, so a run of taps loads it once.
+function setWordOrderRules(rules) {
+  wordOrder.rules = WORD_ORDER_RULES.filter(rule => rules.includes(rule));
+  try { localStorage.setItem(WORD_ORDER_RULES_KEY, JSON.stringify(wordOrder.rules)); } catch { /* storage unavailable */ }
+  renderWordOrderRules();
+  clearTimeout(wordOrderRulesTimer);
+  wordOrderRulesTimer = setTimeout(() => {
+    wordOrderRulesTimer = 0;
+    refreshWordOrder({ replace: true });
+  }, 300);
+}
+
+function handleWordOrderRulesChange(event) {
+  if (event.target.type !== 'checkbox') return;
+  setWordOrderRules(WORD_ORDER_RULES.filter(rule => wordOrderRuleItems.get(rule)?.input.checked));
+}
+
+// Reads the saved choice; a missing or broken value means all rules.
+function loadWordOrderRules() {
+  let text = null;
+  try { text = localStorage.getItem(WORD_ORDER_RULES_KEY); } catch { /* storage unavailable */ }
+  return parseStoredRules(text, WORD_ORDER_RULES);
+}
+
+// One checkbox per rule, built once; renderWordOrderRules keeps their state and counts up to date.
+function buildWordOrderRuleList() {
+  const list = $('word-order-rules-list');
+  list.replaceChildren(...WORD_ORDER_RULES.map(rule => {
+    const item = document.createElement('li');
+    const label = document.createElement('label');
+    label.className = 'word-order__rule-option';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = rule;
+    const name = document.createElement('span');
+    name.textContent = ruleLabel(rule);
+    const count = document.createElement('span');
+    count.className = 'muted';
+    label.append(input, name, count);
+    item.append(label);
+    wordOrderRuleItems.set(rule, { input, count });
+    return item;
+  }));
+}
+
 // ---------- wiring ----------
 
 function bindEvents() {
@@ -2120,6 +2257,19 @@ function bindEvents() {
   });
 
   // Порядок слів
+  const rulesBox = $('word-order-rules');
+  document.addEventListener('click', event => {
+    if (rulesBox.open && !rulesBox.contains(event.target)) rulesBox.open = false;
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && rulesBox.open && rulesBox.contains(document.activeElement)) {
+      rulesBox.open = false;
+      $('word-order-rules-summary').focus();
+    }
+  });
+  $('word-order-rules-list').addEventListener('change', handleWordOrderRulesChange);
+  $('word-order-rules-all').addEventListener('click', () => setWordOrderRules(WORD_ORDER_RULES));
+  $('word-order-rules-none').addEventListener('click', () => setWordOrderRules([]));
   $('word-order-pile').addEventListener('click', handleWordOrderPileClick);
   $('word-order-answer').addEventListener('click', handleWordOrderAnswerClick);
   $('word-order-check').addEventListener('click', handleWordOrderCheck);
@@ -2164,6 +2314,9 @@ function init() {
     const savedPeriod = localStorage.getItem('statsPeriod');
     if (['day', 'week', 'month', 'year', 'all'].includes(savedPeriod)) ui.stats.period = savedPeriod;
   } catch { /* storage unavailable */ }
+  wordOrder.rules = loadWordOrderRules();
+  buildWordOrderRuleList();
+  renderWordOrderRules();
   bindEvents();
   renderShuffleButton();
   let saved = 'table';

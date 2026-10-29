@@ -1,7 +1,7 @@
 // Builds the chat messages that ask an LLM for new word-order sentences, and reads its JSON answer. The rules follow
 // docs/SENTENCE_GENERATION_PROMPT.md. Pure.
 import { ValidationError } from '../../errors/domain-errors.js';
-import { RULES, normalizeRule } from './word-order-tiles.js';
+import { RULES, STRUCTURE_ROLES, normalizeRule } from './word-order-tiles.js';
 
 const DEFAULT_SENTENCE_COUNT = 20;
 const MAXIMUM_EXISTING_SENTENCES = 200;
@@ -26,9 +26,13 @@ const SYSTEM_PROMPT = [
   '- The Ukrainian field is a natural translation, not word by word. Use the informal "ти" unless the sentence is',
   '  clearly polite.',
   '- Do not repeat or copy any sentence that is already saved.',
+  '- structure: the sentence split into ordered segments, each with a role (the Ukrainian name of its part). The texts',
+  '  of the segments, joined by single spaces, are exactly the words of the sentence in the same order.',
+  `  Roles: ${STRUCTURE_ROLES.join(', ')}. Example: "Deze week ben ik jarig." has the segments`,
+  '  "Deze week" (час), "ben" (дієслово), "ik" (підмет), "jarig" (прикметник).',
   '',
   'Answer with a JSON object only, no text before or after it:',
-  '{"sentences":[{"nl":"...","uk":"...","rule":"..."}]}',
+  '{"sentences":[{"nl":"...","uk":"...","rule":"...","structure":[{"text":"...","role":"..."}]}]}',
   'The array has exactly the number of items the user asks for.',
 ].join('\n');
 
@@ -49,7 +53,8 @@ export function buildGenerationMessages({
   ]);
 }
 
-// Returns the sentences with a string nl and uk (rule null when unknown), at most count of them when count is given.
+// Returns the sentences with a string nl and uk (rule null when unknown; structure the array of segments as the model
+// wrote it, or null), at most count of them when count is given.
 // Throws ValidationError when the answer holds no JSON object or has no sentences array.
 export function parseGeneratedSentences(responseText, { count } = {}) {
   const parsedAnswer = parseJsonObject(responseText);
@@ -121,5 +126,6 @@ function toGeneratedSentence(item) {
     nl: item.nl.trim(),
     uk: item.uk.trim(),
     rule: normalizeRule(item.rule),
+    structure: Array.isArray(item.structure) ? item.structure : null,
   });
 }

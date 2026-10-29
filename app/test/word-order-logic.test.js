@@ -10,12 +10,16 @@ import {
   buildGenerationMessages,
   parseGeneratedSentences,
 } from '../src/domains/word-order/sentence-generation-prompt.js';
-import { parseSentenceMarkdown } from '../src/domains/word-order/sentence-markdown.js';
+import { parseSentenceMarkdown, parseStructureText } from '../src/domains/word-order/sentence-markdown.js';
 import {
   RULES,
+  STRUCTURE_ROLES,
   isCorrectOrder,
   normalizeRule,
+  normalizeRuleNames,
   normalizeSentenceKey,
+  normalizeStructure,
+  parseStoredStructure,
   pickDistractors,
   shuffleTiles,
   splitIntoTiles,
@@ -53,9 +57,9 @@ test('RULES lists the eight rule names, frozen', () => {
 test('add_sentences accepts any rule value: a bad one becomes null and the call still parses', () => {
   const parsed = addSentencesInputSchema.parse({
     sentences: [
-      { nl: 'Ik ga.', uk: 'Я йду.', rule: 'greeting' },
+      { nl: 'Ik ga.', uk: 'Я йду.', rule: 'greeting', structure: null },
       { nl: 'Ik werk.', uk: 'Я працюю.', rule: 42 },
-      { nl: 'Ik slaap.', uk: 'Я сплю.', rule: null },
+      { nl: 'Ik slaap.', uk: 'Я сплю.', rule: null, structure: null },
       { nl: 'Heb je een mes?', uk: 'Маєш ніж?', rule: '`Question`' },
       { nl: 'Ik eet.', uk: 'Я їм.' },
     ],
@@ -78,12 +82,12 @@ test('splitIntoTiles keeps inner punctuation and drops tokens that are only punc
 
 test('normalizeSentenceKey lower-cases and maps apostrophe variants to a plain apostrophe', () => {
   assert.equal(normalizeSentenceKey('Morgen gaan we naar de markt.'), 'morgen gaan we naar de markt');
-  assert.equal(normalizeSentenceKey('Dat’s   ʼn  ‘test` ok.'), "dat's 'n test' ok");
+  assert.equal(normalizeSentenceKey('Dat’s   ʼn  ‘test` ok.'), "dat's 'n 'test' ok");
 });
 
-test('splitIntoTiles strips curly quotes and an ellipsis at token ends, but keeps an inner apostrophe', () => {
+test('splitIntoTiles strips curly double quotes and an ellipsis at token ends; apostrophe variants become \' and stay', () => {
   assert.deepEqual(splitIntoTiles('“Ik ben moe…”'), ['Ik', 'ben', 'moe']);
-  assert.deepEqual(splitIntoTiles('„Dat is z’n fiets‘ …'), ['Dat', 'is', 'z’n', 'fiets']);
+  assert.deepEqual(splitIntoTiles('„Dat is z’n fiets‘ …'), ['Dat', 'is', "z'n", "fiets'"]);
   assert.equal(normalizeSentenceKey('Dat is z’n fiets.'), "dat is z'n fiets");
 });
 
@@ -278,8 +282,8 @@ test('parseSentenceMarkdown reads the rows of the prompt table', () => {
   const result = parseSentenceMarkdown(markdown);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.sentences, [
-    { nl: 'Morgen gaan we naar de markt.', uk: 'Завтра ми йдемо на ринок.', rule: 'inversion' },
-    { nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2' },
+    { nl: 'Morgen gaan we naar de markt.', uk: 'Завтра ми йдемо на ринок.', rule: 'inversion', structure: null },
+    { nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2', structure: null },
   ]);
 });
 
@@ -289,11 +293,11 @@ test('parseSentenceMarkdown turns an unknown rule into null and a missing rule c
     '|---|---|---|',
     '| Привіт. | Hallo daar. | greeting |',
   ].join('\n');
-  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo daar.', uk: 'Привіт.', rule: null }]);
+  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo daar.', uk: 'Привіт.', rule: null, structure: null }]);
 
   const withoutRuleColumn = '| Українською | Nederlands |\n|---|---|\n| Привіт. | Hallo daar. |';
   assert.deepEqual(parseSentenceMarkdown(withoutRuleColumn).sentences, [
-    { nl: 'Hallo daar.', uk: 'Привіт.', rule: null },
+    { nl: 'Hallo daar.', uk: 'Привіт.', rule: null, structure: null },
   ]);
 });
 
@@ -304,7 +308,7 @@ test('parseSentenceMarkdown matches the column names case-insensitively and trim
   ]);
   const matchingHeader = '|  nederlands | УКРАЇНСЬКОЮ |\n|---|---|\n|  Ik ben moe.  | Я втомлений. |';
   assert.deepEqual(parseSentenceMarkdown(matchingHeader).sentences, [
-    { nl: 'Ik ben moe.', uk: 'Я втомлений.', rule: null },
+    { nl: 'Ik ben moe.', uk: 'Я втомлений.', rule: null, structure: null },
   ]);
 });
 
@@ -317,7 +321,7 @@ test('parseSentenceMarkdown reports a row with a blank Dutch or Ukrainian cell a
     '| 4 |  |  | v2 |',
   ].join('\n');
   const result = parseSentenceMarkdown(markdown);
-  assert.deepEqual(result.sentences, [{ nl: 'Eerste zin.', uk: 'Перше.', rule: 'v2' }]);
+  assert.deepEqual(result.sentences, [{ nl: 'Eerste zin.', uk: 'Перше.', rule: 'v2', structure: null }]);
   assert.deepEqual(result.errors, [
     'рядок 2: порожнє українське речення',
     'рядок 3: порожнє нідерландське речення',
@@ -345,19 +349,19 @@ test('parseSentenceMarkdown reads the first table that has both columns', () => 
     '|---|---|',
     '| Другий. | Tweede. |',
   ].join('\n');
-  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo.', uk: 'Привіт.', rule: null }]);
+  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo.', uk: 'Привіт.', rule: null, structure: null }]);
 });
 
 test('parseSentenceMarkdown treats an escaped pipe as a literal pipe inside a cell', () => {
   const markdown = '| Українською | Nederlands |\n|---|---|\n| Або a \\| b. | Kies a \\| b. |';
   assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [
-    { nl: 'Kies a | b.', uk: 'Або a | b.', rule: null },
+    { nl: 'Kies a | b.', uk: 'Або a | b.', rule: null, structure: null },
   ]);
 });
 
 test('parseSentenceMarkdown accepts CRLF line endings and text without a table', () => {
   const markdown = '| Українською | Nederlands |\r\n|---|---|\r\n| Привіт. | Hallo. |\r\n';
-  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo.', uk: 'Привіт.', rule: null }]);
+  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo.', uk: 'Привіт.', rule: null, structure: null }]);
   assert.deepEqual(parseSentenceMarkdown('').sentences, []);
   assert.deepEqual(parseSentenceMarkdown(undefined).errors, [
     'не знайдено таблицю з колонками «Українською» і «Nederlands»',
@@ -375,18 +379,19 @@ test('parseSentenceMarkdown strips backticks and emphasis from the rule, the cel
   ].join('\n');
   assert.deepEqual(parseSentenceMarkdown(markdown), {
     sentences: [
-      { nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2' },
-      { nl: 'Ben je thuis?', uk: 'Ти вдома?', rule: 'question' },
-      { nl: 'Ik bel je op.', uk: 'Я дзвоню тобі.', rule: 'separable' },
-      { nl: 'Ik ga.', uk: 'Я йду.', rule: 'negation' },
+      { nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2', structure: null },
+      { nl: 'Ben je thuis?', uk: 'Ти вдома?', rule: 'question', structure: null },
+      { nl: 'Ik bel je op.', uk: 'Я дзвоню тобі.', rule: 'separable', structure: null },
+      { nl: 'Ik ga.', uk: 'Я йду.', rule: 'negation', structure: null },
     ],
     errors: [],
+    warnings: [],
   });
 });
 
 test('parseSentenceMarkdown matches a bold or backticked header case-insensitively', () => {
   const markdown = '| `українською` | **nederlands** |\n|---|---|\n| Привіт. | Hallo. |';
-  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo.', uk: 'Привіт.', rule: null }]);
+  assert.deepEqual(parseSentenceMarkdown(markdown).sentences, [{ nl: 'Hallo.', uk: 'Привіт.', rule: null, structure: null }]);
 });
 
 test('parseSentenceMarkdown returns frozen results', () => {
@@ -416,7 +421,11 @@ test('the system message holds the generation rules, the rule names and the JSON
   for (const rule of RULES) assert.ok(systemMessage.content.includes(rule), `rule ${rule} is named`);
   assert.match(systemMessage.content, /4 to 9 words/);
   assert.match(systemMessage.content, /No commas/);
-  assert.match(systemMessage.content, /\{"sentences":\[\{"nl":"\.\.\.","uk":"\.\.\.","rule":"\.\.\."\}\]\}/);
+  assert.match(
+    systemMessage.content,
+    /\{"sentences":\[\{"nl":"\.\.\.","uk":"\.\.\.","rule":"\.\.\.","structure":\[\{"text":"\.\.\.","role":"\.\.\."\}\]\}\]\}/,
+  );
+  for (const role of STRUCTURE_ROLES) assert.ok(systemMessage.content.includes(role), `role ${role} is named`);
 });
 
 test('the user message lists the known words, the other words, the saved sentences and the count', () => {
@@ -444,14 +453,14 @@ test('the user message shows (none) for empty lists and uses at most 200 saved s
 
 test('parseGeneratedSentences reads a plain JSON object', () => {
   const answer = JSON.stringify({
-    sentences: [{ nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2' }],
+    sentences: [{ nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2', structure: null }],
   });
-  assert.deepEqual(parseGeneratedSentences(answer), [{ nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2' }]);
+  assert.deepEqual(parseGeneratedSentences(answer), [{ nl: 'Ik drink koffie.', uk: 'Я п\'ю каву.', rule: 'v2', structure: null }]);
 });
 
 test('parseGeneratedSentences reads the JSON inside a fence, with or without the json tag', () => {
   const body = '{"sentences":[{"nl":"Heb je een mes?","uk":"Є в тебе ніж?","rule":"question"}]}';
-  const expected = [{ nl: 'Heb je een mes?', uk: 'Є в тебе ніж?', rule: 'question' }];
+  const expected = [{ nl: 'Heb je een mes?', uk: 'Є в тебе ніж?', rule: 'question', structure: null }];
   assert.deepEqual(parseGeneratedSentences(`\`\`\`json\n${body}\n\`\`\``), expected);
   assert.deepEqual(parseGeneratedSentences(`\`\`\`\n${body}\n\`\`\``), expected);
 });
@@ -459,23 +468,23 @@ test('parseGeneratedSentences reads the JSON inside a fence, with or without the
 test('parseGeneratedSentences makes an unknown rule null and drops items without string nl or uk', () => {
   const answer = JSON.stringify({
     sentences: [
-      { nl: 'Ik slaap.', uk: 'Я сплю.', rule: 'nonsense' },
-      { nl: 'Geen tekst.', uk: 42, rule: 'v2' },
-      { uk: 'Ontbrekend.', rule: 'v2' },
+      { nl: 'Ik slaap.', uk: 'Я сплю.', rule: 'nonsense', structure: null },
+      { nl: 'Geen tekst.', uk: 42, rule: 'v2', structure: null },
+      { uk: 'Ontbrekend.', rule: 'v2', structure: null },
       'just a string',
       null,
       { nl: 'Ik werk.', uk: 'Я працюю.' },
     ],
   });
   assert.deepEqual(parseGeneratedSentences(answer), [
-    { nl: 'Ik slaap.', uk: 'Я сплю.', rule: null },
-    { nl: 'Ik werk.', uk: 'Я працюю.', rule: null },
+    { nl: 'Ik slaap.', uk: 'Я сплю.', rule: null, structure: null },
+    { nl: 'Ik werk.', uk: 'Я працюю.', rule: null, structure: null },
   ]);
 });
 
 test('parseGeneratedSentences reads the JSON object inside text that has words around it', () => {
   const body = '{"sentences":[{"nl":"Ik ga.","uk":"Я йду.","rule":"v2"}]}';
-  const expected = [{ nl: 'Ik ga.', uk: 'Я йду.', rule: 'v2' }];
+  const expected = [{ nl: 'Ik ga.', uk: 'Я йду.', rule: 'v2', structure: null }];
   assert.deepEqual(parseGeneratedSentences(`Hier is het antwoord: ${body} Veel succes!`), expected);
   assert.deepEqual(parseGeneratedSentences(`Here you go:\n\`\`\`\n${body}\n\`\`\`\nThanks`), expected);
 });
@@ -483,9 +492,9 @@ test('parseGeneratedSentences reads the JSON object inside text that has words a
 test('parseGeneratedSentences keeps only count sentences when count is given', () => {
   const answer = JSON.stringify({
     sentences: [
-      { nl: 'Ik ga.', uk: 'Я йду.', rule: 'v2' },
-      { nl: 'Ik werk.', uk: 'Я працюю.', rule: 'v2' },
-      { nl: 'Ik slaap.', uk: 'Я сплю.', rule: 'v2' },
+      { nl: 'Ik ga.', uk: 'Я йду.', rule: 'v2', structure: null },
+      { nl: 'Ik werk.', uk: 'Я працюю.', rule: 'v2', structure: null },
+      { nl: 'Ik slaap.', uk: 'Я сплю.', rule: 'v2', structure: null },
     ],
   });
   assert.deepEqual(parseGeneratedSentences(answer, { count: 2 }).map(sentence => sentence.nl), ['Ik ga.', 'Ik werk.']);
@@ -494,12 +503,12 @@ test('parseGeneratedSentences keeps only count sentences when count is given', (
 
 test('parseGeneratedSentences normalises the rule text the model wrote', () => {
   const answer = JSON.stringify({ sentences: [{ nl: 'Heb je een mes?', uk: 'Маєш ніж?', rule: '`Question`' }] });
-  assert.deepEqual(parseGeneratedSentences(answer), [{ nl: 'Heb je een mes?', uk: 'Маєш ніж?', rule: 'question' }]);
+  assert.deepEqual(parseGeneratedSentences(answer), [{ nl: 'Heb je een mes?', uk: 'Маєш ніж?', rule: 'question', structure: null }]);
 });
 
 test('parseGeneratedSentences trims the sentence texts', () => {
-  const answer = JSON.stringify({ sentences: [{ nl: '  Ik ga.  ', uk: ' Я йду. ', rule: 'v2' }] });
-  assert.deepEqual(parseGeneratedSentences(answer), [{ nl: 'Ik ga.', uk: 'Я йду.', rule: 'v2' }]);
+  const answer = JSON.stringify({ sentences: [{ nl: '  Ik ga.  ', uk: ' Я йду. ', rule: 'v2', structure: null }] });
+  assert.deepEqual(parseGeneratedSentences(answer), [{ nl: 'Ik ga.', uk: 'Я йду.', rule: 'v2', structure: null }]);
 });
 
 test('parseGeneratedSentences returns an empty list for an empty sentences array', () => {
@@ -727,3 +736,208 @@ test('the API key is scrubbed from a provider message that is cut to 200 charact
     return true;
   });
 });
+
+// ---------- sentence structure and rule filter ----------
+
+const KOFFIE_STRUCTURE = [
+  { text: 'Ik', role: 'підмет' },
+  { text: 'drink', role: 'дієслово' },
+  { text: 'koffie', role: 'додаток' },
+];
+
+test('add_sentences accepts any structure value: a bad one never fails the parse', () => {
+  const parsed = addSentencesInputSchema.parse({
+    sentences: [
+      { nl: 'Ik ga.', uk: 'Я йду.', structure: 'Ik (підмет) + ga (дієслово)' },
+      { nl: 'Ik werk.', uk: 'Я працюю.', structure: [{ text: 1 }] },
+      { nl: 'Ik eet.', uk: 'Я їм.', structure: null },
+      { nl: 'Ik slaap.', uk: 'Я сплю.', structure: KOFFIE_STRUCTURE },
+    ],
+  });
+  assert.equal(parsed.sentences.length, 4);
+  assert.deepEqual(parsed.sentences[3].structure, KOFFIE_STRUCTURE);
+});
+
+test('STRUCTURE_ROLES lists the seventeen roles of a schema, частка among them', () => {
+  assert.equal(STRUCTURE_ROLES.length, 17);
+  assert.ok(STRUCTURE_ROLES.includes('підмет'));
+  assert.ok(STRUCTURE_ROLES.includes('питальне слово'));
+  assert.ok(STRUCTURE_ROLES.includes('частка'));
+  assert.ok(Object.isFrozen(STRUCTURE_ROLES));
+});
+
+test('normalizeStructure keeps valid segments, trimmed, with the role lower-cased', () => {
+  const structure = normalizeStructure({
+    nl: 'Ik drink koffie.',
+    structure: [{ text: ' Ik ', role: ' Підмет ' }, { text: 'drink', role: 'дієслово' }, { text: 'koffie', role: 'додаток' }],
+  });
+  assert.deepEqual(structure, KOFFIE_STRUCTURE);
+  assert.ok(Object.isFrozen(structure));
+});
+
+test('normalizeStructure refuses a schema whose texts are not the sentence words in order', () => {
+  const nl = 'Ik drink koffie.';
+  assert.equal(normalizeStructure({
+    nl,
+    structure: [{ text: 'drink', role: 'дієслово' }, { text: 'Ik', role: 'підмет' }, { text: 'koffie', role: 'додаток' }],
+  }), null, 'wrong order');
+  assert.equal(normalizeStructure({
+    nl,
+    structure: [{ text: 'Ik', role: 'підмет' }, { text: 'koffie', role: 'додаток' }],
+  }), null, 'a word missing');
+  assert.equal(normalizeStructure({
+    nl,
+    structure: [{ text: 'Ik', role: 'підмет' }, { text: 'drink', role: 'дієслово' }, { text: 'thee', role: 'додаток' }],
+  }), null, 'another word');
+});
+
+test('normalizeStructure ignores case and punctuation when it compares the words', () => {
+  const structure = normalizeStructure({
+    nl: '«IK drink, koffie!»',
+    structure: [{ text: 'ik', role: 'підмет' }, { text: 'Drink.', role: 'дієслово' }, { text: 'koffie', role: 'додаток' }],
+  });
+  assert.equal(structure.length, 3);
+});
+
+test('normalizeStructure refuses a segment with no word in it (punctuation only) and keeps the text as written', () => {
+  const nl = 'Ik ga.';
+  assert.equal(normalizeStructure({
+    nl,
+    structure: [{ text: 'Ik', role: 'підмет' }, { text: 'ga', role: 'дієслово' }, { text: '.', role: 'інше' }],
+  }), null, 'a full stop as a segment');
+  assert.equal(normalizeStructure({
+    nl: 'Ik ga?',
+    structure: [{ text: 'Ik', role: 'підмет' }, { text: ' ?! ', role: 'дієслово' }, { text: 'ga', role: 'дієслово' }],
+  }), null, 'punctuation in the middle');
+  const kept = normalizeStructure({
+    nl,
+    structure: [{ text: 'Ik', role: 'підмет' }, { text: 'ga.', role: 'дієслово' }],
+  });
+  assert.deepEqual(kept, [{ text: 'Ik', role: 'підмет' }, { text: 'ga.', role: 'дієслово' }]);
+});
+
+test('apostrophe variants read as the plain one, so ’s and \'s give the same tiles, and the apostrophe is kept', () => {
+  const plain = splitIntoTiles("Ik kom 's avonds thuis.");
+  assert.deepEqual(plain, ['Ik', 'kom', "'s", 'avonds', 'thuis']);
+  for (const variant of ['’', 'ʼ', '‘', '`']) {
+    assert.deepEqual(splitIntoTiles(`Ik kom ${variant}s avonds thuis.`), plain, `variant ${variant}`);
+  }
+  assert.deepEqual(splitIntoTiles("'s avonds"), ["'s", 'avonds'], 'a leading apostrophe is not stripped');
+  assert.deepEqual(splitIntoTiles('’s avonds'), splitIntoTiles("'s avonds"));
+  assert.equal(normalizeSentenceKey('Ik kom ’s avonds.'), normalizeSentenceKey("Ik kom 's avonds."));
+  assert.equal(isCorrectOrder({ answerTiles: ['thuis', 'avonds', '’s', 'kom', 'Ik'], dutchSentence: "Ik kom 's avonds thuis." }), false);
+  assert.equal(isCorrectOrder({ answerTiles: ['Ik', 'kom', '’s', 'avonds', 'thuis'], dutchSentence: "Ik kom 's avonds thuis." }), true);
+});
+
+test('normalizeStructure matches a ’s segment against a sentence with \'s, and the other way round', () => {
+  const structureWithCurly = [
+    { text: 'Ik', role: 'підмет' },
+    { text: 'kom', role: 'дієслово' },
+    { text: '’s avonds', role: 'час' },
+    { text: 'thuis', role: 'місце' },
+  ];
+  const kept = normalizeStructure({ nl: "Ik kom 's avonds thuis.", structure: structureWithCurly });
+  assert.deepEqual(kept, structureWithCurly, 'the segment text is kept as written');
+  const structureWithStraight = [
+    { text: 'Ik', role: 'підмет' },
+    { text: 'kom', role: 'дієслово' },
+    { text: "'s avonds", role: 'час' },
+    { text: 'thuis', role: 'місце' },
+  ];
+  assert.deepEqual(normalizeStructure({ nl: 'Ik kom ’s avonds thuis.', structure: structureWithStraight }), structureWithStraight);
+});
+
+test('normalizeStructure allows up to twelve segments and refuses thirteen, blank parts and long roles', () => {
+  const words = Array.from({ length: 13 }, (_, index) => `w${index}`);
+  const segmentsOf = count => words.slice(0, count).map(word => ({ text: word, role: 'додаток' }));
+  assert.equal(normalizeStructure({ nl: words.slice(0, 12).join(' '), structure: segmentsOf(12) }).length, 12);
+  assert.equal(normalizeStructure({ nl: words.join(' '), structure: segmentsOf(13) }), null, 'thirteen segments');
+  assert.equal(normalizeStructure({ nl: 'Ik drink koffie.', structure: [] }), null, 'no segments');
+  assert.equal(normalizeStructure({
+    nl: 'Ik drink koffie.',
+    structure: [{ text: 'Ik', role: ' ' }, { text: 'drink', role: 'дієслово' }, { text: 'koffie', role: 'додаток' }],
+  }), null, 'blank role');
+  assert.equal(normalizeStructure({
+    nl: 'Ik drink koffie.',
+    structure: [{ text: 'Ik', role: 'x'.repeat(31) }, { text: 'drink', role: 'дієслово' }, { text: 'koffie', role: 'додаток' }],
+  }), null, 'role longer than 30 characters');
+  assert.equal(normalizeStructure({ nl: 'Ik drink koffie.', structure: 'Ik (підмет)' }), null, 'not an array');
+  assert.equal(normalizeStructure({ nl: 'Ik drink koffie.' }), null, 'missing');
+});
+
+test('parseStoredStructure reads the stored JSON back, and gives null for NULL or junk', () => {
+  assert.deepEqual(parseStoredStructure(JSON.stringify(KOFFIE_STRUCTURE)), KOFFIE_STRUCTURE);
+  assert.equal(parseStoredStructure(null), null);
+  assert.equal(parseStoredStructure('{"text":"Ik"}'), null);
+  assert.equal(parseStoredStructure('не JSON'), null);
+});
+
+test('parseStructureText reads the schema cell into segments', () => {
+  assert.deepEqual(parseStructureText('Deze week (час) + ben (дієслово) + ik (підмет) + jarig (прикметник)'), [
+    { text: 'Deze week', role: 'час' },
+    { text: 'ben', role: 'дієслово' },
+    { text: 'ik', role: 'підмет' },
+    { text: 'jarig', role: 'прикметник' },
+  ]);
+});
+
+test('parseStructureText splits on + with or without spaces, and keeps brackets inside the Dutch text', () => {
+  assert.deepEqual(parseStructureText('Ik (підмет)+ga (дієслово)'), [
+    { text: 'Ik', role: 'підмет' },
+    { text: 'ga', role: 'дієслово' },
+  ]);
+  assert.deepEqual(parseStructureText('Ik (підмет)  +  ga (дієслово)'), [
+    { text: 'Ik', role: 'підмет' },
+    { text: 'ga', role: 'дієслово' },
+  ]);
+  assert.deepEqual(parseStructureText('Ik (bedoel) iets (додаток) + ga (дієслово)'), [
+    { text: 'Ik (bedoel) iets', role: 'додаток' },
+    { text: 'ga', role: 'дієслово' },
+  ]);
+});
+
+test('parseStructureText drops backticks and emphasis marks from each text and role', () => {
+  assert.deepEqual(parseStructureText('**Ik** (_підмет_) + `ga` (`дієслово`) + *je* (*частка*)'), [
+    { text: 'Ik', role: 'підмет' },
+    { text: 'ga', role: 'дієслово' },
+    { text: 'je', role: 'частка' },
+  ]);
+  assert.equal(parseStructureText('** (час)'), null, 'emphasis only, no text');
+  assert.equal(parseStructureText('ga (`  `)'), null, 'backticks only, no role');
+});
+
+test('parseStructureText returns null for an empty cell or a segment it cannot read', () => {
+  assert.equal(parseStructureText(''), null);
+  assert.equal(parseStructureText(undefined), null);
+  assert.equal(parseStructureText('Deze week + ben (дієслово)'), null, 'no role in the first segment');
+  assert.equal(parseStructureText('Deze week (час) + (дієслово)'), null, 'no text in the second segment');
+  assert.equal(parseStructureText('Ik (підмет) + ben (дієслово'), null, 'unclosed bracket');
+});
+
+test('parseSentenceMarkdown reads the Схема column, and warns about a schema it cannot read', () => {
+  const markdown = [
+    '| Українською | Nederlands | Правило | Схема |',
+    '|---|---|---|---|',
+    "| Я п'ю каву. | Ik drink koffie. | v2 | Ik (підмет) + drink (дієслово) + koffie (додаток) |",
+    '| Я йду. | Ik ga. | v2 | Ik (підмет) + ga |',
+    '| Я працюю. | Ik werk hard. | | |',
+  ].join('\n');
+  const result = parseSentenceMarkdown(markdown);
+  assert.deepEqual(result.sentences.map(sentence => sentence.structure), [KOFFIE_STRUCTURE, null, null]);
+  assert.deepEqual(result.warnings, [{ nl: 'Ik ga.', reason: 'схему не розібрано, речення додано без неї' }]);
+  assert.deepEqual(result.errors, []);
+});
+
+test('parseSentenceMarkdown reads a table without a Схема column with no structure', () => {
+  const markdown = '| Українською | Nederlands |\n|---|---|\n| Я п\'ю каву. | Ik drink koffie. |';
+  const result = parseSentenceMarkdown(markdown);
+  assert.equal(result.sentences[0].structure, null);
+  assert.deepEqual(result.warnings, []);
+});
+
+test('normalizeRuleNames reads comma lists: trimmed, lower-cased, unknown names and repeats dropped', () => {
+  assert.deepEqual(normalizeRuleNames([' V2 , none ', 'greeting', 'v2', 42, 'Perfect']), ['v2', 'none', 'perfect']);
+  assert.deepEqual(normalizeRuleNames([' , ', '']), []);
+  assert.deepEqual(normalizeRuleNames([]), []);
+});
+

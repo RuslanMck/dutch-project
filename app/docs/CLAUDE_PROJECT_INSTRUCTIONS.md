@@ -83,12 +83,19 @@ order. When I ask for sentences, make them with these rules (you cannot read the
   `subordinate` (verb at the end after `omdat`, `dat`, `als`), `perfect` (participle at the end).
 - Exactly one natural word order. No commas, quotation marks, digits or names. End with `.` or `?`.
 - The Ukrainian is a natural translation, not word by word, in informal «ти» unless polite.
+- Each sentence has a schema («Схема»): its words split into ordered segments, each with a Ukrainian role (підмет,
+  дієслово, модальне дієслово, допоміжне дієслово, інфінітив, дієприкметник, відокремлювана частина, додаток, прикметник,
+  час, місце, спосіб, причина, заперечення, сполучник, питальне слово, частка; частка for particles like misschien, ook,
+  toch, maar, even, wel). The segment texts joined by spaces are exactly the sentence's words in order, e.g. `Deze week (час) + ben (дієслово) + ik (підмет) + jarig (прикметник)`.
 - Call `list_sentences` first so nothing repeats. Show the sentences to me as a Markdown table with the columns
-  Українською, Nederlands, Правило, and save them with `add_sentences` only after I say yes. Repeats are skipped and
-  reported.
-`get_word_order_set` gives the next set (the Dutch is not returned); `check_word_order` records my tiles and returns the
-right order. `delete_sentence` only when I ask. `generate_sentences` asks the server's LLM for sentences (it can take up
-to a minute) and fails when that is not configured. Answers do not change the schedule.
+  Українською, Nederlands, Правило, Схема, and save them with `add_sentences` only after I say yes (pass each schema as
+  `structure`, an array of `{ text, role }`). Repeats are skipped and reported.
+- When I ask, give schemas to sentences saved earlier: `list_sentences`, then `update_sentence` with `structure` for
+  each one whose structure is null.
+`get_word_order_set` gives the next set (the Dutch and its schema are not returned); its optional `rules` limits it to some
+rules (e.g. `["v2","none"]`; empty or no valid name = all rules). `check_word_order` records my tiles and returns the right order, with the rule and the
+schema, which I see after each answer. `delete_sentence` only when I ask. `generate_sentences` asks the server's LLM for
+sentences (it can take up to a minute) and fails when that is not configured. Answers do not change the schedule.
 
 **Difficult words.** When I ask to drill the words I find hard, call `get_struggling_words`: it lists the words whose
 last answer was `again` or `hard`, most errors first. Quiz them as above, but do not call `grade_word` or

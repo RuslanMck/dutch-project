@@ -24,7 +24,8 @@ const EXPECTED_TOOLS = [
   'get_practice_batch', 'grade_word', 'set_current_chapter', 'set_word_priority', 'import_frequency_list',
   'preview_priorities', 'migrate_to_fsrs', 'practice_stats', 'get_phrase_batch', 'grade_phrase',
   'reset_practice', 'get_struggling_words',
-  'add_sentences', 'list_sentences', 'delete_sentence', 'get_word_order_set', 'check_word_order', 'generate_sentences',
+  'add_sentences', 'list_sentences', 'update_sentence', 'delete_sentence', 'get_word_order_set', 'check_word_order',
+  'generate_sentences',
 ];
 
 const application = createApplication({

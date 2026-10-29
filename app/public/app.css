@@ -14,6 +14,15 @@
   --on-danger: #ffffff;
   --ok: #15803d;
   --radius: 10px;
+  /* schema role colours («Порядок слів»): subject, verb, object, adverbial, negation, connector, adjective, other */
+  --role-subject: #1d4ed8;
+  --role-verb: #047857;
+  --role-object: #7c3aed;
+  --role-adverbial: #b45309;
+  --role-negation: #be123c;
+  --role-connector: #0f766e;
+  --role-adjective: #a21caf;
+  --role-other: #57534e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,6 +38,14 @@
     --danger: #dc2626;
     --on-danger: #ffffff;
     --ok: #4ade80;
+    --role-subject: #93c5fd;
+    --role-verb: #6ee7b7;
+    --role-object: #c4b5fd;
+    --role-adverbial: #fcd34d;
+    --role-negation: #fda4af;
+    --role-connector: #5eead4;
+    --role-adjective: #f0abfc;
+    --role-other: #d6d3d1;
   }
 }
 
@@ -44,6 +61,14 @@
   --danger: #dc2626;
   --on-danger: #ffffff;
   --ok: #4ade80;
+  --role-subject: #93c5fd;
+  --role-verb: #6ee7b7;
+  --role-object: #c4b5fd;
+  --role-adverbial: #fcd34d;
+  --role-negation: #fda4af;
+  --role-connector: #5eead4;
+  --role-adjective: #f0abfc;
+  --role-other: #d6d3d1;
 }
 
 * { box-sizing: border-box; }
@@ -1136,3 +1161,138 @@ button.danger {
   white-space: nowrap;
   font-size: 14px;
 }
+
+/* Rule dropdown and schema («Порядок слів», spec §8.2). Tap targets are at least 44px. */
+.word-order__rules {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+
+.word-order__rules > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.word-order__rules-panel {
+  padding: 0 14px 12px;
+}
+
+.word-order__rules-tools {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.word-order__rules-tools button {
+  flex: 1 1 0;
+  min-height: 44px;
+}
+
+.word-order__rules-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.word-order__rules-list li {
+  border-top: 1px solid var(--border);
+}
+
+.word-order__rule-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.word-order__rule-option input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.word-order__rule-option input:disabled + span {
+  opacity: 0.5;
+}
+
+.word-order__rule-option input:disabled {
+  cursor: default;
+}
+
+.word-order__rule {
+  margin: 8px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.word-order__schema {
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.word-order__schema-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+
+.word-order__sep {
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.word-order__segment {
+  --role: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--role);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.word-order__segment-text {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.word-order__segment-role {
+  font-size: 13px;
+  color: var(--role);
+  overflow-wrap: anywhere;
+}
+
+.word-order__schema-text {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.role-subject { --role: var(--role-subject); }
+.role-verb { --role: var(--role-verb); }
+.role-object { --role: var(--role-object); }
+.role-adverbial { --role: var(--role-adverbial); }
+.role-negation { --role: var(--role-negation); }
+.role-connector { --role: var(--role-connector); }
+.role-adjective { --role: var(--role-adjective); }
+.role-other { --role: var(--role-other); }

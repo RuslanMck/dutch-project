@@ -164,3 +164,59 @@ Drawer link `Порядок слів` (`data-tab="word-order"`), after `Фраз
 - `test/word-order.test.js`: service + REST + MCP with the existing test helpers (OpenRouter faked with a
   `fetchFunction`).
 - `test/ui-logic.test.js`: the logic.js state functions.
+
+## 8. Rule filter and sentence schema
+
+### 8.1 Schema (structure) of a sentence
+
+Each sentence may have a `structure`: the sentence split into ordered segments, each with a Ukrainian role, e.g.
+`[{ text: 'Deze week', role: 'час' }, { text: 'ben', role: 'дієслово' }, { text: 'ik', role: 'підмет' },
+{ text: 'jarig', role: 'прикметник' }]`. Shown after every answer as the schema `час > дієслово > підмет > прикметник`
+with each segment's Dutch above its role.
+
+- Roles (recommended list, `STRUCTURE_ROLES` in word-order-tiles.js): підмет, дієслово, модальне дієслово, допоміжне
+  дієслово, інфінітив, дієприкметник, відокремлювана частина, додаток, прикметник, час, місце, спосіб, причина,
+  заперечення, сполучник, питальне слово, частка (particle or modal word: misschien, ook, toch, maar, even, wel, eens).
+  Another short role (1–30 chars) is kept as given.
+- Migration `010-add-sentence-structure.sql`: `ALTER TABLE order_sentences ADD COLUMN structure TEXT;` (JSON array,
+  NULL = no schema).
+- `normalizeStructure({ nl, structure })` (word-order-tiles.js) → the cleaned array (texts and roles trimmed; roles
+  lower-cased) or `null` when missing/invalid. Valid when 1–12 segments, each with non-blank text and role, and
+  `normalizeSentenceKey(segments' texts joined by ' ')` equals `normalizeSentenceKey(nl)`. A segment whose text has no
+  word in it (punctuation only) makes it invalid. Segment texts are kept as written.
+- `parseStructureText(text)` (sentence-markdown.js) → array or null. Format: segments joined by ` + ` (the spaces are
+  optional: `Ik (підмет)+ga (дієслово)` works), each `<Dutch> (<role>)`, e.g.
+  `Deze week (час) + ben (дієслово) + ik (підмет) + jarig (прикметник)`. The role is the last `(...)` of a segment, so
+  Dutch text may hold brackets; backticks and `*`/`_` around a text or role are dropped.
+- Markdown table: optional column `Схема` in that format (emphasis/backticks stripped as for other cells).
+- Service `addSentences`: input may carry `structure` (array). Invalid structure → sentence still added without it,
+  plus a warning `{ nl, reason: 'схема не збігається з реченням' }`. On a duplicate whose stored structure is NULL and
+  the input has a valid one, fill structure (and rule when stored rule is NULL) → reported in `updated` (a sentence
+  added earlier in the same call stays in `added` only, in its latest state). Result:
+  `{ added, updated, skipped, warnings }`. `importMarkdown` returns the same plus `errors`.
+- `updateSentence({ id, uk?, rule?, structure? })` → the sentence; invalid structure → ValidationError. REST
+  `PATCH /word-order/sentences/:id`; MCP `update_sentence`.
+- `answerSentence` also returns `rule` and `structure` (array or null). `listSentences` rows include `structure`.
+- OpenRouter prompt and response: each item also has `structure` (array of `{ text, role }`, roles from the list);
+  `parseGeneratedSentences` keeps it (array or null).
+- MCP `add_sentences` schema: `structure` optional array of `{ text, role }`; description explains it with an
+  example and the role list. `docs/SENTENCE_GENERATION_PROMPT.md` asks for the `Схема` column and passes
+  `structure` to add_sentences.
+
+### 8.2 Rule filter
+
+- `getSentenceSet({ size = 10, rules })`: `rules` = array of rule names and/or `'none'` (sentences without a rule);
+  missing, empty or with no valid name = all (unknown names are dropped first). Only matching sentences are chosen (same ordering as before). Response adds
+  `rule_counts: { v2: n, …, perfect: n, none: n }` over all sentences, and `total` = matching count.
+- REST `GET /word-order/set?rules=v2,inversion,none` (unknown names ignored; empty or unknown-only = all rules). MCP `get_word_order_set` gets an
+  optional `rules` array.
+- Page: above the exercise, a dropdown (a `<details>` with a summary «Правила: усі» / «Правила: 3 з 9») holding a
+  checkbox per rule with its Ukrainian name and count, plus «Усі» / «Жодного» shortcuts. Names: v2 «Дієслово на 2-му
+  місці», inversion «Інверсія», question «Питання», modal «Модальне дієслово + інфінітив», separable
+  «Відокремлювані дієслова», negation «niet / geen», subordinate «Підрядне речення», perfect «Минулий час
+  (perfectum)», none «Без правила». Rules with 0 sentences are shown disabled. The choice is kept in localStorage
+  (try/catch) and changing it loads a new set (when nothing is checked, show «Обери хоча б одне правило» and no set).
+- After «Перевірити»: under the right/wrong message, the rule's Ukrainian name and the schema: segments in a row
+  that wraps, each a small box with the Dutch on top and the role below, `>` between boxes, and a text line
+  `час > дієслово > підмет > прикметник`. Each role has a consistent colour from a small palette (existing tokens; 
+  readable in light and dark). No schema → nothing shown.

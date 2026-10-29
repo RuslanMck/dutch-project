@@ -7,6 +7,8 @@ import {
   answerInputSchema,
   generateInputSchema,
   importInputSchema,
+  sentenceSetQuerySchema,
+  updateSentenceInputSchema,
   wordOrderPathParametersSchema,
 } from '../../contracts/word-order-contracts.js';
 import { readRequestBody } from '../../http/request-input.js';
@@ -28,8 +30,16 @@ export function createWordOrderRoutes({ wordOrderService }) {
     response.json({ ok: true });
   });
 
+  wordOrderRouter.patch('/word-order/sentences/:id', (request, response) => {
+    const { id } = wordOrderPathParametersSchema.parse(request.params);
+    const changes = updateSentenceInputSchema.parse(readRequestBody(request));
+    response.json(wordOrderService.updateSentence({ id, ...changes }));
+  });
+
+  // ?rules=v2,none: only these rules. Empty or with no valid name: every rule (the service decides).
   wordOrderRouter.get('/word-order/set', (request, response) => {
-    response.json(wordOrderService.getSentenceSet());
+    const { rules } = sentenceSetQuerySchema.parse(request.query);
+    response.json(wordOrderService.getSentenceSet({ rules: rules === undefined ? undefined : [rules].flat() }));
   });
 
   wordOrderRouter.post('/word-order/sentences/:id/answer', (request, response) => {

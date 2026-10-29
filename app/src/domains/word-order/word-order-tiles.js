@@ -11,7 +11,32 @@ export const RULES = Object.freeze([
   'perfect',
 ]);
 
-const EDGE_PUNCTUATION_PATTERN = /^[.,?!;:"«»“”„‘’…]+|[.,?!;:"«»“”„‘’…]+$/g;
+// The filter names of the set: the rules and 'none' (sentences without a rule).
+export const RULE_FILTER_NAMES = Object.freeze([...RULES, 'none']);
+
+// Roles of a sentence's segments (its schema). Another short role (up to MAXIMUM_ROLE_LENGTH characters) is accepted too.
+export const STRUCTURE_ROLES = Object.freeze([
+  'підмет',
+  'дієслово',
+  'модальне дієслово',
+  'допоміжне дієслово',
+  'інфінітив',
+  'дієприкметник',
+  'відокремлювана частина',
+  'додаток',
+  'прикметник',
+  'час',
+  'місце',
+  'спосіб',
+  'причина',
+  'заперечення',
+  'сполучник',
+  'питальне слово',
+  'частка',
+]);
+
+const EDGE_PUNCTUATION_PATTERN = /^[.,?!;:"«»“”„…]+|[.,?!;:"«»“”„…]+$/g;
+// The apostrophe variants are read as the plain ' first, so ’s and 's are the same word; ' itself is kept.
 const APOSTROPHE_VARIANTS_PATTERN = /[’ʼ‘`]/g;
 const RULE_NOISE_PATTERN = /[`*_\s]/g;
 const DISTRACTOR_WORD_PATTERN = /^[\p{L}'-]+$/u;
@@ -23,6 +48,8 @@ const MINIMUM_DISTRACTOR_LETTERS = 2;
 const DISTRACTOR_COUNT_WITH_EXTRA = 3;
 const DISTRACTOR_COUNT_WITHOUT_EXTRA = 2;
 const MAXIMUM_SHUFFLE_ATTEMPTS = 10;
+const MAXIMUM_STRUCTURE_SEGMENTS = 12;
+const MAXIMUM_ROLE_LENGTH = 30;
 // Words that are interchangeable in a sentence: a distractor is never taken from a group that shares a word with the
 // sentence, so the learner could not tell which tile was meant.
 const INTERCHANGEABLE_WORD_GROUPS = Object.freeze([
@@ -46,9 +73,58 @@ export function normalizeRule(value) {
   return RULES.includes(rule) ? rule : null;
 }
 
-// Splits on whitespace and strips punctuation from both ends of each token; case is kept.
+// Reads rule filter names (from a query string or a list): commas split them, each is trimmed and lower-cased, and
+// names that are not in RULE_FILTER_NAMES are dropped (duplicates too). Non-text values are dropped. An empty result
+// means no filter (every rule), as the service applies it.
+export function normalizeRuleNames(values) {
+  const names = [];
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    for (const part of value.split(',')) {
+      const name = part.trim().toLowerCase();
+      if (RULE_FILTER_NAMES.includes(name) && !names.includes(name)) names.push(name);
+    }
+  }
+  return names;
+}
+
+// Reads a sentence's schema as it was written: an array of { text, role }, each trimmed (the role lower-cased), with
+// the texts joined by single spaces equal to the sentence after normalizeSentenceKey. Returns the cleaned segments, or
+// null when the value is missing or invalid (not an array, 0 or more than 12 segments, a blank text or role, a role
+// longer than 30 characters, a text with no word in it (punctuation only), or a text sequence that is not the
+// sentence's words). A segment's text is kept as written.
+export function normalizeStructure({ nl, structure } = {}) {
+  if (!Array.isArray(structure) || structure.length === 0 || structure.length > MAXIMUM_STRUCTURE_SEGMENTS) return null;
+  const segments = [];
+  for (const segment of structure) {
+    if (segment === null || typeof segment !== 'object') return null;
+    const text = typeof segment.text === 'string' ? segment.text.trim() : '';
+    const role = typeof segment.role === 'string' ? segment.role.trim().toLowerCase() : '';
+    if (text === '' || role === '' || role.length > MAXIMUM_ROLE_LENGTH) return null;
+    if (splitIntoTiles(text).length === 0) return null;
+    segments.push(Object.freeze({ text, role }));
+  }
+  const segmentTextKey = normalizeSentenceKey(segments.map(segment => segment.text).join(' '));
+  if (segmentTextKey !== normalizeSentenceKey(nl)) return null;
+  return Object.freeze(segments);
+}
+
+// The schema as stored (JSON text, or NULL) read back as an array, or null.
+export function parseStoredStructure(storedText) {
+  if (typeof storedText !== 'string' || storedText === '') return null;
+  try {
+    const parsed = JSON.parse(storedText);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Splits on whitespace and strips punctuation from both ends of each token; case is kept. The apostrophe variants
+// (’ ‘ ʼ `) become ' before the stripping, so ’s avonds and 's avonds give the same tiles.
 export function splitIntoTiles(dutchSentence) {
   return String(dutchSentence ?? '')
+    .replace(APOSTROPHE_VARIANTS_PATTERN, "'")
     .split(/\s+/)
     .map(stripEdgePunctuation)
     .filter(tile => tile.length > 0);

@@ -34,6 +34,26 @@ in the right order).
 - No commas, quotes, numbers or names. End with `.` or `?`.
 - The Ukrainian is a natural translation, not word by word. Use the informal «ти» unless the sentence is clearly polite.
 
+**Schema of each sentence**
+
+Each sentence also gets its schema («Схема»): the Dutch sentence split into ordered segments, each with its role in
+Ukrainian. The segments, joined by single spaces, must give exactly the sentence's words in the same order (no word
+missing, repeated or moved; the same punctuation rules as the sentence). Use these roles:
+`підмет`, `дієслово`, `модальне дієслово`, `допоміжне дієслово`, `інфінітив`, `дієприкметник`,
+`відокремлювана частина`, `додаток`, `прикметник`, `час`, `місце`, `спосіб`, `причина`, `заперечення`, `сполучник`,
+`питальне слово`, `частка`.
+
+Use `частка` for particles and modal words such as misschien, ook, toch, maar, even, wel, eens (a word that only
+adds tone or emphasis, not a time, place or manner).
+
+The schema has the form `Deze week (час) + ben (дієслово) + ik (підмет) + jarig (прикметник)`. For example:
+
+- `Ik drink koffie.`: `Ik (підмет) + drink (дієслово) + koffie (додаток)`
+- `Morgen gaan we naar de markt.`: `Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце)`
+- `We willen bij het raam zitten.`: `We (підмет) + willen (модальне дієслово) + bij het raam (місце) + zitten (інфінітив)`
+- `Ik heb de rekening betaald.`: `Ik (підмет) + heb (допоміжне дієслово) + de rekening (додаток) + betaald (дієприкметник)`
+- `Ik bel je morgen op.`: `Ik (підмет) + bel (дієслово) + je (додаток) + morgen (час) + op (відокремлювана частина)`
+
 **Output**
 
 A `.md` file named `sentences-YYYY-MM-DD.md` with exactly this table (the app reads this format):
@@ -41,13 +61,22 @@ A `.md` file named `sentences-YYYY-MM-DD.md` with exactly this table (the app re
 ```markdown
 # Порядок слів — YYYY-MM-DD
 
-| # | Українською | Nederlands | Правило |
-|---|---|---|---|
-| 1 | Завтра ми йдемо на ринок. | Morgen gaan we naar de markt. | inversion |
+| # | Українською | Nederlands | Правило | Схема |
+|---|---|---|---|---|
+| 1 | Завтра ми йдемо на ринок. | Morgen gaan we naar de markt. | inversion | Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце) |
 ```
 
 The `Правило` column is one of: `v2`, `inversion`, `question`, `modal`, `separable`, `negation`, `subordinate`,
-`perfect`.
+`perfect`. The `Схема` column is the schema in the form above.
 
-Then ask me: «Зберегти ці речення в додаток?». When I say yes, call `add_sentences` with all of them (`nl`, `uk`,
-`rule`). Tell me how many were added and how many were skipped as duplicates.
+Then ask me: «Зберегти ці речення в додаток?». When I say yes, call `add_sentences` with all of them: for each sentence
+`nl`, `uk`, `rule` and `structure`, the schema as an array of `{ text, role }` objects in order, for example
+`[{"text":"Morgen","role":"час"},{"text":"gaan","role":"дієслово"},{"text":"we","role":"підмет"},{"text":"naar de markt","role":"місце"}]`.
+Tell me how many were added, how many were skipped as duplicates, and any warning (a schema that does not match its sentence is
+dropped and the sentence is still added).
+
+**Schemas for sentences saved earlier**
+
+When I ask for it (or when I ask for sentences and some saved ones have no schema): call `list_sentences` with limit 500
+and, for each sentence whose `structure` is null, call `update_sentence` with its `id` and `structure` (the same array of
+`{ text, role }` as above, built from its `nl`). Tell me how many got a schema.
