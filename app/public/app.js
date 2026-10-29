@@ -6,7 +6,7 @@ import {
   buildAlsoOrderLines,
   buildWordOrderCheckView,
   chooseFirstPileFocus,
-  formatOrderCountLabel,
+  formatExpectedFormLabel,
   chooseFocusAfterPlace,
   chooseFocusAfterReturn,
   createWordOrderState,
@@ -1929,7 +1929,9 @@ function renderWordOrderExercise() {
     }
   }
 
-  $('word-order-order-count').textContent = formatOrderCountLabel(sentence.order_count);
+  const formLabel = $('word-order-order-count');
+  formLabel.textContent = formatExpectedFormLabel(sentence.rule);
+  formLabel.hidden = !formLabel.textContent;
 
   const msg = $('word-order-msg');
   const mainLine = $('word-order-main');

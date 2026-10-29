@@ -53,7 +53,7 @@ import {
   formatWordOrderSummary,
   buildWordOrderCheckView,
   buildAlsoOrderLines,
-  formatOrderCountLabel,
+  formatExpectedFormLabel,
   formatSentenceStats,
   formatImportResult,
   shouldApplyFetch,
@@ -843,13 +843,11 @@ test('buildWordOrderCheckView: a missing orders list is treated as none (older s
   assert.deepEqual(view.otherOrders, []);
 });
 
-test('formatOrderCountLabel: one order or several; a missing or zero count is one order', () => {
-  assert.equal(formatOrderCountLabel(1), 'Один правильний порядок');
-  assert.equal(formatOrderCountLabel(2), 'Можливо кілька порядків');
-  assert.equal(formatOrderCountLabel(4), 'Можливо кілька порядків');
-  assert.equal(formatOrderCountLabel(0), 'Один правильний порядок');
-  assert.equal(formatOrderCountLabel(undefined), 'Один правильний порядок');
-  assert.equal(formatOrderCountLabel(null), 'Один правильний порядок');
+test('formatExpectedFormLabel: the rule the sentence expects, nothing for a sentence without a rule', () => {
+  assert.equal(formatExpectedFormLabel('inversion'), 'Форма: Інверсія');
+  assert.equal(formatExpectedFormLabel('v2'), 'Форма: Дієслово на 2-му місці');
+  assert.equal(formatExpectedFormLabel(null), '');
+  assert.equal(formatExpectedFormLabel(undefined), '');
 });
 
 test('buildAlsoOrderLines: one muted «також» line per alternative, none for an empty list', () => {

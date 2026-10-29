@@ -285,8 +285,8 @@ subordinate clause before or after the main clause). A sentence therefore has a 
 
 ### 9.4 Page
 
-- Under the Ukrainian sentence, a small label from `order_count`: `Один правильний порядок` (1) or `Можливо кілька
-  порядків` (>1).
+- Under the Ukrainian sentence, one muted line naming the word order the sentence expects, from its rule:
+  `Форма: Інверсія` (hidden for a sentence without a rule). The number of accepted orders is not shown.
 - After «Перевірити»:
   - correct, `matched_order === 0`: «Правильно ✓» (as now).
   - correct, `matched_order > 0`: «Правильно ✓» and a muted line «Основний варіант: <orders[0]>».

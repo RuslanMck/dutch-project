@@ -695,11 +695,10 @@ export function formatWordOrderSummary(correctCount, total) {
   return `Готово: ${correctCount} з ${total} правильно`;
 }
 
-// The small label under the Ukrainian sentence (spec §9.4): one accepted order, or several. A missing or zero
-// order_count (an older server) counts as one.
-export function formatOrderCountLabel(orderCount) {
-  const count = Number(orderCount);
-  return count > 1 ? 'Можливо кілька порядків' : 'Один правильний порядок';
+// The line under the Ukrainian sentence: the word order the sentence expects, e.g. «Форма: Інверсія». Empty for a
+// sentence without a rule.
+export function formatExpectedFormLabel(rule) {
+  return rule ? `Форма: ${ruleLabel(rule)}` : '';
 }
 
 // The feedback after «Перевірити» (spec §9.4). message and tone (ok | bad) are the line under the answer.
