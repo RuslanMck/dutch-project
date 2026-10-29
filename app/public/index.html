@@ -38,6 +38,7 @@
     </div>
     <div class="tabs drawer__links">
       <button type="button" class="drawer__link" data-tab="practice">Практика</button>
+      <button type="button" class="drawer__link" data-tab="decks">Колоди</button>
       <button type="button" class="drawer__link" data-tab="cards">Картки</button>
       <button type="button" class="drawer__link" data-tab="phrases">Фрази</button>
       <button type="button" class="drawer__link" data-tab="word-order">Порядок слів</button>
@@ -146,6 +147,72 @@
       <p id="card-count" class="muted center"></p>
     </section>
 
+    <!-- 3b · Колоди -->
+    <section id="tab-decks" class="tab" data-tab="decks" hidden>
+      <div id="decks-list-view">
+        <button id="decks-create-button" class="primary deck-create" type="button">Створити колоду</button>
+        <p id="decks-message" class="muted" role="status"></p>
+        <ul id="decks-list" class="deck-list"></ul>
+        <p id="decks-empty" class="empty" hidden>Колод поки немає. Колода — це ваш список слів для додаткового тренування: він не змінює розклад повторень.</p>
+      </div>
+
+      <div id="decks-picker-view" class="deck-picker" hidden>
+        <div class="deck-picker__head">
+          <h2 class="deck-picker__title">Обери слова</h2>
+          <button id="decks-picker-cancel" type="button">Скасувати</button>
+        </div>
+        <input id="decks-search" type="search" placeholder="Пошук: голландське або українське слово" aria-label="Пошук слів"
+          autocapitalize="none" spellcheck="false" autocomplete="off">
+        <div id="decks-filters" class="deck-chips" role="group" aria-label="Фільтр слів">
+          <button type="button" data-filter="all" aria-pressed="true">Усі</button>
+          <button type="button" data-filter="hard" aria-pressed="false">Важкі</button>
+          <button type="button" data-filter="medium" aria-pressed="false">Середні</button>
+          <button type="button" data-filter="easy" aria-pressed="false">Легкі</button>
+          <button type="button" data-filter="new" aria-pressed="false">Нові</button>
+          <button type="button" data-filter="selected" aria-pressed="false">Обрані</button>
+        </div>
+        <div class="deck-picker__tools">
+          <label class="field">
+            <span>Порядок</span>
+            <select id="decks-sort" aria-label="Порядок слів">
+              <option value="alpha">за алфавітом</option>
+              <option value="hardest">спочатку важкі</option>
+              <option value="stale">давно не практиковані</option>
+            </select>
+          </label>
+          <button id="decks-select-visible" type="button">Обрати всі видимі</button>
+          <button id="decks-clear-selection" type="button">Зняти всі</button>
+        </div>
+        <p id="decks-catalog-message" class="muted" role="status"></p>
+        <ul id="decks-catalog" class="deck-catalog" aria-label="Слова"></ul>
+        <div id="decks-picker-bar" class="deck-bar">
+          <p id="decks-selected-count" class="deck-bar__count" role="status">Обрано: 0</p>
+          <button id="decks-add-button" class="primary" type="button" disabled>Додати слова</button>
+        </div>
+      </div>
+
+      <form id="decks-form" class="deck-form" autocomplete="off" hidden>
+        <h2 id="decks-form-title" class="deck-picker__title">Нова колода</h2>
+        <label class="field">
+          <span>Назва</span>
+          <input id="decks-name" name="name" required maxlength="80" autocapitalize="sentences">
+        </label>
+        <label class="field">
+          <span>Опис (необов'язково)</span>
+          <textarea id="decks-description" name="description" maxlength="500" rows="2"></textarea>
+        </label>
+        <div class="deck-form__words">
+          <p id="decks-form-count" class="muted"></p>
+          <ul id="decks-form-words" class="deck-form-words"></ul>
+        </div>
+        <p id="decks-form-msg" class="msg" aria-live="polite"></p>
+        <div class="deck-form__actions">
+          <button id="decks-form-back" type="button">Назад</button>
+          <button id="decks-save" class="primary" type="submit">Створити колоду</button>
+        </div>
+      </form>
+    </section>
+
     <!-- 3 · Практика -->
     <section id="tab-practice" class="tab" data-tab="practice" hidden>
       <div class="hint-field">
@@ -158,6 +225,7 @@
           <option value="fsrs">Переклад (FSRS)</option>
           <option value="art">Артикль</option>
           <option value="struggling">Важкі слова</option>
+          <option value="custom" hidden disabled>Тренування</option>
         </select>
         <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" — основна практика. Сесія — це слова, які ви зараз вивчаєте: вона триває, навіть кілька днів, доки всі слова не вивчені; прогрес зберігається. Нове слово треба назвати правильно 2 рази; кожна помилка додає ще один раз, до 6, а правильні відповіді зберігаються. Повтори теж рахуються. Набір іде у два раунди: спершу UA → NL, потім NL → UA; слово вивчене, коли його знаєте в обидва боки. Вивчене слово йде за розкладом повторень; якщо ви його забули, воно повертається в сесію. Коли всі нові слова сесії вивчені, одразу приходять наступні 10. "Артикль" — це тренування, яке нічого не змінює. "Важкі слова" — тренування слів, на які ви останнього разу відповіли неправильно або важко; нічого не змінює.</p>
       </div>
@@ -186,6 +254,7 @@
           </svg>
         </button>
       </div>
+      <p id="practice-custom-note" class="muted practice-custom-note" hidden>Тренування — розклад слів не змінюється.</p>
       <p id="practice-progress-hint" class="hint" hidden>Скільки слів набору ще не вивчено. У наборі не більше 10 слів: спершу слова, які ще вчите, і повторення на сьогодні, а нові слова — лише на вільні місця. Одночасно вчимо 5 слів: слово повертається серед них, доки ви не назвете його правильно потрібну кількість разів — її показує рядок «Повторень до вивчення» під відповіддю. Вивчене слово звільняє місце для наступного. Кнопка зі стрілками вмикає й вимикає перемішування.</p>
       <p id="practice-score" class="muted"></p>
       <section id="practice-summary" class="practice-summary" aria-label="Підсумок сесії" hidden>
@@ -197,13 +266,19 @@
         <p id="practice-drill-result" class="practice-summary__text" role="status"></p>
         <p id="practice-drill-note" class="muted"></p>
         <button id="practice-drill-again-button" class="primary practice-summary__struggling-button"
-          type="button">Потренувати ще раз</button>
+          type="button">Ще раз</button>
+        <button id="practice-drill-back-button" class="practice-summary__extra-button" type="button">Назад</button>
       </section>
       <section id="practice-round" class="practice-summary practice-round" aria-labelledby="practice-round-title" hidden>
         <h2 id="practice-round-title" class="practice-round__title"></h2>
         <ul id="practice-round-stats" class="practice-summary__list"></ul>
         <p id="practice-round-hardest" class="practice-round__hardest"></p>
         <ul id="practice-round-words" class="practice-round__words"></ul>
+        <div id="practice-round-drills" class="practice-round__drills" hidden>
+          <button id="practice-round-hard-button" class="practice-summary__extra-button" type="button" hidden></button>
+          <button id="practice-round-hard-medium-button" class="practice-summary__extra-button" type="button"
+            hidden></button>
+        </div>
         <button id="practice-round-next-button" class="primary practice-summary__extra-button" type="button">Наступний
           набір</button>
       </section>
@@ -295,9 +370,15 @@
 
       <div id="word-order-exercise" hidden>
         <p id="word-order-uk" class="word-order__uk"></p>
+        <p id="word-order-order-count" class="muted word-order__order-count"></p>
         <div id="word-order-answer" class="word-order__answer" aria-label="Відповідь"></div>
         <div id="word-order-pile" class="word-order__pile"></div>
         <p id="word-order-msg" class="msg" aria-live="polite"></p>
+        <p id="word-order-main" class="muted word-order__main" hidden></p>
+        <div id="word-order-others" class="muted word-order__others" hidden>
+          <p id="word-order-others-title" class="word-order__others-title"></p>
+          <ul id="word-order-others-list" class="word-order__others-list"></ul>
+        </div>
         <div id="word-order-schema" class="word-order__schema" hidden>
           <p id="word-order-rule" class="word-order__rule muted"></p>
           <div id="word-order-schema-row" class="word-order__schema-row"></div>

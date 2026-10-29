@@ -7,6 +7,7 @@ import { PRACTICE_DIRECTIONS, UK_TO_NL_DIRECTION } from '../domains/practice/pra
 import {
   createNonEmptyTextSchema,
   createOptionalTextSchema,
+  identifierParameterSchema,
   identifierSchema,
   wordPriorityValueSchema,
 } from './shared-contracts.js';
@@ -79,6 +80,14 @@ export const gradePhraseToolInputSchema = gradePhraseFieldsSchema.extend({
 
 export const gradePhraseInputSchema = gradePhraseFieldsSchema.extend({
   phrase_id: identifierSchema.describe('phrase id, from the phrase batch'),
+}).strict();
+
+// The custom drill's words: ids as text, comma-separated (REST query), at most 1000 (a deck's size); repeats are ignored.
+const MAXIMUM_DRILL_WORDS = 1000;
+export const drillWordsQuerySchema = z.object({
+  ids: z.string().min(1, 'required')
+    .transform(text => text.split(',').map(part => part.trim()))
+    .pipe(z.array(identifierParameterSchema).min(1).max(MAXIMUM_DRILL_WORDS)),
 }).strict();
 
 export const setCurrentChapterInputSchema = z.object({

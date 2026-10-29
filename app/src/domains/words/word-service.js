@@ -109,12 +109,14 @@ export function createWordService({
     return getWord(wordId);
   }
 
+  // Deleting a word also takes it out of every custom deck (ON DELETE CASCADE), so 'decks' changes too.
   function deleteWord(wordId) {
     runInTransaction(() => {
       getWord(wordId);
       wordRepository.deleteWord(wordId);
     });
     changeEventBus.publishChange('words');
+    changeEventBus.publishChange('decks');
   }
 
   function updateWordStatus(wordId, learningStatus) {

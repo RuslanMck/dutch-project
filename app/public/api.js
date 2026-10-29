@@ -55,6 +55,10 @@ export const getPracticeStats = () => request('GET', '/api/practice/stats');
 export const getPhraseBatch = sessionId => request('GET', `/api/practice/phrases/batch?session_id=${enc(sessionId)}`);
 export const gradePracticePhrase = body => request('POST', '/api/practice/phrases/grades', body);
 export const getStrugglingWords = () => request('GET', '/api/practice/struggling-words');
+// Practice words for the custom drill, in the given order (unknown ids are skipped by the server). Read-only.
+export const getDrillWords = ids => (ids.length
+  ? request('GET', `/api/practice/drill-words?ids=${ids.map(enc).join(',')}`)
+  : Promise.resolve({ words: [] }));
 export const getRoundSummary = () => request('GET', '/api/practice/round-summary');
 export const getStats = () => request('GET', '/api/stats');
 export const getActivity = period => request('GET', `/api/stats/activity?period=${enc(period)}`);
@@ -98,3 +102,11 @@ export function subscribe(onChange) {
     stopPolling();
   };
 }
+
+// Decks («Колоди»): named word lists for extra drilling. The catalog feeds the picker.
+export const listDecks = () => request('GET', '/api/decks');
+export const getDeck = id => request('GET', `/api/decks/${enc(id)}`);
+export const createDeck = body => request('POST', '/api/decks', body);
+export const updateDeck = (id, patch) => request('PATCH', `/api/decks/${enc(id)}`, patch);
+export const deleteDeck = id => request('DELETE', `/api/decks/${enc(id)}`);
+export const getDeckWordCatalog = () => request('GET', '/api/decks/word-catalog');

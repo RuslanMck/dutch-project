@@ -50,6 +50,13 @@ const DISTRACTOR_COUNT_WITHOUT_EXTRA = 2;
 const MAXIMUM_SHUFFLE_ATTEMPTS = 10;
 const MAXIMUM_STRUCTURE_SEGMENTS = 12;
 const MAXIMUM_ROLE_LENGTH = 30;
+const MAXIMUM_ALTERNATIVE_ORDERS = 5;
+const ALTERNATIVE_NOT_LIST_REASON = 'має бути списком рядків';
+const EMPTY_ORDER_REASON = 'порожній порядок';
+const DIFFERENT_WORDS_REASON = 'інші слова, ніж у реченні';
+const ALREADY_LISTED_REASON = 'такий порядок уже є';
+const SCHEMA_MISMATCH_ORDER_REASON = 'не збігається зі схемою';
+const TOO_MANY_ORDERS_REASON = 'забагато порядків';
 // Words that are interchangeable in a sentence: a distractor is never taken from a group that shares a word with the
 // sentence, so the learner could not tell which tile was meant.
 const INTERCHANGEABLE_WORD_GROUPS = Object.freeze([
@@ -117,6 +124,17 @@ export function parseStoredStructure(storedText) {
     return Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
+  }
+}
+
+// The alternative orders stored as JSON text (a list of strings), read back as an array; anything else is [].
+export function parseStoredAltOrders(storedText) {
+  if (typeof storedText !== 'string' || storedText === '') return [];
+  try {
+    const parsed = JSON.parse(storedText);
+    return Array.isArray(parsed) ? parsed.filter(order => typeof order === 'string') : [];
+  } catch {
+    return [];
   }
 }
 
@@ -188,6 +206,93 @@ function interchangeableWordKeys(sentenceTileKeys) {
     if (group.some(word => sentenceTileKeys.has(word))) group.forEach(word => excludedKeys.add(word));
   }
   return excludedKeys;
+}
+
+// True when both lists hold the same words with the same counts, compared lower-case with apostrophes normalised.
+// Case and punctuation do not make a word different.
+export function isSameWordMultiset(tilesA, tilesB) {
+  return isSameOrder(
+    tilesA.map(normalizeTileForComparison).sort(),
+    tilesB.map(normalizeTileForComparison).sort(),
+  );
+}
+
+// The accepted orders of a sentence as tile lists: the canonical one (from nl) first, then the alternatives in order.
+export function listAcceptedOrders({ nl, altOrders = [] }) {
+  return [splitIntoTiles(nl), ...altOrders.map(order => splitIntoTiles(order))];
+}
+
+// The index of the first order that equals the answer (lower-case, apostrophes normalised), or -1.
+export function findMatchingOrderIndex({ answerTiles, orders }) {
+  const answerKey = answerTiles.map(normalizeTileForComparison).join(' ');
+  return orders.findIndex(orderTiles => orderTiles.map(normalizeTileForComparison).join(' ') === answerKey);
+}
+
+// Reads a sentence's alternative word orders as they were written: each is a string (trimmed) or an array of tiles
+// (joined by spaces). Returns { altOrders: [string], rejected: [{ order, reason }] }: an alternative is kept when it is
+// not blank, has the same words as nl (case and punctuation ignored), is not the canonical order or an earlier one,
+// and, when structure (the sentence's valid schema, else null) is given, is its segments one after another in some
+// order. At most MAXIMUM_ALTERNATIVE_ORDERS are kept; the rest are rejected. A value that is not a list is rejected
+// as a whole. null or undefined means no alternatives.
+export function normalizeAltOrders({ nl, altOrders, structure = null } = {}) {
+  if (altOrders === undefined || altOrders === null) return Object.freeze({ altOrders: Object.freeze([]), rejected: Object.freeze([]) });
+  if (!Array.isArray(altOrders)) {
+    return Object.freeze({ altOrders: Object.freeze([]), rejected: Object.freeze([Object.freeze({ order: '', reason: ALTERNATIVE_NOT_LIST_REASON })]) });
+  }
+  const nlTiles = splitIntoTiles(nl);
+  const listedKeys = new Set([normalizeSentenceKey(nl)]);
+  const segmentTiles = structure === null ? null : structure.map(segment => splitIntoTiles(segment.text));
+  const kept = [];
+  const rejected = [];
+  for (const value of altOrders) {
+    const order = orderText(value);
+    const tiles = splitIntoTiles(order);
+    const key = tiles.map(normalizeTileForComparison).join(' ');
+    let reason = null;
+    if (tiles.length === 0) reason = EMPTY_ORDER_REASON;
+    else if (!isSameWordMultiset(tiles, nlTiles)) reason = DIFFERENT_WORDS_REASON;
+    else if (listedKeys.has(key)) reason = ALREADY_LISTED_REASON;
+    else if (segmentTiles !== null && !matchesSegments(tiles, segmentTiles)) reason = SCHEMA_MISMATCH_ORDER_REASON;
+    else if (kept.length >= MAXIMUM_ALTERNATIVE_ORDERS) reason = TOO_MANY_ORDERS_REASON;
+    if (reason !== null) {
+      rejected.push(Object.freeze({ order, reason }));
+      continue;
+    }
+    listedKeys.add(key);
+    kept.push(order);
+  }
+  return Object.freeze({ altOrders: Object.freeze(kept), rejected: Object.freeze(rejected) });
+}
+
+// An alternative as text: a string as it is (trimmed), or the tiles of an array joined by spaces; anything else is ''.
+function orderText(value) {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.filter(tile => typeof tile === 'string').join(' ').trim();
+  return '';
+}
+
+// True when the tiles are the segments' tiles one after another, each segment used exactly once, in some order.
+// Segments may share words, so this backtracks. The used segments form a bit mask that fixes the position in the
+// tiles, so a failed mask is never tried again: at most 2^12 states for the 12 segments allowed.
+function matchesSegments(tiles, segmentTiles) {
+  const tileKeys = tiles.map(normalizeTileForComparison);
+  const segmentKeys = segmentTiles.map(segment => segment.map(normalizeTileForComparison));
+  const allSegmentsUsed = (1 << segmentKeys.length) - 1;
+  const failedMasks = new Set();
+  const matchesFrom = (position, usedMask) => {
+    if (usedMask === allSegmentsUsed) return position === tileKeys.length;
+    if (failedMasks.has(usedMask)) return false;
+    for (let index = 0; index < segmentKeys.length; index++) {
+      const segmentBit = 1 << index;
+      if (usedMask & segmentBit) continue;
+      const segment = segmentKeys[index];
+      const fits = segment.every((tile, offset) => tileKeys[position + offset] === tile);
+      if (fits && matchesFrom(position + segment.length, usedMask | segmentBit)) return true;
+    }
+    failedMasks.add(usedMask);
+    return false;
+  };
+  return matchesFrom(0, 0);
 }
 
 function stripEdgePunctuation(token) {

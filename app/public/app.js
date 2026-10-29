@@ -3,8 +3,10 @@
 import * as api from './api.js';
 import {
   advanceDrillQueue,
+  buildAlsoOrderLines,
   buildWordOrderCheckView,
   chooseFirstPileFocus,
+  formatOrderCountLabel,
   chooseFocusAfterPlace,
   chooseFocusAfterReturn,
   createWordOrderState,
@@ -26,7 +28,6 @@ import {
   WORD_ORDER_RULES,
   advanceWindowedQueue,
   answerKey,
-  formatQueueProgress,
   formatRoundProgress,
   formatRoundStart,
   buildRoundSummaryView,
@@ -42,7 +43,10 @@ import {
   formatHardestWord,
   shuffle,
   buildDeckLine,
-  buildStrugglingDrillEnd,
+  buildCustomDrillEnd,
+  buildRoundDrillButtons,
+  formatCustomDrillProgress,
+  planCustomDrill,
   checkAnswer,
   esc,
   formatDutchWithArticle,
@@ -54,9 +58,19 @@ import {
   renderRuleBody,
   revealReverseTranslationAnswer,
   revealTranslationAnswer,
+  clearSelected,
+  filterCatalog,
+  formatDeckWordCount,
+  formatDeckWordLabel,
+  formatDifficultyLabel,
+  formatLastPracticed,
+  formatSelectedCount,
+  selectVisible,
+  sortCatalog,
+  toggleSelected,
 } from './logic.js';
 
-const TABS = ['table', 'cards', 'practice', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
+const TABS = ['table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -147,9 +161,9 @@ const ui = {
     dueTomorrow: null,
     strugglingCount: null,           // words the struggling drill would ask, read when the summary shows
   },
-  // Struggling-words drill (mode 'struggling'). One object per run, see createStrugglingDrill. status: idle | loading |
-  // ready | done | empty | unconfigured | failed. Nothing about the drill is posted.
-  struggling: createStrugglingDrill('idle'),
+  // Custom drill (mode 'custom', or 'struggling' while its list loads). One object per run, see createCustomDrill.
+  // Nothing about the drill is posted.
+  custom: createCustomDrill('idle'),
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
 // Порядок слів. status: idle (not loaded yet) | ready (an exercise is on screen) | done (summary) | empty (no sentences
@@ -233,6 +247,7 @@ const RENDER = {
   table: renderTable,
   cards: renderCards,
   practice: renderPractice,
+  decks: renderDecks,
   rules: renderRules,
   phrases: renderPhrases,
   'word-order': renderWordOrderLive,
@@ -257,9 +272,14 @@ function showTab(name) {
   $('page-title').textContent = TAB_TITLES[ui.tab];
   document.title = `${TAB_TITLES[ui.tab]} · Dutch матеріали`;
   setDrawerOpen(false);
-  if (ui.tab === 'practice') ensureFsrsSession();
+  if (ui.tab === 'practice') {
+    // An idle custom drill (none running, or one that was left) never shows here: the daily practice does.
+    if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = 'fsrs';
+    ensureFsrsSession();
+  }
   if (ui.tab === 'cards') ensureCardsBatch();
   if (ui.tab === 'stats') loadStats();
+  if (ui.tab === 'decks') loadDeckList();
   if (ui.tab === 'word-order') refreshWordOrderIfNeeded();
   render();
 }
@@ -774,7 +794,7 @@ function pickArticleQuestion(excludedWordId = null) {
 }
 
 // The word the Practice tab is asking about, or null when there is none (the trash button needs it).
-// The struggling-words drill has none: it is not a word the schedule is about.
+// The custom drill has none: it is not a word the schedule is about.
 function findCurrentPracticeWord() {
   if (ui.practice.mode === 'art') return ui.practice.current?.word ?? null;
   if (ui.practice.mode !== 'fsrs' || ui.fsrs.status !== 'ready' || !ui.fsrs.current) return null;
@@ -945,6 +965,7 @@ function renderRoundSummary() {
       <span class="difficulty-badge difficulty-badge--${esc(word.difficulty)}">${esc(word.difficultyLabel)}</span>
       <span class="muted practice-round__word-detail">${esc(word.detail)}</span>
     </li>`).join('');
+  renderRoundDrillButtons(ui.fsrs.round);
 }
 
 // Asks the batch again with the same session id for the next set. Its words continue the session, with continueMessage
@@ -1008,11 +1029,11 @@ function finishFsrsSession() {
 }
 
 // A deleted word leaves the practice at once, so no session or drill asks for it again. When it is the question on
-// screen (the FSRS session, the article drill or the struggling-words drill), the answer typed for it is cleared: Enter
+// screen (the FSRS session, the article drill or the custom drill), the answer typed for it is cleared: Enter
 // must not grade the word that replaces it.
 function forgetDeletedWord(wordId) {
   const session = ui.fsrs;
-  const drill = ui.struggling;
+  const drill = ui.custom;
   const practice = ui.practice;
   const wasOnScreen = findCurrentPracticeWord()?.id === wordId || drill.current?.word.id === wordId;
   session.queue = session.queue.filter(word => word.id !== wordId);
@@ -1020,8 +1041,13 @@ function forgetDeletedWord(wordId) {
     session.waiting[direction] = session.waiting[direction].filter(word => word.id !== wordId);
   }
   if (session.current?.word.id === wordId) showNextFsrsWord();
+  // A restart («Ще раз») uses the words that are left; the end keeps counting the words the drill started with.
+  drill.words = drill.words.filter(word => word.id !== wordId);
   drill.queue = drill.queue.filter(word => word.id !== wordId);
-  if (drill.current?.word.id === wordId) showNextStrugglingWord();
+  for (const direction of ROUND_DIRECTIONS) {
+    drill.waiting[direction] = drill.waiting[direction].filter(word => word.id !== wordId);
+  }
+  if (drill.current?.word.id === wordId) showNextCustomWord();
   if (practice.mode === 'art' && practice.current?.word.id === wordId) pickArticleQuestion(wordId);
   if (wasOnScreen) $('practice-input').value = '';
   renderPractice();
@@ -1040,15 +1066,17 @@ async function loadDueTomorrow() {
 }
 
 // Enter or the button: check the answer; once checked the button reads "Далі" and moves on.
+// Grading: only the FSRS mode posts grades. The custom drill (and its struggling mode) takes the drill branch, which
+// posts nothing; the dispatch here, handlePracticeSkipClick and the override listener are pinned by a test.
 function submitPractice() {
   if (ui.practice.mode === 'fsrs') submitFsrsAnswer();
-  else if (ui.practice.mode === 'struggling') submitStrugglingAnswer();
+  else if (isCustomPracticeMode()) submitCustomAnswer();
   else submitArticleAnswer();
 }
 
-// «Не знаю» is shown in the FSRS mode and in the drill; each one reveals the answer its own way.
+// «Не знаю» is shown in the FSRS mode and in the custom drill; each one reveals the answer its own way.
 function handlePracticeSkipClick() {
-  if (ui.practice.mode === 'struggling') revealStrugglingAnswer();
+  if (isCustomPracticeMode()) revealCustomAnswer();
   else revealFsrsAnswer();
 }
 
@@ -1159,7 +1187,8 @@ async function advanceFsrsWord() {
   current.isAdvancing = true;
   if (!current.post) recordFsrsAnswer(current);
   await current.post;
-  if (session.current !== current) return;
+  // Another mode may be on screen by now: its input is not this word's to clear or focus.
+  if (session.current !== current || ui.practice.mode !== 'fsrs') return;
   const isStillInSession = current.schedule
     ? current.schedule.deck[current.direction]?.in_deck
     : current.grade !== 'good';
@@ -1211,12 +1240,14 @@ function renderPractice() {
   $('practice-progress-hint-button').hidden = !isFsrs;
   if (!isFsrs) setHintOpen($('practice-progress-hint-button'), false);
   $('practice-delete-button').hidden = !findCurrentPracticeWord();
-  // Only the FSRS round 2 shows «Я мав рацію» (renderFsrsPractice).
+  // Only the round 2 of the FSRS practice and of the custom drill show «Я мав рацію» (renderFsrsPractice,
+  // renderCustomPractice). The drill's own blocks are shown by renderCustomPractice.
   $('practice-override-button').hidden = true;
-  $('practice-drill-summary').hidden = mode !== 'struggling' || ui.struggling.status !== 'done';
+  $('practice-drill-summary').hidden = true;
+  $('practice-custom-note').hidden = true;
   if (isFsrs) renderFsrsPractice();
-  else if (mode === 'struggling') renderStrugglingPractice();
-  else renderArticlePractice();
+  else if (mode === 'art') renderArticlePractice();
+  else renderCustomPractice();
 }
 
 function setPracticeMessage(feedback) {
@@ -1331,65 +1362,106 @@ async function loadStrugglingCount() {
   renderPractice();
 }
 
-// The FSRS summary's button: the mode select moves to the drill and the drill starts.
-function handleStrugglingButtonClick() {
-  ui.practice.mode = 'struggling';
-  startStrugglingDrill();
-}
+// ---------- 3b · Custom drill (Важкі слова, round-summary drills, decks) ----------
 
-// ---------- 3b · Важкі слова (struggling-words drill) ----------
+// Practice without a schedule (docs/CUSTOM_PRACTICE_ARCHITECTURE.md §1). The drill grades the typed answers with the
+// same checks as the daily practice, but nothing is posted: no grade, no deck answer, no review log. The only API calls
+// in this section are the reads of the struggling-words list and of the drill words; a test checks that.
+//
+// One drill run is one object (createCustomDrill). status: idle | loading | ready | done | empty | unconfigured | failed.
+// title: the name in the progress line. words: the drill's words as given (the «Ще раз» button uses them again).
+// returnTo: { name, onBack }, see resolveReturnTo. direction, queue, waiting, lastAnsweredId: the two rounds, planned by
+// planCustomDrill and planNextRound. answered: answerKey of each word's first check; firstTry: words right at their
+// first check, per direction. current: { word, direction, checked, grade, canOverride } of the word on screen.
+const STRUGGLING_DRILL_TITLE = 'Важкі слова';
 
-// One drill run. Each run has its own object, so a list that arrives late cannot change a newer run.
-function createStrugglingDrill(status) {
+function createCustomDrill(status) {
   return {
     status,
-    queue: [],                       // words still to answer; the front one is on screen
-    total: 0,                        // words the drill started with
-    correctFirstTimeCount: 0,        // words typed right at their first check
-    answeredWordIds: new Set(),      // words whose first check is done
-    current: null,                   // { word, checked, grade }
+    mode: 'custom',                  // the practice mode select shows while it runs: custom | struggling
+    title: '',
+    words: [],
+    returnTo: { name: 'practice', onBack: null },
+    total: 0,
+    direction: 'uk_nl',
+    queue: [],
+    waiting: { uk_nl: [], nl_uk: [] },
+    lastAnsweredId: null,
+    answered: new Set(),
+    firstTry: { uk_nl: 0, nl_uk: 0 },
+    current: null,
     feedback: null,
   };
 }
 
-// Reads the words whose latest graded answer was wrong or hard. Nothing is posted: the schedule does not change.
-async function startStrugglingDrill() {
-  const drill = createStrugglingDrill('loading');
-  ui.struggling = drill;
+// The return target: a name ('round-summary' | 'practice' | 'decks') or { name, onBack } where onBack goes back itself.
+function resolveReturnTo(returnTo) {
+  if (typeof returnTo === 'string') return { name: returnTo, onBack: null };
+  return { name: returnTo?.name ?? 'practice', onBack: returnTo?.onBack ?? null };
+}
+
+function isCustomPracticeMode() {
+  return ui.practice.mode === 'custom' || ui.practice.mode === 'struggling';
+}
+
+// Starts a custom drill with these practice words (id, uk, nl, article, …) and shows it on the Практика tab.
+// title: the name in the progress line. returnTo: where «Назад» goes at the end: 'round-summary' | 'practice' | 'decks',
+// or { name, onBack }. The 'decks' name shows the Колоди tab (it must be in TABS) unless onBack is given.
+// mode: the practice mode select value while it runs ('custom', or 'struggling' for the Важкі слова drill).
+// Callers check that the learner is still on the tab they started from before calling it.
+function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom' }) {
+  const drill = createCustomDrill(words.length ? 'ready' : 'empty');
+  Object.assign(drill, {
+    mode,
+    title,
+    words: [...words],
+    returnTo: resolveReturnTo(returnTo),
+    total: words.length,
+    ...planCustomDrill(words, orderWords),
+  });
+  ui.custom = drill;
+  ui.practice.mode = mode;
   $('practice-input').value = '';
-  renderPractice();
-  let listing;
-  try {
-    listing = await api.getStrugglingWords();
-  } catch (error) {
-    if (ui.struggling !== drill) return;
-    if (error.status === 409) {
-      drill.status = 'unconfigured';
-    } else {
-      drill.status = 'failed';
-      notice(error.message || 'Помилка');
-    }
-    renderPractice();
-    return;
-  }
-  if (ui.struggling !== drill) return;
-  drill.queue = orderWords(listing.words);
-  drill.total = listing.words.length;
-  if (drill.queue.length) {
-    drill.status = 'ready';
-    showNextStrugglingWord();
-  } else {
-    drill.status = 'empty';
-  }
+  showTab('practice');
+  if (words.length) showNextCustomWord();
   renderPractice();
 }
 
-// Shows the front word of the queue; an empty queue ends the drill.
-function showNextStrugglingWord() {
-  const drill = ui.struggling;
+// «Ще раз»: the same words in a new order.
+function restartCustomDrill() {
+  const { title, words, returnTo, mode } = ui.custom;
+  startCustomDrill({ title, words, returnTo, mode });
+}
+
+// «Назад»: back to where the drill started. The FSRS session keeps its state, so a round summary (round-done) or the
+// session summary shows again. Every target but onBack puts the daily practice back in the mode select.
+function leaveCustomDrill() {
+  const { name, onBack } = ui.custom.returnTo;
+  ui.custom = createCustomDrill('idle');
+  if (onBack) {
+    onBack();
+    return;
+  }
+  ui.practice.mode = 'fsrs';
+  if (name === 'decks') {
+    showTab('decks');
+    return;
+  }
+  showTab('practice');
+  renderPractice();
+}
+
+// Shows the front word of the queue. An empty round hands over to round 2 (its start says so); when no round is left,
+// the drill is done.
+function showNextCustomWord() {
+  const drill = ui.custom;
   drill.feedback = null;
+  if (!drill.queue.length && startNextRound(drill) === 'nl_uk') {
+    drill.feedback = { text: formatRoundStart('nl_uk'), ok: true };
+  }
   if (drill.queue.length) {
-    drill.current = { word: drill.queue[0], checked: false, grade: null };
+    drill.current = { word: drill.queue[0], direction: drill.direction, checked: false, grade: null, canOverride: false };
+    drill.status = 'ready';
     return;
   }
   drill.current = null;
@@ -1397,76 +1469,102 @@ function showNextStrugglingWord() {
 }
 
 // Enter or the button: check the typed answer; once checked the button reads "Далі" and moves on.
-function submitStrugglingAnswer() {
-  const drill = ui.struggling;
+function submitCustomAnswer() {
+  const drill = ui.custom;
   const input = $('practice-input');
   if (drill.current?.checked) {
-    advanceStrugglingWord();
+    advanceCustomWord();
     return;
   }
   if (!drill.current) return;
-  const result = gradeTranslationAnswer(drill.current.word, input.value);
+  const { word, direction } = drill.current;
+  const result = direction === 'uk_nl'
+    ? gradeTranslationAnswer(word, input.value)
+    : gradeReverseTranslationAnswer(word, input.value);
   if (!result.counted) {
     input.focus();
     return;
   }
-  answerStrugglingWord(result);
+  answerCustomWord(result);
 }
 
-// «Не знаю»: the right answer is shown; the word goes back to the end like a wrong answer. Nothing is posted.
-function revealStrugglingAnswer() {
-  const drill = ui.struggling;
+// «Не знаю»: the right answer is shown; the word is not right, so it comes back later. Nothing is posted.
+function revealCustomAnswer() {
+  const drill = ui.custom;
   if (!drill.current || drill.current.checked) return;
-  answerStrugglingWord(revealTranslationAnswer(drill.current.word));
+  const { word, direction } = drill.current;
+  answerCustomWord(direction === 'uk_nl' ? revealTranslationAnswer(word) : revealReverseTranslationAnswer(word));
   $('practice-btn').focus();
 }
 
-// Checks the word on screen. Only its first check counts toward "правильно з першого разу".
-function answerStrugglingWord(result) {
-  const drill = ui.struggling;
-  const { word } = drill.current;
-  if (!drill.answeredWordIds.has(word.id)) {
-    drill.answeredWordIds.add(word.id);
-    if (result.grade === 'good') drill.correctFirstTimeCount += 1;
-  }
-  drill.current.checked = true;
-  drill.current.grade = result.grade;
+// Checks the word on screen. A wrong round-2 answer can still be overruled («Я мав рацію») until «Далі».
+function answerCustomWord(result) {
+  const drill = ui.custom;
+  Object.assign(drill.current, { checked: true, grade: result.grade, canOverride: !!result.canOverride });
   drill.feedback = { text: result.message, ok: result.grade === 'good' };
   renderPractice();
 }
 
-// "Далі": a word typed right leaves the queue; any other word comes back later among the active words, until it is
-// typed right.
-function advanceStrugglingWord() {
-  const drill = ui.struggling;
-  drill.queue = advanceDrillQueue(drill.queue, drill.current.grade, { isShuffled: ui.isShuffleOn });
+// «Я мав рацію»: the wrong round-2 answer counts as right, in this drill only.
+function overrideCustomAnswer() {
+  const drill = ui.custom;
+  if (!drill.current?.canOverride) return;
+  drill.current.grade = 'good';
+  drill.current.canOverride = false;
+  drill.feedback = { text: '✓ Зараховано', ok: true };
+  renderPractice();
+  $('practice-btn').focus();
+}
+
+// «Далі»: a word right on its check leaves the round; any other word comes back later among the active words. The first
+// check of each word in each direction is the one that counts toward «правильно з першого разу».
+function advanceCustomWord() {
+  const drill = ui.custom;
+  const { current } = drill;
+  const key = answerKey(current.direction, current.word.id);
+  if (!drill.answered.has(key)) {
+    drill.answered.add(key);
+    if (current.grade === 'good') drill.firstTry[current.direction] += 1;
+  }
+  drill.queue = advanceDrillQueue(drill.queue, current.grade, { isShuffled: ui.isShuffleOn });
+  drill.lastAnsweredId = current.word.id;
   $('practice-input').value = '';
-  showNextStrugglingWord();
+  showNextCustomWord();
   renderPractice();
   $('practice-input').focus();
 }
 
-function renderStrugglingPractice() {
-  const drill = ui.struggling;
+// The question on screen: the Ukrainian in round 1, the Dutch with its article in round 2.
+function formatCustomQuestion(drill) {
+  const { word, direction } = drill.current;
+  return direction === 'uk_nl' ? word.uk : formatDutchWithArticle(word);
+}
+
+function renderCustomPractice() {
+  const drill = ui.custom;
   const current = drill.current;
   const isReady = drill.status === 'ready' && !!current;
   const questionByStatus = {
     idle: '',
     loading: 'Завантаження…',
-    ready: isReady ? current.word.uk : '',
+    ready: isReady ? formatCustomQuestion(drill) : '',
     done: '',
-    empty: 'Важких слів немає.',
+    empty: 'Слів для тренування немає.',
     unconfigured: 'Практика FSRS ще не налаштована',
     failed: 'Не вдалося завантажити слова',
   };
   $('practice-q').textContent = questionByStatus[drill.status];
   $('practice-form').hidden = !isReady;
   $('practice-skip-button').hidden = !isReady || current.checked;
+  $('practice-override-button').hidden = !isReady || !current.canOverride;
   if (isReady) {
     $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
-    $('practice-input').placeholder = 'нідерландською';
+    $('practice-input').placeholder = drill.direction === 'uk_nl' ? 'нідерландською' : 'українською';
   }
-  $('practice-progress').textContent = isReady ? formatQueueProgress(drill.queue.length) : '';
+  $('practice-progress').textContent = isReady
+    ? formatCustomDrillProgress({ title: drill.title, direction: drill.direction, queueLength: drill.queue.length })
+    : '';
+  $('practice-custom-note').hidden = !isReady;
   $('practice-schedule').textContent = '';
   $('practice-score').textContent = '';
   $('practice-summary').hidden = true;
@@ -1475,15 +1573,101 @@ function renderStrugglingPractice() {
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
   setPracticeMessage(drill.feedback);
-  if (drill.status === 'done') renderStrugglingEnd();
+  $('practice-drill-summary').hidden = drill.status !== 'done';
+  if (drill.status === 'done') renderCustomEnd();
 }
 
-// The end of the drill: the first-check count and the note that the schedule did not change.
-function renderStrugglingEnd() {
-  const drill = ui.struggling;
-  const end = buildStrugglingDrillEnd({ correctFirstTimeCount: drill.correctFirstTimeCount, totalCount: drill.total });
+// The end of the drill: the first-check counts per direction, and the note that the schedule did not change.
+function renderCustomEnd() {
+  const drill = ui.custom;
+  const end = buildCustomDrillEnd({ firstTry: drill.firstTry, total: drill.total });
   $('practice-drill-result').textContent = end.resultText;
   $('practice-drill-note').textContent = end.noteText;
+}
+
+// The FSRS summary's button: the mode select moves to the drill and the drill starts.
+function handleStrugglingButtonClick() {
+  ui.practice.mode = 'struggling';
+  startStrugglingDrill();
+}
+
+// Reads the words whose latest graded answer was wrong or hard, then drills them as a custom drill titled «Важкі слова».
+// Nothing is posted: the schedule does not change.
+async function startStrugglingDrill() {
+  const loading = createCustomDrill('loading');
+  loading.title = STRUGGLING_DRILL_TITLE;
+  loading.mode = 'struggling';
+  ui.custom = loading;
+  ui.practice.mode = 'struggling';
+  $('practice-input').value = '';
+  renderPractice();
+  let listing;
+  try {
+    listing = await api.getStrugglingWords();
+  } catch (error) {
+    if (ui.custom !== loading) return;
+    if (error.status === 409) {
+      loading.status = 'unconfigured';
+    } else {
+      loading.status = 'failed';
+      notice(error.message || 'Помилка');
+    }
+    renderPractice();
+    return;
+  }
+  if (ui.custom !== loading) return;
+  // The learner went to another tab meanwhile: the drill is dropped, and the tab is not pulled back.
+  if (ui.tab !== 'practice') {
+    ui.custom = createCustomDrill('idle');
+    return;
+  }
+  // An empty list still starts with the struggling mode on screen, so the select names the drill.
+  startCustomDrill({ title: STRUGGLING_DRILL_TITLE, words: listing.words, returnTo: 'practice', mode: 'struggling' });
+}
+
+// The round summary's drill buttons (buildRoundDrillButtons): the rendering shows the counts and hides a button with
+// no words, and the whole row when both are hidden.
+const ROUND_DRILL_BUTTON_IDS = { hard: 'practice-round-hard-button', 'hard-medium': 'practice-round-hard-medium-button' };
+
+function renderRoundDrillButtons(round) {
+  const buttons = buildRoundDrillButtons(round.words);
+  for (const button of buttons) {
+    const element = $(ROUND_DRILL_BUTTON_IDS[button.kind]);
+    element.textContent = button.label;
+    element.hidden = button.hidden;
+    element.disabled = roundDrillBusy;
+  }
+  $('practice-round-drills').hidden = buttons.every(button => button.hidden);
+}
+
+// True while a round-summary drill's words are being fetched: both buttons wait (a second tap does nothing).
+let roundDrillBusy = false;
+
+function setRoundDrillsBusy(isBusy) {
+  roundDrillBusy = isBusy;
+  for (const id of Object.values(ROUND_DRILL_BUTTON_IDS)) $(id).disabled = isBusy;
+}
+
+// A round-summary drill button: its words, fetched in the round's order (hardest first), start a custom drill. «Назад»
+// returns to the round summary.
+async function handleRoundDrillClick(kind) {
+  const round = ui.fsrs.round;
+  const button = round && buildRoundDrillButtons(round.words).find(candidate => candidate.kind === kind);
+  if (!button || !button.count || roundDrillBusy) return;
+  const startTab = ui.tab;
+  let words;
+  setRoundDrillsBusy(true);
+  try {
+    words = (await api.getDrillWords(button.wordIds)).words;
+  } catch (error) {
+    notice(error.message || 'Помилка');
+    return;
+  } finally {
+    setRoundDrillsBusy(false);
+  }
+  // The round may have moved on, or the learner may be on another tab: then nothing starts.
+  if (ui.fsrs.round !== round || ui.fsrs.status !== 'round-done' || ui.tab !== startTab) return;
+  startCustomDrill({ title: button.title, words, returnTo: 'round-summary' });
 }
 
 // ---------- 4 · Правила ----------
@@ -1745,15 +1929,24 @@ function renderWordOrderExercise() {
     }
   }
 
+  $('word-order-order-count').textContent = formatOrderCountLabel(sentence.order_count);
+
   const msg = $('word-order-msg');
-  if (checked) {
-    const view = buildWordOrderCheckView(checked);
-    msg.textContent = view.text;
-    msg.className = `msg ${view.ok ? 'ok' : 'bad'}`;
-  } else {
-    msg.textContent = '';
-    msg.className = 'msg';
-  }
+  const mainLine = $('word-order-main');
+  const others = $('word-order-others');
+  const othersList = $('word-order-others-list');
+  const view = checked ? buildWordOrderCheckView(checked) : null;
+  msg.textContent = view ? view.message : '';
+  msg.className = view ? `msg ${view.tone}` : 'msg';
+  mainLine.textContent = view?.mainOrderLine ?? '';
+  mainLine.hidden = !view?.mainOrderLine;
+  $('word-order-others-title').textContent = view?.otherOrdersTitle ?? '';
+  othersList.replaceChildren(...(view?.otherOrders ?? []).map(order => {
+    const item = document.createElement('li');
+    item.textContent = order;
+    return item;
+  }));
+  others.hidden = !view?.otherOrders.length;
 
   $('word-order-check').disabled = !answerTiles.length || isLocked;
   $('word-order-check').hidden = !!checked;
@@ -1870,6 +2063,12 @@ function renderWordOrderSentences() {
     const uk = document.createElement('div');
     uk.textContent = sentence.uk;
     main.append(nl, uk);
+    for (const line of buildAlsoOrderLines(sentence.alt_orders)) {
+      const also = document.createElement('div');
+      also.className = 'muted word-order__also';
+      also.textContent = line;
+      main.append(also);
+    }
     const stats = document.createElement('span');
     stats.className = 'muted';
     stats.textContent = formatSentenceStats(sentence);
@@ -2187,7 +2386,13 @@ function bindEvents() {
 
   // Практика
   $('practice-mode').addEventListener('change', event => {
-    ui.practice.mode = event.target.value;
+    // 'custom' is not a choice (its option is disabled, iOS can still send it): an idle drill means the daily practice.
+    const choice = event.target.value === 'custom' && ui.custom.status === 'idle' ? 'fsrs' : event.target.value;
+    if (choice === 'custom') {
+      renderPractice();
+      return;
+    }
+    ui.practice.mode = choice;
     if (ui.practice.mode === 'art') pickArticleQuestion();
     $('practice-input').value = '';
     if (ui.practice.mode === 'struggling') startStrugglingDrill();
@@ -2199,15 +2404,21 @@ function bindEvents() {
     submitPractice();
   });
   $('practice-skip-button').addEventListener('click', handlePracticeSkipClick);
-  $('practice-override-button').addEventListener('click', handleOverrideClick);
+  $('practice-override-button').addEventListener('click', () => {
+    if (isCustomPracticeMode()) overrideCustomAnswer();
+    else handleOverrideClick();
+  });
   $('practice-struggling-button').addEventListener('click', handleStrugglingButtonClick);
-  $('practice-drill-again-button').addEventListener('click', () => startStrugglingDrill());
+  $('practice-drill-again-button').addEventListener('click', restartCustomDrill);
+  $('practice-drill-back-button').addEventListener('click', leaveCustomDrill);
   $('practice-delete-button').addEventListener('click', () => {
     const word = findCurrentPracticeWord();
     if (word) askDeleteWord(word, () => deleteWordEverywhere(word.id));
   });
   $('practice-restart-button').addEventListener('click', restartFsrsSession);
   $('practice-shuffle-button').addEventListener('click', toggleShuffle);
+  $('practice-round-hard-button').addEventListener('click', () => handleRoundDrillClick('hard'));
+  $('practice-round-hard-medium-button').addEventListener('click', () => handleRoundDrillClick('hard-medium'));
   $('practice-round-next-button').addEventListener('click', handleRoundNextClick);
 
   // Правила
@@ -2282,6 +2493,502 @@ function bindEvents() {
   $('word-order-list').addEventListener('click', handleWordOrderListClick);
 }
 
+// ---------- 7 · Колоди ----------
+
+// The decks tab. view: list | picker | form. list: the decks of GET /api/decks (status idle | loading | ready | failed).
+// catalog: the word catalog of the last picker load: { words, rows (Map id -> row), visibleIds, order, sortedBy }.
+// A row ({ word, li, checkbox, wordText, badge, last }) is built once per word and updated in place on a reload, so
+// the scroll and the focus stay; filters toggle hidden and placeRows moves only the rows out of place. selected: the ids
+// chosen, in the order chosen. editingId: the deck being changed (null for a new one). draft: name and description typed
+// on the form, kept while the picker is open. filter / sort / query: the picker's current choice (reset on every start).
+// busy: a practice or an edit is loading (the deck cards wait); the picker's add button waits for catalogStatus ready.
+const DECK_MAX_WORDS = 1000;
+const decks = {
+  view: 'list', status: 'idle', list: [], editingId: null,
+  catalog: null, catalogStatus: 'idle',
+  selected: new Set(), query: '', filter: 'all', sort: 'alpha',
+  draft: { name: '', description: '' }, busy: false,
+};
+
+// A new element with its text set by textContent (no HTML strings in this section).
+function el(tag, text = '', className = '') {
+  const node = document.createElement(tag);
+  if (text) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+
+// Today's calendar date in the practice time zone, 'YYYY-MM-DD'.
+function amsterdamToday() {
+  try {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Amsterdam' }).format(new Date());
+  } catch {
+    return '';
+  }
+}
+
+function setDeckMessage(text) {
+  $('decks-message').textContent = text;
+}
+
+function renderDecks() {
+  $('decks-list-view').hidden = decks.view !== 'list';
+  $('decks-picker-view').hidden = decks.view !== 'picker';
+  $('decks-form').hidden = decks.view !== 'form';
+  if (decks.view === 'list') renderDeckList();
+  if (decks.view === 'form') renderDeckForm();
+}
+
+function renderDeckList() {
+  $('decks-list').replaceChildren(...decks.list.map(buildDeckCard));
+  syncDeckButtons();
+  const loaded = decks.status === 'ready';
+  $('decks-empty').hidden = !loaded || decks.list.length > 0;
+  if (decks.status === 'loading') setDeckMessage('Завантаження…');
+  else if (decks.status === 'failed') setDeckMessage('Колоди не завантажено. Спробуйте ще раз.');
+  else setDeckMessage('');
+}
+
+// The deck cards' buttons wait while a practice or an edit loads; «Практикувати» needs words in the deck.
+function syncDeckButtons() {
+  for (const button of $('decks-list').querySelectorAll('button[data-act]')) {
+    const deck = decks.list.find(item => item.id === Number(button.dataset.id));
+    button.disabled = decks.busy || (button.dataset.act === 'practice' && !deck?.word_count);
+  }
+}
+
+function setDeckBusy(isBusy) {
+  decks.busy = isBusy;
+  syncDeckButtons();
+}
+
+function deckActionButton(label, act, id, className = '') {
+  const button = el('button', label, className);
+  button.type = 'button';
+  button.dataset.act = act;
+  button.dataset.id = String(id);
+  return button;
+}
+
+function buildDeckCard(deck) {
+  const item = el('li', '', 'deck-card');
+  item.append(el('h3', deck.name, 'deck-card__name'));
+  if (deck.description) item.append(el('p', deck.description, 'muted deck-card__description'));
+  item.append(el('p', formatDeckWordCount(deck.word_count), 'muted deck-card__count'));
+  if (!deck.word_count) item.append(el('p', 'Колода порожня', 'muted deck-card__hint'));
+  const actions = el('div', '', 'deck-card__actions');
+  actions.append(
+    deckActionButton('Практикувати', 'practice', deck.id, 'primary'),
+    deckActionButton('Змінити', 'edit', deck.id),
+    deckActionButton('Видалити', 'delete', deck.id),
+  );
+  item.append(actions);
+  return item;
+}
+
+async function loadDeckList() {
+  const first = decks.status !== 'ready';
+  if (first) decks.status = 'loading';
+  try {
+    const next = await api.listDecks();
+    const changed = JSON.stringify(next) !== JSON.stringify(decks.list);
+    decks.list = next;
+    decks.status = 'ready';
+    if (!changed && !first) return;
+  } catch (error) {
+    decks.status = 'failed';
+    notice(error.message || 'Не вдалося завантажити колоди');
+  }
+  renderDecks();
+}
+
+function handleDeckListClick(event) {
+  const button = event.target.closest('button[data-act]');
+  if (!button) return;
+  const id = Number(button.dataset.id);
+  const deck = decks.list.find(item => item.id === id);
+  if (!deck) return;
+  if (button.dataset.act === 'practice') practiceDeck(deck);
+  else if (button.dataset.act === 'edit') editDeck(id);
+  else if (button.dataset.act === 'delete') confirmDeleteDeck(deck);
+}
+
+// «Практикувати»: the deck's word ids, the practice words of them, then the custom drill. «Назад» there returns here.
+async function practiceDeck(deck) {
+  if (decks.busy || !deck.word_count) return;
+  const startTab = ui.tab;
+  setDeckBusy(true);
+  try {
+    const { words: deckWords } = await api.getDeck(deck.id);
+    const ids = deckWords.map(word => word.id);
+    if (!ids.length) {
+      notice('У колоді немає слів');
+      return;
+    }
+    const { words } = await api.getDrillWords(ids);
+    if (!words.length) {
+      notice('Слів колоди вже немає');
+      return;
+    }
+    // The learner went to another tab while the words loaded: the drill does not start, and the tab is not changed.
+    if (ui.tab !== startTab) return;
+    decks.view = 'list';
+    startCustomDrill({ title: `Колода: ${deck.name}`, words, returnTo: 'decks' });
+  } catch (error) {
+    notice(error.message || 'Помилка');
+  } finally {
+    setDeckBusy(false);
+  }
+}
+
+// A new deck's picker starts fresh: nothing selected, the filter «Усі», an empty search and the default sort.
+function resetPickerChoice() {
+  decks.query = '';
+  decks.filter = 'all';
+  decks.sort = 'alpha';
+}
+
+function startNewDeck() {
+  decks.editingId = null;
+  decks.selected = new Set();
+  decks.draft = { name: '', description: '' };
+  resetPickerChoice();
+  openPicker();
+}
+
+// «Змінити»: the deck's words are checked in the picker (filter «Усі»); the form's name and description come from the deck.
+async function editDeck(id) {
+  if (decks.busy) return;
+  const startTab = ui.tab;
+  setDeckBusy(true);
+  try {
+    const deck = await api.getDeck(id);
+    if (ui.tab !== startTab) return;
+    decks.editingId = id;
+    decks.selected = new Set(deck.words.map(word => word.id));
+    decks.draft = { name: deck.name, description: deck.description || '' };
+    resetPickerChoice();
+    openPicker();
+  } catch (error) {
+    notice(error.message || 'Помилка');
+  } finally {
+    setDeckBusy(false);
+  }
+}
+
+function confirmDeleteDeck(deck) {
+  askConfirm({
+    title: 'Видалити колоду?',
+    text: `Колоду "${deck.name}" буде видалено. Слова й розклад повторень не зміняться.`,
+    onConfirm: () => deleteDeckNow(deck.id),
+  });
+}
+
+async function deleteDeckNow(id) {
+  try {
+    await api.deleteDeck(id);
+  } catch (error) {
+    notice(error.message || 'Не вдалося видалити колоду');
+    return;
+  }
+  await loadDeckList();
+}
+
+// ----- picker -----
+
+function openPicker() {
+  decks.view = 'picker';
+  $('decks-search').value = decks.query;
+  $('decks-sort').value = decks.sort;
+  renderDecks();
+  applyPicker();   // the rows of the last load, if any, show the current selection while the catalog reloads
+  loadCatalog();
+}
+
+// Loads the catalog and builds its rows; the selection and the filters carry over. A reload while the picker is open
+// keeps the rows on screen until the new ones are ready.
+async function loadCatalog() {
+  const hadRows = decks.catalog !== null;
+  if (!hadRows) setCatalogMessage('Завантаження слів…');
+  decks.catalogStatus = 'loading';
+  updateSelectionUi();
+  try {
+    const { words } = await api.getDeckWordCatalog();
+    buildCatalog(words);
+    decks.catalogStatus = 'ready';
+  } catch (error) {
+    decks.catalogStatus = 'failed';
+    setCatalogMessage('Слова не завантажено. Спробуйте ще раз.');
+    updateSelectionUi();
+    notice(error.message || 'Помилка');
+    return;
+  }
+  applyPicker();
+}
+
+function setCatalogMessage(text) {
+  $('decks-catalog-message').textContent = text;
+}
+
+// One catalog row: a label with a checkbox, so the whole row toggles (≥44px). Built once per word.
+function createCatalogRow(id) {
+  const li = el('li', '', 'deck-row');
+  const label = el('label', '', 'deck-row__label');
+  const checkbox = el('input', '', 'deck-row__check');
+  checkbox.type = 'checkbox';
+  checkbox.dataset.id = String(id);
+  const text = el('span', '', 'deck-row__text');
+  const wordText = el('span', '', 'deck-row__word');
+  const meta = el('span', '', 'deck-row__meta');
+  const badge = el('span');
+  const last = el('span', '', 'muted');
+  meta.append(badge, last);
+  text.append(wordText, meta);
+  label.append(checkbox, text);
+  li.append(label);
+  return { word: null, li, checkbox, wordText, badge, last };
+}
+
+function fillCatalogRow(row, word, today) {
+  row.word = word;
+  row.wordText.textContent = formatDeckWordLabel(word);
+  row.badge.textContent = formatDifficultyLabel(word.difficulty);
+  row.badge.className = `difficulty-badge difficulty-badge--${word.difficulty ?? 'new'}`;
+  row.last.textContent = formatLastPracticed(word.last_practiced_on, today);
+}
+
+// The rows of a load. Rows of words already on screen are updated in place; new ones are added at the end, and words
+// that are gone leave. The order is set by applyPicker.
+function buildCatalog(words) {
+  const today = amsterdamToday();
+  const previous = decks.catalog?.rows ?? new Map();
+  const rows = new Map();
+  const list = $('decks-catalog');
+  for (const word of words) {
+    let row = previous.get(word.id);
+    if (!row) {
+      row = createCatalogRow(word.id);
+      list.append(row.li);
+    }
+    fillCatalogRow(row, word, today);
+    rows.set(word.id, row);
+  }
+  for (const [id, row] of previous) {
+    if (!rows.has(id)) row.li.remove();
+  }
+  decks.catalog = { words, rows, visibleIds: new Set(), order: [], sortedBy: null };
+}
+
+// Puts the rows in the given order. Only a row out of place moves, so the others keep their focus and scroll.
+function placeCatalogRows(order, rows) {
+  const list = $('decks-catalog');
+  let previous = null;
+  for (const word of order) {
+    const { li } = rows.get(word.id);
+    const expected = previous ? previous.nextSibling : list.firstChild;
+    if (li !== expected) {
+      if (previous) previous.after(li);
+      else list.prepend(li);
+    }
+    previous = li;
+  }
+}
+
+// Shows the rows that match the filters (hidden on the others), syncs the checkboxes and the sticky bar. The order is
+// computed once per load and sort.
+function applyPicker() {
+  const catalog = decks.catalog;
+  if (!catalog) {
+    updateSelectionUi();
+    return;
+  }
+  const visible = filterCatalog({
+    words: catalog.words, query: decks.query, filter: decks.filter, selectedIds: decks.selected,
+  });
+  const visibleIds = new Set(visible.map(word => word.id));
+  catalog.visibleIds = visibleIds;
+  if (catalog.sortedBy !== decks.sort) {
+    catalog.order = sortCatalog(catalog.words, decks.sort);
+    catalog.sortedBy = decks.sort;
+    placeCatalogRows(catalog.order, catalog.rows);
+  }
+  for (const [id, row] of catalog.rows) {
+    row.li.hidden = !visibleIds.has(id);
+    row.checkbox.checked = decks.selected.has(id);
+  }
+  if (decks.catalogStatus === 'ready') {
+    setCatalogMessage(catalog.words.length && !visible.length ? 'Нічого не знайдено.' : '');
+  }
+  updateSelectionUi();
+}
+
+// «Додати слова» waits until the catalog has loaded: the form needs its rows.
+function updateSelectionUi() {
+  const count = decks.selected.size;
+  $('decks-selected-count').textContent = formatSelectedCount(count);
+  $('decks-add-button').disabled = count === 0 || decks.catalogStatus !== 'ready';
+  for (const button of $('decks-filters').querySelectorAll('button[data-filter]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.filter === decks.filter));
+  }
+}
+
+function cancelPicker() {
+  decks.view = 'list';
+  decks.editingId = null;
+  decks.selected = new Set();
+  decks.draft = { name: '', description: '' };
+  renderDecks();
+}
+
+function openForm() {
+  if (!decks.selected.size || decks.catalogStatus !== 'ready') return;
+  // A word deleted meanwhile has no row any more: it leaves the selection, so the form never counts a missing row.
+  const rowIds = decks.catalog ? decks.catalog.rows : new Map();
+  decks.selected = new Set([...decks.selected].filter(id => rowIds.has(id)));
+  updateSelectionUi();
+  if (!decks.selected.size) return;
+  if (decks.selected.size > DECK_MAX_WORDS) {
+    notice(`Колода може мати не більше ${DECK_MAX_WORDS} слів`);
+    return;
+  }
+  decks.view = 'form';
+  $('decks-name').value = decks.draft.name;
+  $('decks-description').value = decks.draft.description;
+  $('decks-form-title').textContent = decks.editingId ? 'Змінити колоду' : 'Нова колода';
+  $('decks-save').textContent = decks.editingId ? 'Зберегти' : 'Створити колоду';
+  $('decks-form-msg').textContent = '';
+  renderDecks();
+  $('decks-name').focus();
+}
+
+// «Назад» on the form: the typed name and description are kept, the selection too.
+function backToPicker() {
+  decks.draft = { name: $('decks-name').value, description: $('decks-description').value };
+  decks.view = 'picker';
+  renderDecks();
+  applyPicker();
+}
+
+// ----- confirmation form -----
+
+function renderDeckForm() {
+  const catalogRows = decks.catalog ? decks.catalog.rows : new Map();
+  const items = [];
+  for (const id of decks.selected) {
+    const row = catalogRows.get(id);
+    if (!row) continue;
+    const item = el('li', '', 'deck-form-word');
+    item.append(el('span', formatDeckWordLabel(row.word), 'deck-form-word__text'));
+    const remove = el('button', '×');
+    remove.type = 'button';
+    remove.dataset.act = 'remove';
+    remove.dataset.id = String(id);
+    remove.setAttribute('aria-label', `Прибрати слово ${row.word.nl}`);
+    item.append(remove);
+    items.push(item);
+  }
+  $('decks-form-words').replaceChildren(...items);
+  // The count is of the rows listed, so it never names words that have no row.
+  $('decks-form-count').textContent = formatDeckWordCount(items.length);
+  $('decks-save').disabled = decks.selected.size === 0 || decks.busy;
+}
+
+function handleFormWordClick(event) {
+  const button = event.target.closest('button[data-act="remove"]');
+  if (!button) return;
+  decks.selected = toggleSelected(decks.selected, Number(button.dataset.id));
+  renderDeckForm();
+}
+
+async function saveDeck(event) {
+  event.preventDefault();
+  if (decks.busy) return;
+  const message = $('decks-form-msg');
+  const name = $('decks-name').value.trim();
+  const description = $('decks-description').value.trim();
+  if (!name) {
+    message.textContent = 'Введіть назву колоди.';
+    message.className = 'msg bad';
+    $('decks-name').focus();
+    return;
+  }
+  if (!decks.selected.size) {
+    message.textContent = 'Оберіть хоча б одне слово.';
+    message.className = 'msg bad';
+    return;
+  }
+  const body = { name, word_ids: [...decks.selected] };
+  // An edit sends the description even when empty, so it can be cleared; a new deck sends it only when there is one.
+  if (decks.editingId || description) body.description = description;
+  decks.busy = true;
+  $('decks-save').disabled = true;
+  try {
+    if (decks.editingId) await api.updateDeck(decks.editingId, body);
+    else await api.createDeck(body);
+  } catch (error) {
+    message.textContent = error.message || 'Не вдалося зберегти колоду';
+    message.className = 'msg bad';
+    return;
+  } finally {
+    decks.busy = false;
+    $('decks-save').disabled = decks.selected.size === 0;
+  }
+  decks.view = 'list';
+  decks.editingId = null;
+  decks.selected = new Set();
+  decks.draft = { name: '', description: '' };
+  message.textContent = '';
+  message.className = 'msg';
+  await loadDeckList();
+  notice('Колоду збережено');
+}
+
+// Live changes: the deck list refetches on a 'decks', 'words' or 'all' change (a deleted word changes a deck's count);
+// the picker's catalog only on a 'words' or 'all' change.
+function refreshDecksLive(collection) {
+  if (['decks', 'words', 'all'].includes(collection)) loadDeckList();
+  if (['words', 'all'].includes(collection) && decks.view === 'picker' && decks.catalogStatus === 'ready') loadCatalog();
+}
+
+function bindDeckEvents() {
+  $('decks-create-button').addEventListener('click', startNewDeck);
+  $('decks-list').addEventListener('click', handleDeckListClick);
+  $('decks-search').addEventListener('input', event => {
+    decks.query = event.target.value;
+    applyPicker();
+  });
+  $('decks-filters').addEventListener('click', event => {
+    const button = event.target.closest('button[data-filter]');
+    if (!button) return;
+    decks.filter = button.dataset.filter;
+    applyPicker();
+  });
+  $('decks-sort').addEventListener('change', event => {
+    decks.sort = event.target.value;
+    applyPicker();
+  });
+  $('decks-catalog').addEventListener('change', event => {
+    const box = event.target;
+    if (!(box instanceof HTMLInputElement) || !box.dataset.id) return;
+    decks.selected = toggleSelected(decks.selected, Number(box.dataset.id));
+    applyPicker();
+  });
+  $('decks-select-visible').addEventListener('click', () => {
+    if (!decks.catalog) return;
+    decks.selected = selectVisible(decks.selected, decks.catalog.visibleIds);
+    applyPicker();
+  });
+  $('decks-clear-selection').addEventListener('click', () => {
+    decks.selected = clearSelected();
+    applyPicker();
+  });
+  $('decks-picker-cancel').addEventListener('click', cancelPicker);
+  $('decks-add-button').addEventListener('click', openForm);
+  $('decks-form').addEventListener('submit', saveDeck);
+  $('decks-form-back').addEventListener('click', backToPicker);
+  $('decks-form-words').addEventListener('click', handleFormWordClick);
+}
+
 // ---------- start ----------
 
 // Shuffle mode puts a batch in random order; without it, the server's order stays.
@@ -2300,7 +3007,7 @@ function toggleShuffle() {
   ui.isShuffleOn = !ui.isShuffleOn;
   try { localStorage.setItem('shuffle', ui.isShuffleOn ? 'on' : 'off'); } catch { /* storage unavailable */ }
   if (ui.isShuffleOn) {
-    for (const holder of [ui.fsrs, ui.struggling]) {
+    for (const holder of [ui.fsrs, ui.custom]) {
       if (holder?.queue?.length > 1) holder.queue = [holder.queue[0], ...shuffle(holder.queue.slice(1))];
     }
   }
@@ -2318,6 +3025,7 @@ function init() {
   buildWordOrderRuleList();
   renderWordOrderRules();
   bindEvents();
+  bindDeckEvents();
   renderShuffleButton();
   let saved = 'table';
   try { saved = localStorage.getItem('tab') || 'table'; } catch { /* storage unavailable */ }
@@ -2326,6 +3034,8 @@ function init() {
   api.subscribe(collection => {
     if (collection === 'word-order' || collection === 'all') refreshWordOrderIfNeeded();
     if (collection === 'word-order') return;
+    refreshDecksLive(collection);
+    if (collection === 'decks') return;
     refresh(KEYS_FOR[collection] || ALL_KEYS).catch(error => notice(error.message || 'Помилка оновлення'));
   });
 }

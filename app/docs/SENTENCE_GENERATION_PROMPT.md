@@ -30,8 +30,14 @@ in the right order).
   - `niet` / `geen` in the right place
   - verb at the end after `omdat`, `dat` or `als`: `Ik blijf thuis omdat ik ziek ben.`
   - perfect tense with the participle at the end: `Ik heb de rekening betaald.`
-- Only one correct word order. If two orders are both natural Dutch, choose another sentence.
-- No commas, quotes, numbers or names. End with `.` or `?`.
+- Other correct orders: if another word order is also natural Dutch, keep the sentence and list that order in the
+  `Інші порядки` column (see Output). The sentence itself is the most neutral order. Every other order uses exactly the
+  same words (each as often as in the sentence) and the same schema segments: each segment stays together as one block,
+  and the blocks may come in another order. A clause that moves can be several segments, as long as each of them stays
+  whole (`Omdat ik dorst heb, neem ik een drankje.` fits `omdat + ik + dorst + heb + neem + ik + een drankje`). An
+  order that only differs in capitals or punctuation is not another order. At most 5 other orders.
+- No quotes, numbers or names. No commas in the sentence itself; an other order may have the comma after a fronted
+  clause. End with `.` or `?`.
 - The Ukrainian is a natural translation, not word by word. Use the informal «ти» unless the sentence is clearly polite.
 
 **Schema of each sentence**
@@ -61,19 +67,24 @@ A `.md` file named `sentences-YYYY-MM-DD.md` with exactly this table (the app re
 ```markdown
 # Порядок слів — YYYY-MM-DD
 
-| # | Українською | Nederlands | Правило | Схема |
-|---|---|---|---|---|
-| 1 | Завтра ми йдемо на ринок. | Morgen gaan we naar de markt. | inversion | Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце) |
+| # | Українською | Nederlands | Правило | Схема | Інші порядки |
+|---|---|---|---|---|---|
+| 1 | Завтра ми йдемо на ринок. | Morgen gaan we naar de markt. | inversion | Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце) | We gaan morgen naar de markt. |
+| 2 | Я п'ю каву. | Ik drink koffie. | v2 | Ik (підмет) + drink (дієслово) + koffie (додаток) |  |
 ```
 
 The `Правило` column is one of: `v2`, `inversion`, `question`, `modal`, `separable`, `negation`, `subordinate`,
-`perfect`. The `Схема` column is the schema in the form above.
+`perfect`. The `Схема` column is the schema in the form above. The `Інші порядки` column holds the other natural orders
+of the sentence separated by `;` (spaces around it optional), or stays empty (or `—`) when there is only one order.
 
 Then ask me: «Зберегти ці речення в додаток?». When I say yes, call `add_sentences` with all of them: for each sentence
-`nl`, `uk`, `rule` and `structure`, the schema as an array of `{ text, role }` objects in order, for example
-`[{"text":"Morgen","role":"час"},{"text":"gaan","role":"дієслово"},{"text":"we","role":"підмет"},{"text":"naar de markt","role":"місце"}]`.
+`nl`, `uk`, `rule`, `structure` and `alt_orders`, the schema as an array of `{ text, role }` objects in order, for example
+`[{"text":"Morgen","role":"час"},{"text":"gaan","role":"дієслово"},{"text":"we","role":"підмет"},{"text":"naar de markt","role":"місце"}]`,
+and `alt_orders` as an array of strings: the `Інші порядки` cell split on `;` (`[]` when the cell is empty), for example
+`["We gaan morgen naar de markt."]`.
 Tell me how many were added, how many were skipped as duplicates, and any warning (a schema that does not match its sentence is
-dropped and the sentence is still added).
+dropped and the sentence is still added). A sentence with an other order that does not match (other words, a duplicate, or
+a broken schema) is skipped with the reason: fix that order and add it again.
 
 **Schemas for sentences saved earlier**
 

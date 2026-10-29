@@ -8,11 +8,11 @@ next sentences; they never change the FSRS schedule of words or phrases.
 
 | File | What it does |
 |---|---|
-| `word-order-tiles.js` | Pure rules: the tiles of a sentence, the key that compares orders, the answer check, sentence validation, distractor choice and the shuffle, the schema (`normalizeStructure`, the roles) and the rule filter names. |
-| `sentence-markdown.js` | Pure: reads the sentence table (`Українською`, `Nederlands`, optional `Правило` and `Схема`) of a Markdown file. |
+| `word-order-tiles.js` | Pure rules: the tiles of a sentence, the key that compares orders, the answer check, sentence validation, distractor choice and the shuffle, the schema (`normalizeStructure`, the roles), the alternative word orders (`normalizeAltOrders`, `listAcceptedOrders`, `findMatchingOrderIndex`) and the rule filter names. |
+| `sentence-markdown.js` | Pure: reads the sentence table (`Українською`, `Nederlands`, optional `Правило`, `Схема` and `Інші порядки`) of a Markdown file. |
 | `sentence-generation-prompt.js` | Pure: the chat messages for the LLM (rules of `docs/SENTENCE_GENERATION_PROMPT.md`) and the reader of its JSON answer. |
 | `word-order-repository.js` | SQL for `order_sentences`, `order_sentence_answers` and the vocabulary; the set is ordered here (last answer wrong, then never answered, then least recently answered). |
-| `word-order-service.js` | Business rules: add (invalid and repeated sentences are skipped; a bad schema is a warning), import, generate through OpenRouter, list, update, delete, the set with shuffled tiles (no Dutch text, optional rule filter), the answer check (returns the rule and schema). Publishes `word-order`. |
+| `word-order-service.js` | Business rules: add (invalid and repeated sentences are skipped; a bad schema is a warning), import, generate through OpenRouter, list, update, delete, the set with shuffled tiles (no Dutch text, optional rule filter), the answer check against every accepted order (returns the rule, schema and orders). Publishes `word-order`. |
 | `word-order-routes.js` | REST adapter: `/api/word-order/…`. |
 | `word-order-tools.js` | MCP adapter: `add_sentences`, `list_sentences`, `update_sentence`, `delete_sentence`, `get_word_order_set`, `check_word_order`, `generate_sentences`. |
 

@@ -3,6 +3,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -14,7 +17,8 @@ import { createWordOrderRepository } from '../src/domains/word-order/word-order-
 import { createWordOrderService } from '../src/domains/word-order/word-order-service.js';
 import { createOpenRouterClient } from '../src/integrations/openrouter-client.js';
 import { createApplication } from '../src/server/create-application.js';
-import { createTestContext } from './database-test-helpers.js';
+import { createDatabaseConnection } from '../src/database/create-database-connection.js';
+import { createTestContext, mulberry32 } from './database-test-helpers.js';
 
 const SECRET = '0123456789abcdef'.repeat(4);
 const TOKEN = 'test-api-token-for-word-order';
@@ -39,7 +43,12 @@ const NO_RULE_COUNTS = Object.freeze({
   v2: 0, inversion: 0, question: 0, modal: 0, separable: 0, negation: 0, subordinate: 0, perfect: 0, none: 0,
 });
 
-// Each sentence gets the next time, so the order of addition and of answers is known.
+// The word order service's random numbers (tiles, distractors, the prompt sample) come from a seeded generator, so the
+// shuffles repeat run to run. Every service the tests create uses it, and the counting clock below.
+const WORD_ORDER_RANDOM_SEED = 20261029;
+
+// Each sentence gets the next time, so the order of addition and of answers is known. Times never repeat within one
+// database, so the set query's random() tie-break (same queue group and time) is never reached.
 function createCountingClock() {
   let time = 1_000_000;
   return Object.freeze({ now: () => (time += 1000) });
@@ -47,7 +56,7 @@ function createCountingClock() {
 
 // A fresh database with the vocabulary of VOCABULARY_WORDS and no sentences.
 function createFixture() {
-  const context = createTestContext({ clock: createCountingClock() });
+  const context = createTestContext({ clock: createCountingClock(), random: mulberry32(WORD_ORDER_RANDOM_SEED) });
   context.wordService.createWords(VOCABULARY_WORDS.map(nl => ({ nl, uk: `${nl} (uk)` })));
   return context;
 }
@@ -166,6 +175,9 @@ test('answerSentence returns the rule and the schema, and the set does not send 
     correct_tiles: ['Ik', 'drink', 'koffie'],
     rule: 'v2',
     structure: KOFFIE_STRUCTURE,
+    matched_order: 0,
+    orders: ['Ik drink koffie'],
+    has_other_orders: false,
   });
 });
 
@@ -381,6 +393,7 @@ test('generateSentences with a configured client saves the sentences with source
     runInTransaction: createTransactionRunner({ database: context.database }),
     changeEventBus: context.changeEventBus,
     clock: context.clock,
+    random: mulberry32(WORD_ORDER_RANDOM_SEED),
   });
 
   const result = await service.generateSentences({ count: 5 });
@@ -454,6 +467,9 @@ test('REST: add, list, set, answer, import, delete', async () => {
     correct_tiles: ['Ik', 'drink', 'koffie'],
     rule: 'v2',
     structure: null,
+    matched_order: 0,
+    orders: ['Ik drink koffie'],
+    has_other_orders: false,
   });
 
   const badAnswer = await postJson(`/api/word-order/sentences/${koffieId}/answer`, { tiles: [] });
@@ -647,3 +663,382 @@ test('MCP: update_sentence sets a schema; a bad one is an error; add_sentences w
   assert.equal(emptySet.total, everySet.total, 'an empty list: every rule');
 });
 
+
+// ---------- several correct word orders ----------
+
+const MARKT_ALT = 'We gaan morgen naar de markt.';
+const MARKT_TILES = ['morgen', 'gaan', 'we', 'naar', 'de', 'markt'];
+const MARKT_ALT_TILES = ['we', 'gaan', 'morgen', 'naar', 'de', 'markt'];
+const MARKT_SCHEMA = [
+  { text: 'Morgen', role: 'час' },
+  { text: 'gaan', role: 'дієслово' },
+  { text: 'we', role: 'підмет' },
+  { text: 'naar de markt', role: 'місце' },
+];
+
+test('one order: only the main tiles are right, another order is wrong with matched_order -1', () => {
+  const context = createFixture();
+  const [koffie] = addFixtureSentences(context, [KOFFIE]);
+  const wrong = context.wordOrderService.answerSentence({ id: koffie.id, tiles: ['koffie', 'drink', 'Ik'] });
+  assert.deepEqual([wrong.is_correct, wrong.matched_order, wrong.has_other_orders], [false, -1, false]);
+  assert.deepEqual(wrong.orders, ['Ik drink koffie']);
+  const right = context.wordOrderService.answerSentence({ id: koffie.id, tiles: ['ik', 'Drink', 'koffie'] });
+  assert.deepEqual([right.is_correct, right.matched_order], [true, 0]);
+  const [listed] = context.wordOrderService.listSentences();
+  assert.deepEqual(listed.alt_orders, []);
+  assert.equal(listed.order_count, 1);
+  assert.equal(context.wordOrderService.getSentenceSet().sentences[0].order_count, 1);
+});
+
+test('two orders: both are right (matched_order 0 and 1), a third order is wrong; the set does not send the alternative', () => {
+  const context = createFixture();
+  const [markt] = context.wordOrderService.addSentences([{ ...MARKT, alt_orders: [MARKT_ALT] }], { source: 'mcp' }).added;
+  assert.deepEqual(markt.alt_orders, [MARKT_ALT]);
+  assert.equal(markt.order_count, 2);
+
+  const main = context.wordOrderService.answerSentence({ id: markt.id, tiles: MARKT_TILES });
+  assert.deepEqual([main.is_correct, main.matched_order], [true, 0]);
+  const other = context.wordOrderService.answerSentence({ id: markt.id, tiles: MARKT_ALT_TILES });
+  assert.deepEqual(other, {
+    is_correct: true,
+    correct_nl: MARKT.nl,
+    correct_tiles: ['Morgen', 'gaan', 'we', 'naar', 'de', 'markt'],
+    rule: 'inversion',
+    structure: null,
+    matched_order: 1,
+    orders: ['Morgen gaan we naar de markt', 'We gaan morgen naar de markt'],
+    has_other_orders: true,
+  });
+  const third = context.wordOrderService.answerSentence({ id: markt.id, tiles: ['gaan', 'morgen', 'we', 'naar', 'de', 'markt'] });
+  assert.deepEqual([third.is_correct, third.matched_order], [false, -1]);
+
+  const { sentences } = context.wordOrderService.getSentenceSet();
+  assert.equal(sentences[0].order_count, 2);
+  for (const item of sentences) {
+    assert.deepEqual(Object.keys(item).sort(), ['id', 'order_count', 'rule', 'tiles', 'uk']);
+  }
+  assert.equal(JSON.stringify(sentences).includes('We gaan morgen'), false);
+});
+
+test('an alternative with other words, or a missing or extra word, skips its sentence with the reason', () => {
+  const context = createFixture();
+  const result = context.wordOrderService.addSentences([
+    { ...MARKT, alt_orders: ['Naar de markt gaan we vandaag.'] },
+    { ...KOFFIE, alt_orders: ['Ik drink koffie nu.'] },
+    { ...MES, alt_orders: ['Heb je mes?'] },
+  ], { source: 'mcp' });
+  assert.deepEqual(result.added, []);
+  assert.deepEqual(result.skipped, [
+    { nl: MARKT.nl, reason: 'альтернативний порядок: інші слова, ніж у реченні («Naar de markt gaan we vandaag.»)' },
+    { nl: KOFFIE.nl, reason: 'альтернативний порядок: інші слова, ніж у реченні («Ik drink koffie nu.»)' },
+    { nl: MES.nl, reason: 'альтернативний порядок: інші слова, ніж у реченні («Heb je mes?»)' },
+  ]);
+  assert.equal(context.wordOrderService.listSentences().length, 0);
+});
+
+test('a case or punctuation change of the main order is a duplicate, and so is a repeated alternative', () => {
+  const context = createFixture();
+  const result = context.wordOrderService.addSentences([
+    { ...KOFFIE, alt_orders: ['ik DRINK koffie!'] },
+    { ...MARKT, alt_orders: [MARKT_ALT, 'we gaan morgen naar de markt'] },
+  ], { source: 'mcp' });
+  assert.deepEqual(result.skipped.map(item => item.reason), [
+    'альтернативний порядок: такий порядок уже є («ik DRINK koffie!»)',
+    'альтернативний порядок: такий порядок уже є («we gaan morgen naar de markt»)',
+  ]);
+});
+
+test('an alternative that breaks a schema segment is refused; the same blocks in another order are kept', () => {
+  const context = createFixture();
+  const result = context.wordOrderService.addSentences([
+    { ...MARKT, structure: MARKT_SCHEMA, alt_orders: ['Gaan we naar morgen de markt.'] },
+    { ...MARKT, structure: MARKT_SCHEMA, alt_orders: [MARKT_ALT] },
+  ], { source: 'mcp' });
+  assert.deepEqual(result.skipped, [
+    { nl: MARKT.nl, reason: 'альтернативний порядок: не збігається зі схемою («Gaan we naar morgen de markt.»)' },
+  ]);
+  assert.deepEqual(result.added.map(sentence => sentence.alt_orders), [[MARKT_ALT]]);
+});
+
+test('segments that share a word are matched in any order, and the answer checks them', () => {
+  const context = createFixture();
+  const [sentence] = context.wordOrderService.addSentences([{
+    nl: 'Ik ik moe.',
+    uk: 'Я втомлений.',
+    structure: [{ text: 'Ik', role: 'підмет' }, { text: 'ik moe', role: 'додаток' }],
+    alt_orders: ['Ik moe ik.'],
+  }], { source: 'mcp' }).added;
+  assert.equal(sentence.order_count, 2);
+  const answer = context.wordOrderService.answerSentence({ id: sentence.id, tiles: ['ik', 'moe', 'Ik'] });
+  assert.deepEqual([answer.is_correct, answer.matched_order], [true, 1]);
+});
+
+test('at most five alternatives: the sixth skips the sentence', () => {
+  const context = createFixture();
+  const result = context.wordOrderService.addSentences([{
+    nl: 'Ik drink nu koffie.',
+    uk: 'Я п\'ю зараз каву.',
+    alt_orders: [
+      'Nu drink ik koffie.', 'Koffie drink ik nu.', 'Nu koffie drink ik.', 'Koffie nu drink ik.', 'Drink ik nu koffie.',
+      'Drink nu ik koffie.',
+    ],
+  }], { source: 'mcp' });
+  assert.deepEqual(result.added, []);
+  assert.equal(result.skipped[0].reason, 'альтернативний порядок: забагато порядків («Drink nu ik koffie.»)');
+});
+
+test('importMarkdown reads the Інші порядки column; a bad alternative skips its row, named by the row number', () => {
+  const context = createFixture();
+  const markdown = [
+    '| Українською | Nederlands | Правило | Схема | Інші порядки |',
+    '|---|---|---|---|---|',
+    `| ${MARKT.uk} | ${MARKT.nl} | inversion | Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце) | ${MARKT_ALT} |`,
+    `| ${KOFFIE.uk} | ${KOFFIE.nl} | v2 |  | Ik drink nu koffie. |`,
+  ].join('\n');
+  const result = context.wordOrderService.importMarkdown(markdown);
+  assert.deepEqual(result.added.map(sentence => sentence.alt_orders), [[MARKT_ALT]]);
+  assert.deepEqual(result.skipped, [{
+    nl: KOFFIE.nl,
+    reason: 'рядок 2: альтернативний порядок: інші слова, ніж у реченні («Ik drink nu koffie.»)',
+  }]);
+});
+
+test('a repeat fills the other orders of a sentence saved without them; a bad one is only a warning; stored ones stay', () => {
+  const context = createFixture();
+  addFixtureSentences(context, [MARKT, KOFFIE]);
+
+  const filled = context.wordOrderService.addSentences([
+    { nl: 'morgen gaan we naar de markt', uk: 'другий переклад', alt_orders: [MARKT_ALT] },
+  ], { source: 'mcp' });
+  assert.deepEqual(filled.skipped, []);
+  assert.equal(filled.updated.length, 1);
+  assert.deepEqual(filled.updated[0].alt_orders, [MARKT_ALT]);
+  assert.equal(filled.updated[0].rule, 'inversion', 'the rule is kept');
+  assert.equal(filled.updated[0].uk, MARKT.uk, 'the translation is kept');
+
+  const kept = context.wordOrderService.addSentences([
+    { nl: MARKT.nl, uk: 'x', alt_orders: ['Naar de markt gaan we vandaag.'] },
+  ], { source: 'mcp' });
+  assert.deepEqual(kept.updated, []);
+  assert.deepEqual(kept.warnings, [{
+    nl: MARKT.nl,
+    reason: 'інші порядки проігноровано, бо вони вже збережені; змінити їх можна через update_sentence',
+  }]);
+  assert.deepEqual(kept.skipped, [{ nl: MARKT.nl, reason: 'вже є' }]);
+  const sameOrder = context.wordOrderService.addSentences([
+    { nl: MARKT.nl, uk: 'x', alt_orders: [MARKT_ALT.toLowerCase()] },
+  ], { source: 'mcp' });
+  assert.deepEqual(sameOrder.warnings, [], 'the saved order in other capitals or punctuation is not a difference');
+
+  const bad = context.wordOrderService.addSentences([
+    { nl: KOFFIE.nl, uk: 'x', alt_orders: ['Ik drink nu koffie.'] },
+  ], { source: 'mcp' });
+  assert.deepEqual(bad.updated, []);
+  assert.deepEqual(bad.skipped, [{ nl: KOFFIE.nl, reason: 'вже є' }]);
+  assert.deepEqual(bad.warnings, [{
+    nl: KOFFIE.nl,
+    reason: 'альтернативний порядок: інші слова, ніж у реченні («Ik drink nu koffie.»)',
+  }]);
+  const listed = context.wordOrderService.listSentences();
+  assert.deepEqual(listed.find(sentence => sentence.nl === KOFFIE.nl).alt_orders, []);
+  assert.deepEqual(listed.find(sentence => sentence.nl === MARKT.nl).alt_orders, [MARKT_ALT]);
+});
+
+const DRANKJE_NL = 'Ik neem een drankje omdat ik dorst heb.';
+const DRANKJE_SCHEMA = [
+  { text: 'Ik', role: 'підмет' },
+  { text: 'neem', role: 'дієслово' },
+  { text: 'een drankje', role: 'додаток' },
+  { text: 'omdat', role: 'сполучник' },
+  { text: 'ik', role: 'підмет' },
+  { text: 'dorst', role: 'додаток' },
+  { text: 'heb', role: 'дієслово' },
+];
+
+test('a repeat does not fill a schema that a saved alternative does not fit; the warning names the alternative', () => {
+  const context = createFixture();
+  addFixtureSentences(context, [{
+    nl: DRANKJE_NL,
+    uk: 'Я візьму напій, бо хочу пити.',
+    alt_orders: ['Een ik drankje neem omdat ik dorst heb.'],
+  }]);
+  const repeat = context.wordOrderService.addSentences([
+    { nl: DRANKJE_NL, uk: 'x', structure: DRANKJE_SCHEMA },
+  ], { source: 'mcp' });
+  assert.deepEqual(repeat.updated, []);
+  assert.deepEqual(repeat.skipped, [{ nl: DRANKJE_NL, reason: 'вже є' }]);
+  assert.deepEqual(repeat.warnings, [{
+    nl: DRANKJE_NL,
+    reason: 'альтернативний порядок: не збігається зі схемою («Een ik drankje neem omdat ik dorst heb.»)',
+  }]);
+  assert.equal(context.wordOrderService.listSentences()[0].structure, null, 'the schema is not filled');
+});
+
+test('a repeat fills the schema when the saved alternative still fits it', () => {
+  const context = createFixture();
+  addFixtureSentences(context, [{
+    nl: DRANKJE_NL,
+    uk: 'Я візьму напій, бо хочу пити.',
+    alt_orders: ['Omdat ik dorst heb, neem ik een drankje.'],
+  }]);
+  const repeat = context.wordOrderService.addSentences([
+    { nl: DRANKJE_NL, uk: 'x', structure: DRANKJE_SCHEMA },
+  ], { source: 'mcp' });
+  assert.deepEqual(repeat.warnings, []);
+  assert.equal(repeat.updated.length, 1);
+  assert.deepEqual(repeat.updated[0].structure, DRANKJE_SCHEMA);
+  assert.deepEqual(repeat.updated[0].alt_orders, ['Omdat ik dorst heb, neem ik een drankje.']);
+});
+
+test('a single string alt_orders is one alternative order', () => {
+  const context = createFixture();
+  const [sentence] = context.wordOrderService.addSentences([
+    { ...KOFFIE, alt_orders: 'Koffie drink ik.' },
+  ], { source: 'mcp' }).added;
+  assert.deepEqual(sentence.alt_orders, ['Koffie drink ik.']);
+});
+
+test('a generated sentence drops a bad alternative with a warning and keeps the rest; other sources skip the sentence', () => {
+  const context = createFixture();
+  const generated = context.wordOrderService.addSentences([
+    { ...MARKT, alt_orders: [MARKT_ALT, 'Naar de markt gaan we vandaag.'] },
+  ], { source: 'openrouter' });
+  assert.deepEqual(generated.skipped, []);
+  assert.deepEqual(generated.added.map(sentence => sentence.alt_orders), [[MARKT_ALT]]);
+  assert.deepEqual(generated.warnings, [{
+    nl: MARKT.nl,
+    reason: 'альтернативний порядок: інші слова, ніж у реченні («Naar de markt gaan we vandaag.»)',
+  }]);
+  const strict = context.wordOrderService.addSentences([
+    { ...MARKT, uk: 'інший', alt_orders: [MARKT_ALT, 'Naar de markt gaan we vandaag.'] },
+  ], { source: 'mcp' });
+  assert.deepEqual(strict.added, []);
+  assert.equal(strict.skipped.length, 1);
+});
+
+test('updateSentence sets, checks and clears the other orders; a schema change re-checks them', () => {
+  const context = createFixture();
+  const [markt] = addFixtureSentences(context, [MARKT]);
+  const withAlt = context.wordOrderService.updateSentence({ id: markt.id, alt_orders: [MARKT_ALT] });
+  assert.deepEqual(withAlt.alt_orders, [MARKT_ALT]);
+  assert.equal(withAlt.order_count, 2);
+
+  assert.throws(
+    () => context.wordOrderService.updateSentence({ id: markt.id, alt_orders: ['Naar de markt gaan we vandaag.'] }),
+    error => error instanceof ValidationError && error.message.startsWith('альтернативний порядок: інші слова'),
+  );
+  assert.throws(
+    () => context.wordOrderService.updateSentence({ id: markt.id, alt_orders: 'We gaan morgen naar de markt.' }),
+    ValidationError,
+  );
+  assert.throws(
+    () => context.wordOrderService.updateSentence({ id: markt.id, alt_orders: [...Array(5).fill(MARKT_ALT), 'x y'] }),
+    ValidationError,
+  );
+
+  const schemaBreaks = [
+    { text: 'Morgen gaan', role: 'час' },
+    { text: 'we', role: 'підмет' },
+    { text: 'naar de markt', role: 'місце' },
+  ];
+  assert.throws(
+    () => context.wordOrderService.updateSentence({ id: markt.id, structure: schemaBreaks }),
+    /не збігається зі схемою/,
+  );
+  assert.equal(context.wordOrderService.listSentences()[0].structure, null, 'the refused schema is not saved');
+
+  const cleared = context.wordOrderService.updateSentence({ id: markt.id, alt_orders: [] });
+  assert.deepEqual([cleared.alt_orders, cleared.order_count], [[], 1]);
+});
+
+test('a sentence saved before the migration has no other orders and one order', () => {
+  const migrationsDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
+  const migrationNames = fs.readdirSync(migrationsDirectory).filter(name => name.endsWith('.sql')).sort();
+  const database = createDatabaseConnection({ databasePath: ':memory:' });
+  for (const name of migrationNames.filter(name => name < '011')) {
+    database.exec(fs.readFileSync(path.join(migrationsDirectory, name), 'utf8'));
+  }
+  database.prepare(`
+    INSERT INTO order_sentences (nl, uk, rule, source, nl_key, added_at)
+    VALUES ('Ik drink koffie.', 'Я п''ю каву.', 'v2', 'mcp', 'ik drink koffie', 1000)
+  `).run();
+  database.exec(fs.readFileSync(path.join(migrationsDirectory, '011-add-alternative-word-orders.sql'), 'utf8'));
+
+  const service = createWordOrderService({
+    wordOrderRepository: createWordOrderRepository({ database }),
+    openRouterClient: { isConfigured: false },
+    runInTransaction: createTransactionRunner({ database }),
+    changeEventBus: { publishChange() {} },
+    clock: createCountingClock(),
+    random: mulberry32(WORD_ORDER_RANDOM_SEED),
+  });
+  const [sentence] = service.listSentences();
+  assert.deepEqual(sentence.alt_orders, []);
+  assert.equal(sentence.order_count, 1);
+});
+
+test('generateSentences saves the other orders the model gives', async () => {
+  const context = createFixture();
+  const fetchFunction = async () => {
+    const content = JSON.stringify({
+      sentences: [
+        { nl: MARKT.nl, uk: MARKT.uk, rule: 'inversion', alt_orders: [MARKT_ALT] },
+        { nl: KOFFIE.nl, uk: KOFFIE.uk, rule: 'v2', alt_orders: ['Ik drink nu koffie.'] },
+      ],
+    });
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const service = createWordOrderService({
+    wordOrderRepository: createWordOrderRepository({ database: context.database }),
+    openRouterClient: createOpenRouterClient({ apiKey: 'test-key', model: 'test/model', fetchFunction }),
+    runInTransaction: createTransactionRunner({ database: context.database }),
+    changeEventBus: context.changeEventBus,
+    clock: context.clock,
+    random: mulberry32(WORD_ORDER_RANDOM_SEED),
+  });
+  const result = await service.generateSentences({ count: 2 });
+  assert.deepEqual(result.added.map(sentence => sentence.alt_orders), [[MARKT_ALT], []]);
+  assert.deepEqual(result.skipped, []);
+  assert.deepEqual(result.warnings, [{
+    nl: KOFFIE.nl,
+    reason: 'альтернативний порядок: інші слова, ніж у реченні («Ik drink nu koffie.»)',
+  }]);
+});
+
+test('REST: PATCH sets the other orders; a bad one is a 400', async () => {
+  const station = { nl: 'Morgen gaan we naar het station.', uk: 'Завтра ми йдемо на вокзал.', rule: 'inversion' };
+  const added = await postJson('/api/word-order/sentences', { sentences: [station] });
+  const { id } = (await added.json()).added[0];
+  const patched = await patchJson(`/api/word-order/sentences/${id}`, { alt_orders: ['Naar het station gaan we morgen.'] });
+  assert.equal(patched.status, 200);
+  assert.deepEqual((await patched.json()).alt_orders, ['Naar het station gaan we morgen.']);
+  const bad = await patchJson(`/api/word-order/sentences/${id}`, { alt_orders: ['Naar het station gaan we vandaag.'] });
+  assert.equal(bad.status, 400);
+});
+
+test('MCP: add_sentences takes alt_orders, check_word_order matches any order, update_sentence refuses a bad one', async () => {
+  const client = await connectMcp();
+  const tools = (await client.listTools()).tools;
+  assert.match(tools.find(tool => tool.name === 'add_sentences').description, /alt_orders/);
+  const bakker = { nl: 'Morgen gaan we naar de bakker.', uk: 'Завтра ми йдемо до пекаря.', rule: 'inversion' };
+  const added = await callJson(client, 'add_sentences', {
+    sentences: [{ ...bakker, alt_orders: ['Naar de bakker gaan we morgen.'] }],
+  });
+  assert.equal(added.added.length, 1);
+  const { id } = added.added[0];
+  assert.equal(added.added[0].order_count, 2);
+
+  const other = await callJson(client, 'check_word_order', {
+    id,
+    tiles: ['naar', 'de', 'bakker', 'gaan', 'we', 'morgen'],
+  });
+  assert.deepEqual([other.is_correct, other.matched_order, other.has_other_orders], [true, 1, true]);
+  const refused = await client.callTool({
+    name: 'update_sentence',
+    arguments: { id, alt_orders: ['Naar de bakker gaan we vandaag.'] },
+  });
+  assert.equal(refused.isError, true);
+});

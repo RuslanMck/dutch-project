@@ -6,6 +6,7 @@ import { identifierParameterSchema, identifierSchema } from './shared-contracts.
 
 const MAXIMUM_SENTENCE_LENGTH = 1000;
 const MAXIMUM_TILE_LENGTH = 100;
+const MAXIMUM_ALTERNATIVE_ORDERS = 5;
 
 export const wordOrderPathParametersSchema = z.object({ id: identifierParameterSchema });
 
@@ -24,6 +25,12 @@ export const sentenceInputSchema = z.object({
     + 'додаток, прикметник, час, місце, спосіб, причина, заперечення, сполучник, питальне слово, частка. Example for '
     + '"Deze week ben ik jarig.": [{"text":"Deze week","role":"час"},{"text":"ben","role":"дієслово"},{"text":"ik","role":"підмет"},'
     + '{"text":"jarig","role":"прикметник"}]'),
+  // Any value is accepted: an alternative that is not valid (other words, a duplicate, a broken schema) skips the
+  // sentence with a reason, never a failed call.
+  alt_orders: z.unknown().optional().describe('optional: the other natural word orders of the sentence, a list of '
+    + 'strings. Each uses exactly the same words and the same schema segments (the segments may come in another order); not the '
+    + 'same order with other capitals or punctuation. Example: nl "Ik neem een drankje omdat ik dorst heb." with '
+    + 'alt_orders ["Omdat ik dorst heb, neem ik een drankje."]. Leave it out when there is only one order.'),
 });
 
 export const addSentencesInputSchema = z.object({
@@ -38,6 +45,9 @@ export const updateSentenceInputSchema = z.object({
     + 'perfect), or null to clear it'),
   structure: z.unknown().optional().describe('the schema: an array of { text, role } as in add_sentences, or null to '
     + 'clear it'),
+  alt_orders: z.array(z.string().max(MAXIMUM_SENTENCE_LENGTH)).max(MAXIMUM_ALTERNATIVE_ORDERS).optional()
+    .describe('the other natural word orders (strings, at most 5), with the same words and schema segments as the '
+      + 'sentence; [] clears them. Checked against the sentence and its schema, a bad one is an error.'),
 });
 
 export const updateSentenceToolInputSchema = updateSentenceInputSchema.extend({

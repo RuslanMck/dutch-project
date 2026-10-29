@@ -26,6 +26,7 @@ const EXPECTED_TOOLS = [
   'reset_practice', 'get_struggling_words',
   'add_sentences', 'list_sentences', 'update_sentence', 'delete_sentence', 'get_word_order_set', 'check_word_order',
   'generate_sentences',
+  'list_decks', 'get_deck', 'create_deck', 'update_deck', 'delete_deck',
 ];
 
 const application = createApplication({
@@ -577,4 +578,14 @@ test('get_struggling_words is read-only, lists the words to drill and changes no
     assert.equal(drill.count, 1);
     assert.deepEqual(await call(freshClient, 'practice_stats'), statsBefore);
   });
+});
+
+test('word-order tool descriptions name the other orders and matched_order', async () => {
+  const wordOrderClient = await secretClient();
+  const { tools } = await wordOrderClient.listTools();
+  const description = name => tools.find(tool => tool.name === name).description;
+  assert.match(description('add_sentences'), /alt_orders/);
+  assert.match(description('update_sentence'), /alt_orders/);
+  assert.match(description('check_word_order'), /matched_order/);
+  assert.match(description('generate_sentences'), /alt_orders/);
 });

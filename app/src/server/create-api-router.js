@@ -3,6 +3,7 @@ import express from 'express';
 
 import { createServerSentEventsRoutes } from '../change-events/server-sent-events-routes.js';
 import { createArtifactExportRoutes } from '../domains/artifact-export/artifact-export-routes.js';
+import { createDeckRoutes } from '../domains/decks/deck-routes.js';
 import { createMistakeRoutes } from '../domains/mistakes/mistake-routes.js';
 import { createPhraseRoutes } from '../domains/phrases/phrase-routes.js';
 import { createPracticeRoutes } from '../domains/practice/practice-routes.js';
@@ -25,6 +26,7 @@ export function createApiRouter({
   textService,
   statisticsService,
   artifactExportService,
+  deckService,
   changeEventBus,
   logger = console,
 }) {
@@ -38,6 +40,7 @@ export function createApiRouter({
   apiRouter.use(createTextRoutes({ textService }));
   apiRouter.use(createStatisticsRoutes({ statisticsService }));
   apiRouter.use(createArtifactExportRoutes({ artifactExportService }));
+  apiRouter.use(createDeckRoutes({ deckService }));
   apiRouter.use(createServerSentEventsRoutes({ changeEventBus }));
   apiRouter.use((request, response) => response.status(404).json({ error: 'not found' }));
   apiRouter.use(createRestErrorHandler({ logger }));

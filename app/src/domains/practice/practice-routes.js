@@ -3,6 +3,7 @@
 import express from 'express';
 
 import {
+  drillWordsQuerySchema,
   gradePhraseInputSchema,
   gradeWordInputSchema,
   practiceBatchQuerySchema,
@@ -62,6 +63,12 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
   // Read only: the drill grades nothing, so it writes nothing.
   practiceRouter.get('/practice/struggling-words', (request, response) => {
     response.json(practiceService.listStrugglingWords());
+  });
+
+  // Read only: the words of a custom drill, in the order of ids; unknown ids are skipped.
+  practiceRouter.get('/practice/drill-words', (request, response) => {
+    const drillInput = drillWordsQuerySchema.parse(removeBlankQueryValues(request.query));
+    response.json(practiceService.getDrillWords({ wordIds: drillInput.ids }));
   });
 
   practiceRouter.get('/practice/priorities/preview', (request, response) => {

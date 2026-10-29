@@ -237,23 +237,66 @@ export function orderNextRound(words, lastWordId, random = Math.random) {
   return shuffled;
 }
 
-// The struggling-words drill ("Важкі слова"): the front word leaves the queue when it is typed right (grade good);
-// any other answer sends it back into the active window (advanceWindowedQueue, same options).
+// A word leaves a drill's queue when it is typed right (grade good); any other answer sends it back into the active
+// window (advanceWindowedQueue, same options).
 export function advanceDrillQueue(queue, grade, options) {
   return advanceWindowedQueue(queue, grade === 'good', options);
 }
 
-// The button under the FSRS summary that starts the drill with this many words.
+// The button under the FSRS summary that starts the struggling-words drill with this many words.
 export function formatStrugglingDrillButton(wordCount) {
   return `Потренувати важкі слова (${wordCount})`;
 }
 
-// The end of the struggling-words drill: how many of the words it started with were right at the first check.
-export function buildStrugglingDrillEnd({ correctFirstTimeCount, totalCount }) {
+// ---------- custom drill (Важкі слова, round-summary drills, decks) ----------
+// PURE: these helpers take plain values and return new values. They never call the API and never grade anything: a
+// custom drill is extra practice and does not change any word's schedule (docs/CUSTOM_PRACTICE_ARCHITECTURE.md §1).
+// The page's drill code (app.js, section 3b) grades only with gradeTranslationAnswer / gradeReverseTranslationAnswer
+// and posts nothing; a test checks that section for grading calls.
+
+export const CUSTOM_DRILL_NOTE = 'Тренування — розклад слів не змінюється.';
+
+// The two rounds of a custom drill, in the holder shape planNextRound reads: round 1 (UA → NL) starts with the words in
+// the given order (order is the caller's shuffle, or the identity); round 2 (NL → UA) waits with all of them, and
+// planNextRound puts them in a new order that never starts with the last word of round 1. The words passed in are not
+// changed.
+export function planCustomDrill(words, order = list => list) {
   return {
-    resultText: `Тренування завершено: правильно з першого разу ${correctFirstTimeCount} з ${totalCount}.`,
-    noteText: 'Це тренування не змінює розклад слів.',
+    direction: 'uk_nl',
+    queue: order([...words]),
+    waiting: { uk_nl: [], nl_uk: [...words] },
+    lastAnsweredId: null,
   };
+}
+
+// The progress line of a custom drill: "Важкі слова · Раунд 1 з 2 · UA → NL · Залишилось: 7".
+export function formatCustomDrillProgress({ title, direction, queueLength }) {
+  return `${title} · ${formatRoundProgress({ direction, queueLength })}`;
+}
+
+// The end of a custom drill: how many words were right at their first check in each direction, out of all the words.
+// firstTry holds { uk_nl, nl_uk } counts.
+export function buildCustomDrillEnd({ firstTry, total }) {
+  return {
+    resultText: `Готово! Правильно з першого разу: UA → NL ${firstTry.uk_nl} з ${total} · NL → UA ${firstTry.nl_uk} з ${total}.`,
+    noteText: CUSTOM_DRILL_NOTE,
+  };
+}
+
+// The drill buttons under a round summary. words are the round's words (round.words: id, difficulty), hardest first, so
+// each button's wordIds keep that order. A button with no words is hidden (hidden: true) with count 0.
+export function buildRoundDrillButtons(words) {
+  const build = (kind, title, difficulties) => {
+    const matching = words.filter(word => difficulties.includes(word.difficulty));
+    const count = matching.length;
+    return {
+      kind, title, count, wordIds: matching.map(word => word.id), label: `${title} (${count})`, hidden: count === 0,
+    };
+  };
+  return [
+    build('hard', 'Повторити важкі', ['hard']),
+    build('hard-medium', 'Важкі й середні', ['hard', 'medium']),
+  ];
 }
 
 // Ukrainian plural of "день" for a count of days: 1 день, 3 дні, 5 днів, 11 днів, 21 день.
@@ -415,6 +458,7 @@ function formatDutch(word) {
 
 export const TAB_TITLES = Object.freeze({
   practice: 'Практика',
+  decks: 'Колоди',
   cards: 'Картки',
   phrases: 'Фрази',
   'word-order': 'Порядок слів',
@@ -651,10 +695,50 @@ export function formatWordOrderSummary(correctCount, total) {
   return `Готово: ${correctCount} з ${total} правильно`;
 }
 
-// The line under the answer after «Перевірити»: right is green, wrong shows the correct sentence.
-export function buildWordOrderCheckView({ is_correct: isCorrect, correct_nl: correctNl }) {
-  if (isCorrect) return { ok: true, text: 'Правильно ✓' };
-  return { ok: false, text: `Правильно: ${correctNl}` };
+// The small label under the Ukrainian sentence (spec §9.4): one accepted order, or several. A missing or zero
+// order_count (an older server) counts as one.
+export function formatOrderCountLabel(orderCount) {
+  const count = Number(orderCount);
+  return count > 1 ? 'Можливо кілька порядків' : 'Один правильний порядок';
+}
+
+// The feedback after «Перевірити» (spec §9.4). message and tone (ok | bad) are the line under the answer.
+// mainOrderLine: «Основний варіант: …» when the learner found another accepted order (matched_order > 0), else null.
+// otherOrders: the accepted orders after the canonical one, shown when the answer is wrong and has_other_orders is
+// set (otherOrdersTitle names them); empty otherwise. orders are tile strings from the server, canonical first.
+export function buildWordOrderCheckView({
+  is_correct: isCorrect,
+  correct_nl: correctNl,
+  matched_order: matchedOrder,
+  orders = [],
+  has_other_orders: hasOtherOrders = false,
+}) {
+  const list = Array.isArray(orders) ? orders : [];
+  if (isCorrect) {
+    const isAlternative = Number.isInteger(matchedOrder) && matchedOrder > 0 && list.length > 0;
+    return {
+      message: 'Правильно ✓',
+      tone: 'ok',
+      // correct_nl is the canonical sentence with its punctuation; orders are bare tile strings.
+      mainOrderLine: isAlternative ? `Основний варіант: ${correctNl}` : null,
+      otherOrdersTitle: null,
+      otherOrders: [],
+    };
+  }
+  const others = hasOtherOrders ? list.slice(1) : [];
+  return {
+    message: `Правильно: ${correctNl}`,
+    tone: 'bad',
+    mainOrderLine: null,
+    otherOrdersTitle: others.length ? 'Є й інші правильні варіанти:' : null,
+    otherOrders: others,
+  };
+}
+
+// The muted «також: …» lines under a sentence in the list, one per alternative order (spec §9.4).
+export function buildAlsoOrderLines(altOrders) {
+  if (!Array.isArray(altOrders)) return [];
+  return altOrders.filter(order => typeof order === 'string' && order.trim()).map(order => `також: ${order}`);
 }
 
 // "✓ 3 / 4" for a sentence answered four times, three of them right; "ще не відповідали" before the first answer.
@@ -783,4 +867,112 @@ export function roleColourClass(role) {
     if (roles.includes(name)) return `role-${group}`;
   }
   return 'role-other';
+}
+
+// ---------- decks («Колоди») ----------
+
+// The picker's search form of a text: accents removed from Latin letters only, lower case, typographic apostrophes as ',
+// spaces collapsed. "Café" and "cafe" compare equal; Ukrainian й and ї stay distinct from и and і (NFD would split them
+// into и + breve and і + diaeresis, so Cyrillic is never decomposed).
+export function foldSearchText(value) {
+  return String(value ?? '')
+    .normalize('NFC')
+    .replace(/\p{Script=Latin}/gu, letter => letter.normalize('NFD').replace(/\p{M}/gu, ''))
+    .toLowerCase()
+    .replace(/[’‘ʼ`]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// The difficulty bucket of a catalog word: its difficulty, or 'new' when it was never answered.
+function catalogBucket(word) {
+  return word.difficulty ?? 'new';
+}
+
+// The picker's filter: the chosen bucket (all | hard | medium | easy | new | selected) and the search text, matched
+// against the article, the Dutch word and the Ukrainian translation. selectedIds: a Set or an array of ids.
+// Returns the matching words in their given order; the words are not changed.
+export function filterCatalog({ words, query = '', filter = 'all', selectedIds = [] }) {
+  const selected = selectedIds instanceof Set ? selectedIds : new Set(selectedIds);
+  const needle = foldSearchText(query);
+  return words.filter(word => {
+    if (filter === 'selected') {
+      if (!selected.has(word.id)) return false;
+    } else if (filter !== 'all' && catalogBucket(word) !== filter) {
+      return false;
+    }
+    if (!needle) return true;
+    return foldSearchText(`${word.article ?? ''} ${word.nl} ${word.uk}`).includes(needle);
+  });
+}
+
+const DIFFICULTY_RANK = Object.freeze({ hard: 3, medium: 2, easy: 1 });
+
+// The picker's order, as a new array. alpha: by the Dutch word. hardest: hard, medium, easy, then new words; within a
+// bucket the most mistakes first. stale: the longest without practice first (never practised first), then by the word.
+export function sortCatalog(words, sort = 'alpha') {
+  // The folded Dutch word is computed once per word, not once per comparison.
+  const entries = words.map(word => ({ word, nl: foldSearchText(word.nl) }));
+  const byWord = (a, b) => a.nl.localeCompare(b.nl) || (a.word.id - b.word.id);
+  const compare = {
+    hardest: (a, b) => (DIFFICULTY_RANK[b.word.difficulty] ?? 0) - (DIFFICULTY_RANK[a.word.difficulty] ?? 0)
+      || (b.word.mistake_count ?? 0) - (a.word.mistake_count ?? 0)
+      || byWord(a, b),
+    stale: (a, b) => {
+      const aDate = a.word.last_practiced_on ?? '';
+      const bDate = b.word.last_practiced_on ?? '';
+      if (aDate !== bDate) return aDate < bDate ? -1 : 1;   // '' (never) sorts first
+      return byWord(a, b);
+    },
+  }[sort] ?? byWord;
+  return entries.sort(compare).map(entry => entry.word);
+}
+
+// "востаннє: 28.10" for a date this year, "востаннє: 28.10.2025" for an earlier year, "ще не практиковано" for none.
+// date and today are 'YYYY-MM-DD' (today is the practice calendar date).
+export function formatLastPracticed(date, today) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date ?? ''));
+  if (!match) return 'ще не практиковано';
+  const todayYear = /^(\d{4})-/.exec(String(today ?? ''))?.[1];
+  const day = `${match[3]}.${match[2]}`;
+  return `востаннє: ${match[1] === todayYear ? day : `${day}.${match[1]}`}`;
+}
+
+// "1 слово", "2 слова", "5 слів", "11 слів", "21 слово".
+export function formatDeckWordCount(count) {
+  return `${count} ${pluralize(count, ['слово', 'слова', 'слів'])}`;
+}
+
+// "de huis — будинок" (the article first when the word has one).
+export function formatDeckWordLabel(word) {
+  const dutch = word.article ? `${word.article} ${word.nl}` : word.nl;
+  return `${dutch} — ${word.uk}`;
+}
+
+// The badge text of a catalog word: легко | середньо | важко, «нове» when it was never answered.
+export function formatDifficultyLabel(difficulty) {
+  return difficulty ? DIFFICULTY_LABELS[difficulty] : 'нове';
+}
+
+// The selection model: each function returns a new Set and leaves the given one unchanged.
+export function toggleSelected(selected, id) {
+  const next = new Set(selected);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+export function selectVisible(selected, visibleIds) {
+  const next = new Set(selected);
+  for (const id of visibleIds) next.add(id);
+  return next;
+}
+
+export function clearSelected() {
+  return new Set();
+}
+
+// The sticky bar's count: "Обрано: 3".
+export function formatSelectedCount(count) {
+  return `Обрано: ${count}`;
 }

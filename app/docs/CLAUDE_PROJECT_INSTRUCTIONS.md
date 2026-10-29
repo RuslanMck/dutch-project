@@ -81,15 +81,22 @@ order. When I ask for sentences, make them with these rules (you cannot read the
 - Each sentence uses at least one of my `learning` or `learned` words (call `list_words` for them).
 - Spread over the rules, at least two sentences each: `v2`, `inversion`, `question`, `modal`, `separable`, `negation`,
   `subordinate` (verb at the end after `omdat`, `dat`, `als`), `perfect` (participle at the end).
-- Exactly one natural word order. No commas, quotation marks, digits or names. End with `.` or `?`.
+- The sentence is its most neutral natural word order. If another order is also natural Dutch, give it as an
+  alternative (see below). No commas in the sentence itself (nl); an alternative order may have a comma after a
+  fronted clause. No quotation marks, digits or names. End with `.` or `?`.
+- Other natural orders (alternatives): each uses exactly the same words and the same schema segments (a segment stays
+  together as one block; the blocks may come in another order). A clause that moves can be several segments, as long
+  as each segment stays whole. It is not the same order with other capitals or punctuation. At most 5. Example:
+  "Morgen gaan we naar de markt." with the alternative "We gaan morgen naar de markt.".
 - The Ukrainian is a natural translation, not word by word, in informal «ти» unless polite.
 - Each sentence has a schema («Схема»): its words split into ordered segments, each with a Ukrainian role (підмет,
   дієслово, модальне дієслово, допоміжне дієслово, інфінітив, дієприкметник, відокремлювана частина, додаток, прикметник,
   час, місце, спосіб, причина, заперечення, сполучник, питальне слово, частка; частка for particles like misschien, ook,
   toch, maar, even, wel). The segment texts joined by spaces are exactly the sentence's words in order, e.g. `Deze week (час) + ben (дієслово) + ik (підмет) + jarig (прикметник)`.
 - Call `list_sentences` first so nothing repeats. Show the sentences to me as a Markdown table with the columns
-  Українською, Nederlands, Правило, Схема, and save them with `add_sentences` only after I say yes (pass each schema as
-  `structure`, an array of `{ text, role }`). Repeats are skipped and reported.
+  Українською, Nederlands, Правило, Схема, Інші порядки, and save them with `add_sentences` only after I say yes (pass
+  each schema as `structure`, an array of `{ text, role }`, and the other orders as `alt_orders`, an array of strings).
+  Repeats are skipped and reported; a bad alternative skips its sentence with the reason.
 - When I ask, give schemas to sentences saved earlier: `list_sentences`, then `update_sentence` with `structure` for
   each one whose structure is null.
 `get_word_order_set` gives the next set (the Dutch and its schema are not returned); its optional `rules` limits it to some
@@ -100,6 +107,14 @@ sentences (it can take up to a minute) and fails when that is not configured. An
 **Difficult words.** When I ask to drill the words I find hard, call `get_struggling_words`: it lists the words whose
 last answer was `again` or `hard`, most errors first. Quiz them as above, but do not call `grade_word` or
 `log_word_error` for them. The drill changes nothing; the schedule moves only in real practice.
+
+**Decks («Колоди»).** Named word lists I drill on my own in the app (both rounds, UA → NL then NL → UA), outside the
+schedule. A deck never changes a word's schedule: never call `grade_word`, `grade_phrase` or `log_word_error` for a
+deck drill. `list_decks`; `get_deck` (words with difficulty, mistake_count, answer_count, last_practiced_on);
+`create_deck` (name 1–80 characters, unique ignoring case; at least one word id); `update_deck` (`word_ids` replaces the
+words; `add_word_ids` / `remove_word_ids` change them, not together with `word_ids`; a deck keeps at least one word);
+`delete_deck` (its words stay). To build a deck from my hard words, call `get_struggling_words` and pass the ids to
+`create_deck`. Ask me before creating, changing or deleting a deck.
 
 **Chapters and priorities.** When I tell you which chapter I am on, call `set_current_chapter`: new words of that
 chapter and the one before get priority 1, and the call returns a preview. `set_word_priority` sets one word's priority

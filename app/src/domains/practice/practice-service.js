@@ -402,6 +402,17 @@ export function createPracticeService({
     return { words, count: words.length };
   }
 
+  // The words of a custom drill, in the order given (repeats count once); ids that are not words are skipped. Read
+  // only: nothing is graded or written, so the drill never changes the schedule.
+  function getDrillWords({ wordIds }) {
+    const uniqueWordIds = [...new Set(wordIds)];
+    const wordRows = practiceRepository.findPracticeWordsByIds(uniqueWordIds);
+    const wordRowById = new Map(wordRows.map(wordRow => [wordRow.id, wordRow]));
+    const words = uniqueWordIds.filter(wordId => wordRowById.has(wordId))
+      .map(wordId => mapToPracticeWord(wordRowById.get(wordId)));
+    return { words };
+  }
+
   // The current round: the words of the pinned set, each with its answers since the set opened and its mistakes, and
   // the time from the first answer to the last. Null when no set was pinned or nothing was answered.
   function getRoundSummary() {
@@ -504,6 +515,7 @@ export function createPracticeService({
     migrateToFsrs,
     rebuildLearningDeck,
     listStrugglingWords,
+    getDrillWords,
     getRoundSummary,
     calculatePracticeStatistics,
   });

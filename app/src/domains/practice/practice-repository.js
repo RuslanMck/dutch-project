@@ -33,6 +33,10 @@ export function createPracticeRepository({ database }) {
   `);
   const selectPracticeWordsStatement = database.prepare(`${PRACTICE_WORD_SELECT} ORDER BY v_words.id ASC`);
   const selectPracticeWordByIdStatement = database.prepare(`${PRACTICE_WORD_SELECT} WHERE v_words.id = @wordId`);
+  const selectPracticeWordsByIdsStatement = database.prepare(`
+    ${PRACTICE_WORD_SELECT}
+    WHERE v_words.id IN (SELECT json_each.value FROM json_each(@wordIdsJson))
+  `);
   const updateWordScheduleStatement = database.prepare(`
     UPDATE words
     SET fsrs_card = @fsrsCard, due_at = @dueAt, introduced_on = @introducedOn, status = @learningStatus,
@@ -239,6 +243,11 @@ export function createPracticeRepository({ database }) {
     return selectPracticeWordByIdStatement.get({ wordId }) ?? null;
   }
 
+  // The practice words with these ids, in one query (the order is not defined; the caller sorts).
+  function findPracticeWordsByIds(wordIds) {
+    return selectPracticeWordsByIdsStatement.all({ wordIdsJson: JSON.stringify(wordIds) });
+  }
+
   // The words in rotation whose latest graded answer was again or hard, most errors first, then the latest review
   // first. Each row also carries last_grade and last_reviewed_at (ms).
   function listStrugglingWordRows() {
@@ -413,6 +422,7 @@ export function createPracticeRepository({ database }) {
     saveSetting,
     listPracticeWords,
     findPracticeWordById,
+    findPracticeWordsByIds,
     listStrugglingWordRows,
     updateWordSchedule,
     updateWordDeck,

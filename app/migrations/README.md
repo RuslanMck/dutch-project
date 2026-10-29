@@ -16,6 +16,8 @@ Numbered SQL files that build the SQLite schema. The runner applies them in name
 | `008-add-two-way-practice.sql` | Two-way practice: `words.deck_reverse_*` columns for the nl_uk direction (the existing deck columns are uk_nl), `direction` on `deck_answers`, `direction` and `second_grade` on `review_logs` and `phrase_review_logs`, and `phrase_answers`, one counting answer per phrase, session and direction (existing phrase grades become uk_nl answers). |
 | `009-add-word-order-sentences.sql` | The word-order exercise: `order_sentences` (the Dutch and Ukrainian sentence, its optional rule, its source and a normalized key that makes repeats unique) and `order_sentence_answers`, one row per answer. |
 | `010-add-sentence-structure.sql` | `order_sentences.structure`: the sentence's schema as a JSON array of `{ text, role }` segments (NULL = no schema yet). |
+| `011-add-alternative-word-orders.sql` | `order_sentences.alt_orders`: the other natural word orders of a sentence as a JSON array of strings (`'[]'` = only the canonical order). |
+| `012-add-custom-decks.sql` | Custom decks: `custom_decks` (unique name ignoring case) and `custom_deck_words`, the words of each deck in the order added (cascade on delete of a deck or a word). |
 
 ## Conventions
 

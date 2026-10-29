@@ -66,9 +66,10 @@ CREATE INDEX index_order_sentence_answers_on_sentence_id ON order_sentence_answe
 
 - `buildGenerationMessages({ knownWords, otherWords, existingSentences, count })` → `[{ role:'system', content },
   { role:'user', content }]`. Content follows `docs/SENTENCE_GENERATION_PROMPT.md`'s rules (level, length, word-order
-  rules spread, one correct order, no commas/digits/names, end with . or ?), lists `knownWords` (learning/learned, the
-  words every sentence must draw on), `otherWords` (more vocabulary allowed) and up to 200 `existingSentences` not to
-  repeat, and asks for JSON only: `{"sentences":[{"nl":"…","uk":"…","rule":"…"}]}` with exactly `count` items.
+  rules spread, the main order plus its alternatives (§9), no commas in nl, no digits/names, end with . or ?), lists
+  `knownWords` (learning/learned, the words every sentence must draw on), `otherWords` (more vocabulary allowed) and up
+  to 200 `existingSentences` not to repeat, and asks for JSON only:
+  `{"sentences":[{"nl":"…","uk":"…","rule":"…","structure":[…],"alt_orders":["…"]}]}` with exactly `count` items.
 - `parseGeneratedSentences(responseText, { count })` → array of `{ nl, uk, rule }`, at most `count`. Accepts the JSON
   object, also inside a ```` ```json ```` fence, or the text from its first `{` to its last `}`; throws
   `ValidationError('відповідь моделі не JSON')` otherwise. Items without string nl/uk
@@ -220,3 +221,86 @@ with each segment's Dutch above its role.
   that wraps, each a small box with the Dutch on top and the role below, `>` between boxes, and a text line
   `час > дієслово > підмет > прикметник`. Each role has a consistent colour from a small palette (existing tokens; 
   readable in light and dark). No schema → nothing shown.
+
+## 9. Several correct word orders
+
+Dutch often allows more than one natural order (a time/manner adverbial at the front or after the verb; a
+subordinate clause before or after the main clause). A sentence therefore has a list of accepted orders.
+
+### 9.1 Model
+
+- `orders` (API, `string[][]`): the accepted orders as tile lists. `orders[0]` is the canonical order =
+  `splitIntoTiles(nl)`; the rest come from the stored alternatives. `nl` stays the canonical sentence and the source
+  of the pile's tiles.
+- Migration `011-add-alternative-word-orders.sql`: `ALTER TABLE order_sentences ADD COLUMN alt_orders TEXT NOT NULL
+  DEFAULT '[]';` — a JSON array of alternative sentences (strings, as written, e.g. `"Omdat ik dorst heb, neem ik een
+  drankje."`). Existing sentences get `[]`, so their `orders` is `[current order]`. Schema rows are unaffected.
+- Tile comparison ignores case and punctuation (as `isCorrectOrder` already does), because a fronted clause changes
+  capitals and adds a comma. Words themselves must match exactly.
+
+### 9.2 Pure functions (word-order-tiles.js)
+
+- `isSameWordMultiset(tilesA, tilesB)` → boolean: same tiles with the same counts, compared lower-case with
+  apostrophes normalised (the `normalizeSentenceKey` mapping).
+- `normalizeAltOrders({ nl, altOrders, structure })` → `{ altOrders: string[], rejected: [{ order, reason }] }`.
+  Each alternative (string, trimmed; also accepts an array of tiles, joined by spaces) is rejected when:
+  blank → `'порожній порядок'`; not the same word multiset as `nl` → `'інші слова, ніж у реченні'`; its key equals
+  `nl`'s key or an earlier alternative's → `'такий порядок уже є'`; `structure` is given and the alternative is not
+  a concatenation of the structure's segments in some order (each segment's tiles contiguous, every segment used
+  once; compare lower-case) → `'не збігається зі схемою'`. Max 5 alternatives (rest rejected `'забагато порядків'`).
+- `listAcceptedOrders({ nl, altOrders })` → `string[][]` = `[splitIntoTiles(nl), ...altOrders.map(splitIntoTiles)]`.
+- `findMatchingOrderIndex({ answerTiles, orders })` → index of the first order equal to the answer (lower-case,
+  apostrophes normalised), or `-1`. `isCorrectOrder` stays for compatibility (canonical only).
+
+### 9.3 Service and adapters
+
+- `addSentences`: input may carry `alt_orders` (array of strings or tile arrays; a single string is one order).
+  Authoring is strict for alternatives: if any alternative is rejected, the whole sentence is skipped with reason
+  `'альтернативний порядок: <reason> («<order>»)'` (the sentence is not added half-checked). Validation uses the
+  sentence's valid structure if it has one. Source `openrouter` (generated) instead drops each rejected alternative
+  with a warning and keeps the sentence. Fill-on-repeat (§8.1) also fills `alt_orders` when the stored list is
+  empty and the input's alternatives are usable → `updated`. Fill-on-repeat of a missing schema is refused (a
+  warning names the alternative) when a stored alternative does not fit that schema. When the stored list is
+  non-empty and the input's differs, the input is ignored with a warning (change it with `update_sentence`).
+- `updateSentence({ id, uk?, rule?, structure?, alt_orders? })`: alternatives validated against the stored `nl` and
+  the resulting structure; any rejection → `ValidationError` with the reason. Changing `structure` re-checks the
+  stored alternatives; a mismatch → `ValidationError`.
+- `getSentenceSet` items add `order_count` (number of accepted orders; the orders themselves are not sent).
+- `answerSentence` returns, in addition: `matched_order` (index or `-1`), `orders` (`string[]`, each accepted order
+  as tiles joined by spaces, canonical first), `has_other_orders` (`orders.length > 1`). `is_correct` = `matched_order
+  >= 0`. `correct_nl` stays the canonical sentence. The stored answer row is unchanged.
+- `listSentences` rows add `alt_orders` (strings) and `order_count`.
+- Markdown import: optional column `Інші порядки`: alternatives separated by `;` (spaces around it optional); an empty cell, a dash (`—`, `–`, `-`) or `немає`/`none`
+  = none. A rejected
+  alternative skips that sentence with the reason (row number in the reason).
+- OpenRouter generation: the prompt asks for `alt_orders` (all other natural orders, may be empty) and parses them.
+- Contracts: `alt_orders` optional, lenient in `add_sentences` (any value; validated in the service), strict in
+  `update_sentence` (array of strings, max 5).
+- MCP: `add_sentences`, `update_sentence`, `generate_sentences` descriptions explain `alt_orders` with the example
+  `nl: "Ik neem een drankje omdat ik dorst heb."`, `alt_orders: ["Omdat ik dorst heb, neem ik een drankje."]`, and
+  that every alternative must use exactly the same words and the same schema segments. `check_word_order` describes
+  the new fields. Docs: `SENTENCE_GENERATION_PROMPT.md` replaces «Only one correct word order…» with: list every
+  other natural order in the `Інші порядки` column (and `alt_orders`), keeping the same words and segments; prefer
+  the most neutral order as the main one. Also `mcp-instructions.js`, `CLAUDE_PROJECT_INSTRUCTIONS.md`.
+
+### 9.4 Page
+
+- Under the Ukrainian sentence, a small label from `order_count`: `Один правильний порядок` (1) or `Можливо кілька
+  порядків` (>1).
+- After «Перевірити»:
+  - correct, `matched_order === 0`: «Правильно ✓» (as now).
+  - correct, `matched_order > 0`: «Правильно ✓» and a muted line «Основний варіант: <orders[0]>».
+  - wrong: «Правильно: <correct_nl>»; when `has_other_orders`, also «Є й інші правильні варіанти:» followed by the
+    other orders (orders[1..]) as a short list.
+  - The schema shown is always the canonical one (as now).
+- Sentences list shows the alternatives under each sentence (muted, «також: …»).
+
+### 9.5 Tests
+
+- One order: only the canonical tiles are accepted; any other permutation → `is_correct: false`, `matched_order -1`.
+- Two orders: both accepted (`matched_order` 0 and 1); a third permutation rejected.
+- Authoring: an alternative with a different word set → sentence skipped (add_sentences / import) or ValidationError
+  (update_sentence); an extra or missing word rejected; a case/punctuation-only difference is NOT a different word
+  set; a duplicate of the canonical order rejected; an alternative that breaks the schema's segments rejected.
+- Migration: existing sentences have `alt_orders = '[]'` and `order_count` 1.
+- Page logic: label from order_count; feedback lines for the three cases.

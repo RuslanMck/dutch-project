@@ -6,6 +6,8 @@ import { createArtifactExportRepository } from '../domains/artifact-export/artif
 import { createArtifactExportService } from '../domains/artifact-export/artifact-export-service.js';
 import { createArtifactImportRepository } from '../domains/artifact-export/artifact-import-repository.js';
 import { createArtifactImportService } from '../domains/artifact-export/artifact-import-service.js';
+import { createDeckRepository } from '../domains/decks/deck-repository.js';
+import { createDeckService } from '../domains/decks/deck-service.js';
 import { createMistakeRepository } from '../domains/mistakes/mistake-repository.js';
 import { createMistakeService } from '../domains/mistakes/mistake-service.js';
 import { createPhraseRepository } from '../domains/phrases/phrase-repository.js';
@@ -132,6 +134,11 @@ export function createDomainServices({
     wordService,
     clock,
   });
+  const deckService = createDeckService({
+    deckRepository: createDeckRepository({ database }),
+    practiceSettings,
+    ...sharedDependencies,
+  });
   const artifactImportService = createArtifactImportService({
     artifactImportRepository: createArtifactImportRepository({ database }),
     sectionService,
@@ -155,5 +162,6 @@ export function createDomainServices({
     statisticsService,
     artifactExportService,
     artifactImportService,
+    deckService,
   });
 }

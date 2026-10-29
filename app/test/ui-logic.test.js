@@ -1,6 +1,9 @@
 // Tests for the pure UI helpers in public/logic.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   esc,
   normalise,
@@ -28,7 +31,11 @@ import {
   formatActivityRange,
   shuffle,
   formatStrugglingDrillButton,
-  buildStrugglingDrillEnd,
+  buildCustomDrillEnd,
+  buildRoundDrillButtons,
+  formatCustomDrillProgress,
+  planCustomDrill,
+  CUSTOM_DRILL_NOTE,
   gradeReverseTranslationAnswer,
   revealReverseTranslationAnswer,
   orderNextRound,
@@ -45,6 +52,8 @@ import {
   formatWordOrderProgress,
   formatWordOrderSummary,
   buildWordOrderCheckView,
+  buildAlsoOrderLines,
+  formatOrderCountLabel,
   formatSentenceStats,
   formatImportResult,
   shouldApplyFetch,
@@ -60,6 +69,18 @@ import {
   parseStoredRules,
   formatStructureLine,
   roleColourClass,
+  clearSelected,
+  filterCatalog,
+  foldSearchText,
+  formatDeckWordCount,
+  formatDeckWordLabel,
+  formatDifficultyLabel,
+  formatLastPracticed,
+  formatSelectedCount,
+  selectVisible,
+  sortCatalog,
+  toggleSelected,
+  TAB_TITLES,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -391,13 +412,14 @@ test('formatStrugglingDrillButton: the button text carries the word count', () =
   assert.equal(formatStrugglingDrillButton(3), 'Потренувати важкі слова (3)');
 });
 
-test('buildStrugglingDrillEnd: first-try count out of all words, and the schedule note', () => {
-  assert.deepEqual(buildStrugglingDrillEnd({ correctFirstTimeCount: 1, totalCount: 3 }), {
-    resultText: 'Тренування завершено: правильно з першого разу 1 з 3.',
-    noteText: 'Це тренування не змінює розклад слів.',
+test('buildCustomDrillEnd: first-check count per direction out of all words, and the schedule note', () => {
+  assert.deepEqual(buildCustomDrillEnd({ firstTry: { uk_nl: 2, nl_uk: 1 }, total: 3 }), {
+    resultText: 'Готово! Правильно з першого разу: UA → NL 2 з 3 · NL → UA 1 з 3.',
+    noteText: 'Тренування — розклад слів не змінюється.',
   });
-  assert.equal(buildStrugglingDrillEnd({ correctFirstTimeCount: 0, totalCount: 2 }).resultText,
-    'Тренування завершено: правильно з першого разу 0 з 2.');
+  assert.equal(CUSTOM_DRILL_NOTE, 'Тренування — розклад слів не змінюється.');
+  assert.equal(buildCustomDrillEnd({ firstTry: { uk_nl: 0, nl_uk: 0 }, total: 2 }).resultText,
+    'Готово! Правильно з першого разу: UA → NL 0 з 2 · NL → UA 0 з 2.');
 });
 
 test('the deck line says the right answers still needed, a word learned just now, or a review answered right', async () => {
@@ -766,9 +788,76 @@ test('formatWordOrderProgress and formatWordOrderSummary', () => {
 
 test('buildWordOrderCheckView shows green for a right answer and the correct sentence for a wrong one', () => {
   assert.deepEqual(buildWordOrderCheckView({ is_correct: true, correct_nl: 'Ik woon hier.' }),
-    { ok: true, text: 'Правильно ✓' });
+    { message: 'Правильно ✓', tone: 'ok', mainOrderLine: null, otherOrdersTitle: null, otherOrders: [] });
   assert.deepEqual(buildWordOrderCheckView({ is_correct: false, correct_nl: 'Ik woon hier.' }),
-    { ok: false, text: 'Правильно: Ik woon hier.' });
+    { message: 'Правильно: Ik woon hier.', tone: 'bad', mainOrderLine: null, otherOrdersTitle: null, otherOrders: [] });
+});
+
+test('buildWordOrderCheckView: a right answer that is the main order has no extra line', () => {
+  const view = buildWordOrderCheckView({
+    is_correct: true, correct_nl: 'Ik neem een drankje omdat ik dorst heb.', matched_order: 0,
+    orders: ['ik neem een drankje omdat ik dorst heb', 'omdat ik dorst heb ik neem een drankje'], has_other_orders: true,
+  });
+  assert.equal(view.message, 'Правильно ✓');
+  assert.equal(view.tone, 'ok');
+  assert.equal(view.mainOrderLine, null);
+  assert.deepEqual(view.otherOrders, []);
+});
+
+test('buildWordOrderCheckView: a right alternative names the main order', () => {
+  const view = buildWordOrderCheckView({
+    is_correct: true, correct_nl: 'Ik neem een drankje omdat ik dorst heb.', matched_order: 1,
+    orders: ['ik neem een drankje omdat ik dorst heb', 'omdat ik dorst heb ik neem een drankje'], has_other_orders: true,
+  });
+  assert.equal(view.message, 'Правильно ✓');
+  assert.equal(view.tone, 'ok');
+  // The canonical sentence with its punctuation (correct_nl), not the bare tile string of orders[0].
+  assert.equal(view.mainOrderLine, 'Основний варіант: Ik neem een drankje omdat ik dorst heb.');
+  assert.deepEqual(view.otherOrders, []);
+});
+
+test('buildWordOrderCheckView: a wrong answer shows the correct sentence and the other orders', () => {
+  const view = buildWordOrderCheckView({
+    is_correct: false, correct_nl: 'Ik neem een drankje omdat ik dorst heb.', matched_order: -1,
+    orders: ['ik neem een drankje omdat ik dorst heb', 'omdat ik dorst heb ik neem een drankje', 'ik dorst heb een drankje'],
+    has_other_orders: true,
+  });
+  assert.equal(view.message, 'Правильно: Ik neem een drankje omdat ik dorst heb.');
+  assert.equal(view.tone, 'bad');
+  assert.equal(view.mainOrderLine, null);
+  assert.equal(view.otherOrdersTitle, 'Є й інші правильні варіанти:');
+  assert.deepEqual(view.otherOrders, ['omdat ik dorst heb ik neem een drankje', 'ik dorst heb een drankje']);
+});
+
+test('buildWordOrderCheckView: a wrong answer with one accepted order has no other-orders list', () => {
+  const view = buildWordOrderCheckView({
+    is_correct: false, correct_nl: 'Ik woon hier.', matched_order: -1, orders: ['ik woon hier'], has_other_orders: false,
+  });
+  assert.equal(view.otherOrdersTitle, null);
+  assert.deepEqual(view.otherOrders, []);
+});
+
+test('buildWordOrderCheckView: a missing orders list is treated as none (older server)', () => {
+  const view = buildWordOrderCheckView({ is_correct: true, correct_nl: 'Ik woon hier.', matched_order: 1 });
+  assert.equal(view.mainOrderLine, null);
+  assert.deepEqual(view.otherOrders, []);
+});
+
+test('formatOrderCountLabel: one order or several; a missing or zero count is one order', () => {
+  assert.equal(formatOrderCountLabel(1), 'Один правильний порядок');
+  assert.equal(formatOrderCountLabel(2), 'Можливо кілька порядків');
+  assert.equal(formatOrderCountLabel(4), 'Можливо кілька порядків');
+  assert.equal(formatOrderCountLabel(0), 'Один правильний порядок');
+  assert.equal(formatOrderCountLabel(undefined), 'Один правильний порядок');
+  assert.equal(formatOrderCountLabel(null), 'Один правильний порядок');
+});
+
+test('buildAlsoOrderLines: one muted «також» line per alternative, none for an empty list', () => {
+  assert.deepEqual(buildAlsoOrderLines(['Omdat ik dorst heb, neem ik een drankje.', 'Ik neem een drankje, omdat ik dorst heb.']),
+    ['також: Omdat ik dorst heb, neem ik een drankje.', 'також: Ik neem een drankje, omdat ik dorst heb.']);
+  assert.deepEqual(buildAlsoOrderLines([]), []);
+  assert.deepEqual(buildAlsoOrderLines(undefined), []);
+  assert.deepEqual(buildAlsoOrderLines(['  ', 'Ik woon hier.']), ['також: Ik woon hier.']);
 });
 
 test('formatSentenceStats reads the answer counts', () => {
@@ -912,4 +1001,330 @@ test('roleColourClass groups the 16 schema roles into a few colours, and other r
   assert.equal(roleColourClass('щось інше'), 'role-other');
   assert.equal(roleColourClass(undefined), 'role-other');
   assert.equal(roleColourClass('частка'), 'role-adverbial');
+});
+
+// ---------- custom drill (pure helpers and the no-grading guard) ----------
+
+const wordsOf = ids => ids.map(id => ({ id, nl: `woord${id}`, uk: `слово${id}`, article: null }));
+
+test('planCustomDrill: round 1 holds the words in the given order, round 2 waits with all of them', () => {
+  const words = wordsOf([1, 2, 3]);
+  const plan = planCustomDrill(words);
+  assert.equal(plan.direction, 'uk_nl');
+  assert.deepEqual(plan.queue.map(word => word.id), [1, 2, 3]);
+  assert.deepEqual(plan.waiting, { uk_nl: [], nl_uk: words });
+  assert.equal(plan.lastAnsweredId, null);
+  const reversed = planCustomDrill(words, list => [...list].reverse());
+  assert.deepEqual(reversed.queue.map(word => word.id), [3, 2, 1]);
+});
+
+test('planCustomDrill: the input words are not changed, and two plans do not share arrays', () => {
+  const words = wordsOf([1, 2]);
+  const first = planCustomDrill(words);
+  const second = planCustomDrill(words);
+  first.queue.pop();
+  first.waiting.nl_uk.pop();
+  assert.deepEqual(words.map(word => word.id), [1, 2]);
+  assert.deepEqual(second.queue.map(word => word.id), [1, 2]);
+  assert.deepEqual(second.waiting.nl_uk.map(word => word.id), [1, 2]);
+});
+
+test('custom drill rounds: after round 1 the next round starts with a word other than the last answered one', () => {
+  for (let seed = 0; seed < 8; seed++) {
+    const words = wordsOf([1, 2, 3, 4]);
+    const plan = planCustomDrill(words);
+    const random = () => (seed % 5) / 5;
+    const round2 = planNextRound(plan, 4, random);
+    assert.equal(round2.direction, 'nl_uk');
+    assert.deepEqual(round2.queue.map(word => word.id).sort(), [1, 2, 3, 4]);
+    assert.notEqual(round2.queue[0].id, 4);
+  }
+  // A single word in round 1 is also round 2 (nothing to reorder).
+  const single = planNextRound(planCustomDrill(wordsOf([9])), 9, () => 0);
+  assert.deepEqual(single.queue.map(word => word.id), [9]);
+});
+
+test('formatCustomDrillProgress: the title, the round and the words left; the rotation part only past the window', () => {
+  assert.equal(formatCustomDrillProgress({ title: 'Важкі слова', direction: 'uk_nl', queueLength: 3 }),
+    'Важкі слова · Раунд 1 з 2 · UA → NL · Залишилось: 3');
+  assert.equal(formatCustomDrillProgress({ title: 'Колода: Тест', direction: 'nl_uk', queueLength: 7 }),
+    'Колода: Тест · Раунд 2 з 2 · NL → UA · Залишилось: 7 · вчимо 5');
+});
+
+test('buildRoundDrillButtons: hard, and hard plus medium, in the round order; a button with no words is hidden', () => {
+  const round = [
+    { id: 5, difficulty: 'hard' },
+    { id: 2, difficulty: 'medium' },
+    { id: 9, difficulty: 'hard' },
+    { id: 4, difficulty: 'easy' },
+  ];
+  const [hard, hardMedium] = buildRoundDrillButtons(round);
+  assert.deepEqual(hard, {
+    kind: 'hard', title: 'Повторити важкі', count: 2, wordIds: [5, 9], label: 'Повторити важкі (2)', hidden: false,
+  });
+  assert.deepEqual(hardMedium, {
+    kind: 'hard-medium', title: 'Важкі й середні', count: 3, wordIds: [5, 2, 9], label: 'Важкі й середні (3)', hidden: false,
+  });
+  const easyOnly = buildRoundDrillButtons([{ id: 1, difficulty: 'easy' }]);
+  assert.deepEqual(easyOnly.map(button => [button.count, button.hidden]), [[0, true], [0, true]]);
+  const mediumOnly = buildRoundDrillButtons([{ id: 1, difficulty: 'medium' }]);
+  assert.deepEqual(mediumOnly.map(button => [button.count, button.hidden]), [[0, true], [1, false]]);
+});
+
+test('the drill helpers are pure: same input, same output, and the input is not changed', () => {
+  const round = [{ id: 1, difficulty: 'hard' }, { id: 2, difficulty: 'medium' }];
+  const snapshot = JSON.stringify(round);
+  assert.deepEqual(buildRoundDrillButtons(round), buildRoundDrillButtons(round));
+  assert.equal(JSON.stringify(round), snapshot);
+  const words = wordsOf([1, 2]);
+  assert.deepEqual(planCustomDrill(words, list => list), planCustomDrill(words, list => list));
+  assert.equal(JSON.stringify(words), JSON.stringify(wordsOf([1, 2])));
+});
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const appSource = fs.readFileSync(path.join(here, '..', 'public', 'app.js'), 'utf8');
+const logicSource = fs.readFileSync(path.join(here, '..', 'public', 'logic.js'), 'utf8');
+
+test('the page keeps the filter chips at least 44px tall', () => {
+  const css = fs.readFileSync(path.join(here, '..', 'public', 'app.css'), 'utf8');
+  assert.match(css, /\.deck-chips button \{\s*min-height: 44px;/);
+});
+
+test('logic.js has no network or API access, so its drill helpers cannot post anything', () => {
+  assert.doesNotMatch(logicSource, /^import\s/m);
+  assert.doesNotMatch(logicSource, /\bfetch\s*\(|api\.|recordResult|gradePractice/);
+});
+
+test('the custom drill section of app.js calls no grading API (only the two reads)', () => {
+  const start = appSource.indexOf('// ---------- 3b · Custom drill');
+  const end = appSource.indexOf('// ---------- 4 · Правила ----------');
+  assert.ok(start > 0 && end > start, 'section 3b is found');
+  const section = appSource.slice(start, end);
+  const calls = [...section.matchAll(/\bapi\.(\w+)/g)].map(match => match[1]);
+  assert.deepEqual([...new Set(calls)].sort(), ['getDrillWords', 'getStrugglingWords']);
+  assert.doesNotMatch(section, /recordResult|gradePracticeWord|gradePracticePhrase|recordFsrsAnswer|postFsrsGrade|postPhraseGrade|gradeCardPhrase|answerFsrsWord|trackPendingPost/);
+});
+
+// ---------- Колоди (decks) ----------
+
+const catalogWords = [
+  { id: 1, nl: 'één', article: null, uk: 'один', difficulty: 'hard', mistake_count: 4, answer_count: 6, last_practiced_on: '2026-10-20' },
+  { id: 2, nl: 'huis', article: 'het', uk: 'дім', difficulty: 'easy', mistake_count: 0, answer_count: 3, last_practiced_on: '2025-03-02' },
+  { id: 3, nl: 'boek', article: 'het', uk: 'книга', difficulty: 'medium', mistake_count: 2, answer_count: 5, last_practiced_on: null },
+  { id: 4, nl: 'Zee', article: 'de', uk: 'море', difficulty: null, mistake_count: 0, answer_count: 0, last_practiced_on: null },
+  { id: 5, nl: 'café', article: 'het', uk: 'кав’ярня', difficulty: 'hard', mistake_count: 3, answer_count: 4, last_practiced_on: '2026-10-28' },
+  { id: 6, nl: 'ander', article: null, uk: 'інший', difficulty: 'medium', mistake_count: 1, answer_count: 2, last_practiced_on: '2026-10-01' },
+];
+const ids = words => words.map(word => word.id);
+
+test('foldSearchText ignores case, accents and Ukrainian й/ї marks, and unifies apostrophes', () => {
+  assert.equal(foldSearchText('Café'), 'cafe');
+  assert.equal(foldSearchText('ÉÉN  één'), 'een een');
+  assert.equal(foldSearchText('ЇЖАК'), foldSearchText('їжак'));
+  assert.equal(foldSearchText('ім’я'), foldSearchText("ім'я"));
+  assert.equal(foldSearchText(null), '');
+});
+
+test('foldSearchText keeps Ukrainian й and ї apart from и and і, and still folds Latin accents', () => {
+  assert.notEqual(foldSearchText('йогурт'), foldSearchText('иогурт'));
+  assert.notEqual(foldSearchText('їжак'), foldSearchText('іжак'));
+  assert.equal(foldSearchText('Й'), 'й');
+  assert.equal(foldSearchText('Ї'), 'ї');
+  assert.equal(foldSearchText('йогурт'), 'йогурт');
+  // A decomposed й (и + breve) is the same letter as the composed one, and still not и.
+  assert.equal(foldSearchText('и\u0306'), foldSearchText('й'));
+  assert.notEqual(foldSearchText('и\u0306'), foldSearchText('и'));
+  assert.equal(foldSearchText('e\u0301n'), 'en');
+  assert.equal(foldSearchText('één'), 'een');
+});
+
+test('filterCatalog: a Ukrainian й word is not found by the letter и', () => {
+  const words = [{ id: 9, nl: 'yoghurt', article: 'de', uk: 'йогурт' }];
+  assert.deepEqual(ids(filterCatalog({ words, query: 'иогурт' })), []);
+  assert.deepEqual(ids(filterCatalog({ words, query: 'йогурт' })), [9]);
+});
+
+test('filterCatalog: the search matches Dutch and Ukrainian, case and accent free', () => {
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'CAFE' })), [5]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'één' })), [1]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'ОДИН' })), [1]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'кав’ярня' })), [5]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'het' })), [2, 3, 5], 'the article is searched too');
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'het boek' })), [3], 'a multi-word query is a substring');
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, query: 'het huis' })), [2]);
+});
+
+test('filterCatalog: the bucket filters, the new bucket is a never-answered word, selected uses the given ids', () => {
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'hard' })), [1, 5]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'medium' })), [3, 6]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'easy' })), [2]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'new' })), [4]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'selected', selectedIds: new Set([6, 2]) })), [2, 6]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'selected', selectedIds: [] })), []);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords, filter: 'hard', query: 'café' })), [5]);
+  assert.deepEqual(ids(filterCatalog({ words: catalogWords })), [1, 2, 3, 4, 5, 6], 'no filter, no query: all, in order');
+});
+
+test('filterCatalog returns new arrays and does not change the words', () => {
+  const copy = JSON.stringify(catalogWords);
+  const result = filterCatalog({ words: catalogWords, query: 'a' });
+  assert.notEqual(result, catalogWords);
+  assert.equal(JSON.stringify(catalogWords), copy);
+});
+
+test('sortCatalog: alpha by the Dutch word (accent and case free), hardest first with new words last, stale first', () => {
+  // alpha: ander, boek, café (cafe), één (een), huis, Zee
+  assert.deepEqual(ids(sortCatalog(catalogWords, 'alpha')), [6, 3, 5, 1, 2, 4]);
+  // hardest: hard (4 mistakes, then 3), medium (2 then 1), easy, new last
+  assert.deepEqual(ids(sortCatalog(catalogWords, 'hardest')), [1, 5, 3, 6, 2, 4]);
+  // stale: never practised first, then the oldest date
+  assert.deepEqual(ids(sortCatalog(catalogWords, 'stale')), [3, 4, 2, 6, 1, 5]);
+  assert.deepEqual(ids(sortCatalog(catalogWords, 'nonsense')), [6, 3, 5, 1, 2, 4], 'an unknown sort is alpha');
+});
+
+test('sortCatalog returns a new array and leaves the input order', () => {
+  const before = ids(catalogWords);
+  const sorted = sortCatalog(catalogWords, 'hardest');
+  assert.notEqual(sorted, catalogWords);
+  assert.deepEqual(ids(catalogWords), before);
+});
+
+test('formatLastPracticed: DD.MM this year, with the year otherwise, «ще не практиковано» for none', () => {
+  assert.equal(formatLastPracticed('2026-10-28', '2026-10-29'), 'востаннє: 28.10');
+  assert.equal(formatLastPracticed('2025-03-02', '2026-10-29'), 'востаннє: 02.03.2025');
+  assert.equal(formatLastPracticed(null, '2026-10-29'), 'ще не практиковано');
+  assert.equal(formatLastPracticed('', '2026-10-29'), 'ще не практиковано');
+  assert.equal(formatLastPracticed('2026-10-28', ''), 'востаннє: 28.10.2026', 'no today: the year is shown');
+});
+
+test('formatDeckWordCount uses Ukrainian plurals: 1 слово, 2 слова, 5 слів, 11 слів, 21 слово', () => {
+  const expected = { 0: '0 слів', 1: '1 слово', 2: '2 слова', 3: '3 слова', 4: '4 слова', 5: '5 слів', 11: '11 слів',
+    12: '12 слів', 14: '14 слів', 21: '21 слово', 22: '22 слова', 25: '25 слів', 101: '101 слово', 112: '112 слів' };
+  for (const [count, text] of Object.entries(expected)) {
+    assert.equal(formatDeckWordCount(Number(count)), text, `count ${count}`);
+  }
+});
+
+test('formatDeckWordLabel puts the article first; formatDifficultyLabel names the bucket, «нове» for none', () => {
+  assert.equal(formatDeckWordLabel({ nl: 'huis', article: 'het', uk: 'дім' }), 'het huis — дім');
+  assert.equal(formatDeckWordLabel({ nl: 'één', article: null, uk: 'один' }), 'één — один');
+  assert.equal(formatDifficultyLabel('hard'), 'важко');
+  assert.equal(formatDifficultyLabel('medium'), 'середньо');
+  assert.equal(formatDifficultyLabel('easy'), 'легко');
+  assert.equal(formatDifficultyLabel(null), 'нове');
+});
+
+test('selection model: toggle adds and removes, select visible adds only those, clear empties; no input is changed', () => {
+  const start = new Set([2]);
+  const added = toggleSelected(start, 5);
+  assert.deepEqual([...added], [2, 5]);
+  assert.deepEqual([...toggleSelected(added, 2)], [5]);
+  assert.deepEqual([...start], [2], 'the given set is not changed');
+  assert.deepEqual([...selectVisible(new Set([2]), [3, 4, 2])], [2, 3, 4]);
+  assert.deepEqual([...selectVisible(new Set(), [])], []);
+  assert.equal(clearSelected().size, 0);
+  assert.equal(formatSelectedCount(3), 'Обрано: 3');
+  assert.equal(formatSelectedCount(0), 'Обрано: 0');
+});
+
+test('TAB_TITLES names the decks tab «Колоди»', () => {
+  assert.equal(TAB_TITLES.decks, 'Колоди');
+});
+
+// The body of a top-level function in app.js or logic.js: from its signature to the closing brace at column 0.
+function functionBody(source, signature) {
+  const start = source.indexOf(signature);
+  assert.ok(start >= 0, `${signature} is found`);
+  return source.slice(start, source.indexOf('\n}\n', start));
+}
+
+test('grading dispatch outside section 3b: custom and struggling modes never reach a grading call', () => {
+  // submitPractice: only the FSRS mode grades (submitFsrsAnswer); the custom drill and its struggling mode take the drill.
+  assert.match(functionBody(appSource, 'function submitPractice() {'),
+    /if \(ui\.practice\.mode === 'fsrs'\) submitFsrsAnswer\(\);\s*else if \(isCustomPracticeMode\(\)\) submitCustomAnswer\(\);/);
+  // handlePracticeSkipClick: «Не знаю» in the drill reveals without a post.
+  assert.match(functionBody(appSource, 'function handlePracticeSkipClick() {'),
+    /if \(isCustomPracticeMode\(\)\) revealCustomAnswer\(\);\s*else revealFsrsAnswer\(\);/);
+  // The «Я мав рацію» listener: the drill's override, never the FSRS grade.
+  assert.match(appSource, /addEventListener\('click', \(\) => \{\s*if \(isCustomPracticeMode\(\)\) overrideCustomAnswer\(\);\s*else handleOverrideClick\(\);/);
+  // The mode select: a custom drill never starts the FSRS session or a grade.
+  assert.match(appSource, /if \(choice === 'custom'\) \{\s*renderPractice\(\);\s*return;/);
+});
+
+test('leaving the custom drill puts the daily practice back for every target, except onBack', () => {
+  const body = functionBody(appSource, 'function leaveCustomDrill() {');
+  assert.ok(body.indexOf("if (onBack)") < body.indexOf("ui.practice.mode = 'fsrs'"), 'onBack runs before the mode is reset');
+  assert.ok(body.indexOf("ui.practice.mode = 'fsrs'") < body.indexOf("name === 'decks'"), 'the mode is reset before the decks tab');
+  assert.match(functionBody(appSource, 'function showTab(name) {'),
+    /if \(ui\.custom\.status === 'idle' && isCustomPracticeMode\(\)\) ui\.practice\.mode = 'fsrs';/);
+});
+
+test('the struggling drill keeps its own name in the mode select; the other drills run as custom', () => {
+  assert.match(functionBody(appSource, 'function startCustomDrill('), /mode = 'custom'\s*}\) \{/);
+  assert.match(functionBody(appSource, 'async function startStrugglingDrill() {'), /mode: 'struggling'/);
+  assert.match(fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8'), /<option value="custom" hidden disabled>/);
+});
+
+test('async starts: a drill does not pull the learner back to another tab, and the buttons wait while it loads', () => {
+  for (const signature of ['async function practiceDeck(deck) {', 'async function handleRoundDrillClick(kind) {', 'async function editDeck(id) {']) {
+    assert.match(functionBody(appSource, signature), /const startTab = ui\.tab;[\s\S]*ui\.tab !== startTab/, signature);
+  }
+  const roundBody = functionBody(appSource, 'async function handleRoundDrillClick(kind) {');
+  assert.match(roundBody, /!button\.count \|\| roundDrillBusy\)/);
+  assert.match(roundBody, /setRoundDrillsBusy\(true\)/);
+  assert.match(functionBody(appSource, 'async function practiceDeck(deck) {'), /setDeckBusy\(true\)[\s\S]*setDeckBusy\(false\)/);
+});
+
+test('advanceFsrsWord leaves the input alone when another mode is on screen after its await', () => {
+  assert.match(functionBody(appSource, 'async function advanceFsrsWord() {'),
+    /await current\.post;\s*\/\/[^\n]*\n\s*if \(session\.current !== current \|\| ui\.practice\.mode !== 'fsrs'\) return;/);
+});
+
+test('the picker: «Додати слова» waits for the catalog, a new or edited deck starts with the default choice', () => {
+  assert.match(functionBody(appSource, 'function updateSelectionUi() {'), /decks\.catalogStatus !== 'ready'/);
+  assert.match(functionBody(appSource, 'function openForm() {'), /decks\.catalogStatus !== 'ready'/);
+  assert.match(functionBody(appSource, 'function startNewDeck() {'), /resetPickerChoice\(\)/);
+  assert.match(functionBody(appSource, 'async function editDeck(id) {'), /resetPickerChoice\(\)/);
+  assert.match(functionBody(appSource, 'function resetPickerChoice() {'), /query = ''[\s\S]*filter = 'all'[\s\S]*sort = 'alpha'/);
+  // The rows are updated in place: a reload does not rebuild the list, and only misplaced rows move.
+  assert.doesNotMatch(functionBody(appSource, 'function buildCatalog(words) {'), /replaceChildren/);
+  assert.doesNotMatch(functionBody(appSource, 'function renderDeckForm() {'), /formatDeckWordCount\(decks\.selected\.size\)/);
+});
+
+test('the decks list refreshes on decks, words and all changes, and an empty deck says so', () => {
+  const body = functionBody(appSource, 'function refreshDecksLive(collection) {');
+  assert.match(body, /\['decks', 'words', 'all'\]\.includes\(collection\)\) loadDeckList/);
+  assert.match(appSource, /Колода порожня/);
+  assert.match(functionBody(appSource, 'function syncDeckButtons() {'), /!deck\?\.word_count/);
+});
+
+test('the decks section of app.js uses textContent only and reads or writes decks, never grades', () => {
+  const start = appSource.indexOf('// ---------- 7 · Колоди ----------');
+  const end = appSource.indexOf('// ---------- start ----------');
+  assert.ok(start > 0 && end > start, 'section 7 is found before start');
+  const section = appSource.slice(start, end);
+  assert.doesNotMatch(section, /innerHTML|insertAdjacentHTML|outerHTML|document\.write/);
+  const calls = [...new Set([...section.matchAll(/\bapi\.(\w+)/g)].map(match => match[1]))].sort();
+  assert.deepEqual(calls, ['createDeck', 'deleteDeck', 'getDeck', 'getDeckWordCatalog', 'getDrillWords', 'listDecks', 'updateDeck']);
+  assert.doesNotMatch(section, /recordResult|gradePracticeWord|gradePracticePhrase|postFsrsGrade|postPhraseGrade/);
+});
+
+test('every decks element id used by app.js exists in index.html, and the drawer links to the tab', () => {
+  const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
+  const start = appSource.indexOf('// ---------- 7 · Колоди ----------');
+  const end = appSource.indexOf('// ---------- start ----------');
+  const used = new Set([...appSource.slice(start, end).matchAll(/\$\('(decks-[\w-]+)'\)/g)].map(match => match[1]));
+  assert.ok(used.size > 15, 'the section uses many ids');
+  for (const id of used) assert.match(html, new RegExp(`id="${id}"`), `index.html has #${id}`);
+  assert.match(html, /<section id="tab-decks" class="tab" data-tab="decks"/);
+  assert.match(html, /class="drawer__link" data-tab="decks">Колоди</);
+});
+
+test('api.js exports the deck calls with the REST paths of §2.2–2.3', () => {
+  const apiSource = fs.readFileSync(path.join(here, '..', 'public', 'api.js'), 'utf8');
+  for (const [name, route] of [['listDecks', "'/api/decks'"], ['createDeck', "'/api/decks'"], ['getDeckWordCatalog', "'/api/decks/word-catalog'"],
+    ['getDeck', '/api/decks/${enc(id)}'], ['updateDeck', '/api/decks/${enc(id)}'], ['deleteDeck', '/api/decks/${enc(id)}']]) {
+    assert.match(apiSource, new RegExp(`export const ${name} = `), `${name} is exported`);
+    assert.ok(apiSource.includes(route), `${name} uses ${route}`);
+  }
 });
