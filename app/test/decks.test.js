@@ -1,6 +1,6 @@
 // Custom decks against an in-memory database and a fake clock: create, read, update and delete, the name and word
 // rules, a deleted word leaving its decks, the word catalog (difficulty, last practice day), the custom drill's words
-// (order, unknown ids, read only), and the REST and MCP adapters. Answers are written straight into deck_answers, the
+// (order, unknown ids, read only), the drill answers log (statistics only), and the REST and MCP adapters. Answers are written straight into deck_answers, the
 // table the round summary and the catalog count.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -364,4 +364,69 @@ test('MCP: the deck tools create, read, update and delete decks', async () => {
   const missing = await client.callTool({ name: 'get_deck', arguments: { id: created.id } });
   assert.equal(missing.isError, true);
   await client.close();
+});
+
+// ---------- drill answers: logged for the statistics, the schedule untouched ----------
+
+test('recordDrillAnswer logs the answer and changes nothing of the word; a deleted word takes its answers along', () => {
+  const drillClock = createFakeClock('2026-10-30T09:00:00+01:00');
+  const drillContext = createTestContext({ clock: drillClock });
+  const [wordId] = createWords(drillContext, ['de tafel']);
+  const wordBefore = drillContext.database.prepare('SELECT * FROM words WHERE id = ?').get(wordId);
+  const { id } = drillContext.practiceService.recordDrillAnswer({
+    wordId, direction: 'nl_uk', isCorrect: false, answer: 'стілець', source: 'deck',
+  });
+  assert.deepEqual(drillContext.database.prepare('SELECT * FROM drill_answers WHERE id = ?').get(id), {
+    id, word_id: wordId, direction: 'nl_uk', is_correct: 0, answer: 'стілець', source: 'deck',
+    answered_at: drillClock.now(),
+  });
+  assert.deepEqual(drillContext.database.prepare('SELECT * FROM words WHERE id = ?').get(wordId), wordBefore);
+  for (const tableName of ['deck_answers', 'review_logs', 'word_errors']) assert.equal(countRows(drillContext, tableName), 0);
+  assert.throws(
+    () => drillContext.practiceService.recordDrillAnswer({ wordId: 99999, direction: 'uk_nl', isCorrect: true, source: 'deck' }),
+    NotFoundError,
+  );
+  drillContext.wordService.deleteWord(wordId);
+  assert.equal(countRows(drillContext, 'drill_answers'), 0);
+});
+
+test('drill answers count in the activity totals, chart and streak, but not in the hardest words', () => {
+  const drillClock = createFakeClock('2026-10-30T09:00:00+01:00');
+  const drillContext = createTestContext({ clock: drillClock });
+  const [tafel, stoel] = createWords(drillContext, ['de tafel', 'de stoel']);
+  const record = (wordId, isCorrect) => drillContext.practiceService.recordDrillAnswer({
+    wordId, direction: 'uk_nl', isCorrect, answer: '', source: 'round',
+  });
+  record(tafel, false);
+  drillClock.moveTo('2026-10-30T09:01:00+01:00');
+  record(tafel, true);
+  record(stoel, true);
+  const activity = drillContext.statisticsService.calculateActivity({ period: 'day' });
+  assert.equal(activity.totals.answers, 3);
+  assert.equal(activity.totals.drill_answers, 3);
+  assert.equal(activity.totals.word_answers, 0);
+  assert.equal(activity.totals.mistakes, 1);
+  assert.equal(activity.totals.days_practised, 1);
+  const nineOClock = activity.chart.buckets.find(bucket => bucket.key === '9');
+  assert.deepEqual([nineOClock.answers, nineOClock.drill_answers, nineOClock.mistakes], [3, 3, 1]);
+  assert.equal(activity.streak.is_today_practised, true);
+  assert.deepEqual(activity.hardest_words, []);
+});
+
+test('REST: POST /practice/drill-answers logs an answer (201); a bad body is a 400, an unknown word a 404', async () => {
+  const before = countRows(context, 'drill_answers');
+  const created = await restCall('POST', '/practice/drill-answers', {
+    word_id: huis, direction: 'uk_nl', is_correct: true, answer: 'huis', source: 'struggling',
+  });
+  assert.equal(created.status, 201);
+  assert.equal(typeof created.body.id, 'number');
+  assert.equal(countRows(context, 'drill_answers'), before + 1);
+  const badSource = await restCall('POST', '/practice/drill-answers', {
+    word_id: huis, direction: 'uk_nl', is_correct: true, source: 'fsrs',
+  });
+  assert.equal(badSource.status, 400);
+  const unknownWord = await restCall('POST', '/practice/drill-answers', {
+    word_id: 99999, direction: 'uk_nl', is_correct: true, source: 'deck',
+  });
+  assert.equal(unknownWord.status, 404);
 });

@@ -69,6 +69,10 @@ export function createPracticeRepository({ database }) {
     WHERE (words.deck_required_correct IS NOT NULL AND words.deck_entered_by_lapse = 0)
       OR (words.deck_reverse_required_correct IS NOT NULL AND words.deck_reverse_entered_by_lapse = 0)
   `).pluck();
+  const insertDrillAnswerStatement = database.prepare(`
+    INSERT INTO drill_answers (word_id, direction, is_correct, answer, source, answered_at)
+    VALUES (@wordId, @direction, @isCorrect, @answer, @source, @answeredAt)
+  `);
   const insertDeckAnswerStatement = database.prepare(`
     INSERT INTO deck_answers (word_id, session_id, direction, answered_at, grade, is_first_in_session,
       required_correct_after, correct_count_after)
@@ -299,6 +303,14 @@ export function createPracticeRepository({ database }) {
     return countDeckWordsEnteredAsNewStatement.get();
   }
 
+  // One checked answer of a custom drill; returns its id. The schedule never reads drill_answers.
+  function createDrillAnswer({ wordId, direction, isCorrect, answer, source, answeredAt }) {
+    const insertResult = insertDrillAnswerStatement.run({
+      wordId, direction, isCorrect: isCorrect ? 1 : 0, answer, source, answeredAt,
+    });
+    return Number(insertResult.lastInsertRowid);
+  }
+
   // direction: 'uk_nl' or 'nl_uk'. deckPositionAfter: the position in that direction after the answer, or null.
   function createDeckAnswer({ wordId, sessionId, direction, answeredAt, grade, isFirstInSession, deckPositionAfter }) {
     insertDeckAnswerStatement.run({
@@ -430,6 +442,7 @@ export function createPracticeRepository({ database }) {
     countDeckWords,
     countDeckWordsEnteredAsNew,
     createDeckAnswer,
+    createDrillAnswer,
     markDeckAnswersSuperseded,
     listCountingAnswers,
     listDeckWordIds,

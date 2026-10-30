@@ -50,6 +50,13 @@ export function createStatisticsRepository({ database }) {
     FROM phrase_review_logs
   `);
   // The first answer of each word that was New, since the last reset: when it was started.
+  // The custom drills' answers (statistics only): right = good, wrong = again.
+  const selectDrillAnswersStatement = database.prepare(`
+    SELECT drill_answers.word_id AS item_id,
+      CASE drill_answers.is_correct WHEN 1 THEN 'good' ELSE 'again' END AS grade,
+      drill_answers.answered_at
+    FROM drill_answers
+  `);
   const selectStartedWordsStatement = database.prepare(`
     SELECT review_logs.word_id, review_logs.reviewed_at AS at
     FROM review_logs
@@ -77,6 +84,10 @@ export function createStatisticsRepository({ database }) {
 
   function listPhraseAnswers() {
     return selectPhraseAnswersStatement.all();
+  }
+
+  function listDrillAnswers() {
+    return selectDrillAnswersStatement.all();
   }
 
   function listStartedWords() {
@@ -117,6 +128,7 @@ export function createStatisticsRepository({ database }) {
     listSectionCodes,
     listWordAnswers,
     listPhraseAnswers,
+    listDrillAnswers,
     listStartedWords,
     listCountingDeckAnswers,
     listWordNames,

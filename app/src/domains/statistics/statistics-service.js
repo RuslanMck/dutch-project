@@ -49,6 +49,7 @@ export function createStatisticsService({ statisticsRepository, practiceSettings
     const answers = [
       ...statisticsRepository.listWordAnswers().map(answer => ({ ...answer, kind: 'word' })),
       ...statisticsRepository.listPhraseAnswers().map(answer => ({ ...answer, kind: 'phrase' })),
+      ...statisticsRepository.listDrillAnswers().map(answer => ({ ...answer, kind: 'drill' })),
     ];
     return summarizeLearningActivity({
       period,

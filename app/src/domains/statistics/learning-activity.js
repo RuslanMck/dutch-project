@@ -20,7 +20,8 @@ const MONTH_DAY_COUNT = 30;
 const YEAR_MONTH_COUNT = 12;
 const HOURS_PER_DAY = 24;
 
-// answers: [{ kind: 'word' | 'phrase', item_id, grade, answered_at }], any order. startedWords and learnedWords:
+// answers: [{ kind: 'word' | 'phrase' | 'drill', item_id, grade, answered_at }], any order. Drill answers (custom
+// drills, outside the schedule) count in the totals, chart and streak; the hardest words come from 'word' answers only. startedWords and learnedWords:
 // [{ word_id, at }]. wordsById: Map of id → { nl, uk, article } for the hardest words.
 export function summarizeLearningActivity({ period, now, timeZone, answers, startedWords, learnedWords, wordsById }) {
   const sortedAnswers = attachActiveTime([...answers].sort((left, right) => left.answered_at - right.answered_at));
@@ -115,6 +116,7 @@ function summarizeTotals({ answers, startedCount, learnedCount, timeZone }) {
     answers: answers.length,
     word_answers: answers.filter(answer => answer.kind === 'word').length,
     phrase_answers: answers.filter(answer => answer.kind === 'phrase').length,
+    drill_answers: answers.filter(answer => answer.kind === 'drill').length,
     mistakes: answers.length - goodCount,
     accuracy: answers.length ? goodCount / answers.length : null,
     active_seconds: Math.round(activeMilliseconds / 1000),
@@ -127,11 +129,15 @@ function summarizeTotals({ answers, startedCount, learnedCount, timeZone }) {
 // One bar per hour (day), per day (week, month) or per month (year, all time), empty ones included, in order.
 function buildChart({ range, answers, timeZone }) {
   const keys = listBucketKeys(range);
-  const bucketByKey = new Map(keys.map(key => [key, { key, answers: 0, mistakes: 0, active_seconds: 0 }]));
+  const bucketByKey = new Map(keys.map(key => [
+    key,
+    { key, answers: 0, drill_answers: 0, mistakes: 0, active_seconds: 0 },
+  ]));
   for (const answer of answers) {
     const bucket = bucketByKey.get(findBucketKey(answer.answered_at, range.unit, timeZone));
     if (!bucket) continue;
     bucket.answers += 1;
+    if (answer.kind === 'drill') bucket.drill_answers += 1;
     if (answer.grade !== 'good') bucket.mistakes += 1;
     bucket.active_seconds += answer.active_milliseconds / 1000;
   }

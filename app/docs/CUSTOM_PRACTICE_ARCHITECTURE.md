@@ -25,7 +25,9 @@ Generalise the existing struggling-words drill (`createStrugglingDrill`, `startS
 - End: «Готово!» with `правильно з першого разу: UA → NL x з n · NL → UA y з n`, buttons «Ще раз» (same words,
   new order) and «Назад» (back to where the drill started: the round summary, the deck list, or the normal practice).
 - A visible note under the progress line: «Тренування — розклад слів не змінюється».
-- Nothing is posted: no grade, no deck answer, no review log (a test asserts the drill code calls no grading API).
+- Nothing is graded: no grade, no deck answer, no review log (a test asserts the drill code calls no grading API).
+  Each checked answer («Далі», after a possible «Я мав рацію») is logged in `drill_answers` (§2.4) for the statistics
+  only; a failed post is ignored.
 - Deleted words leave the drill (as today for the struggling drill).
 
 Round-summary buttons: `round.words` carry `difficulty` (`easy|medium|hard`). «Повторити важкі (n)» = hard; «Важкі й
@@ -93,6 +95,15 @@ answer_count, last_practiced_on }] }`, all words, sorted by `nl`.
 - `difficulty`: `null` when never answered, else `classifyDifficulty(mistake_count)` from `round-summary.js`
   (0 → easy, 1–2 → medium, ≥3 → hard).
 - `last_practiced_on`: calendar date (practice time zone) of the latest answer, or null.
+
+### 2.4 Drill answers — migration `014-add-drill-answers.sql`
+
+`drill_answers (id, word_id → words ON DELETE CASCADE, direction, is_correct, answer, source, answered_at)`, source
+`round | deck | struggling | custom`. `POST /api/practice/drill-answers` `{ word_id, direction, is_correct, answer?,
+source }` → 201 `{ id }` (404 for an unknown word). The schedule, the decks, the round summary and the catalog never
+read it; no change event is published. The statistics activity counts drill answers (kind `drill`, right = good) in
+answers, mistakes, accuracy, time, days practised, the chart (`drill_answers` per bucket) and the streak, with
+`totals.drill_answers` shown as the «Тренування» tile; the hardest words stay real practice only.
 
 ## 3. Page «Колоди» (`public/`)
 

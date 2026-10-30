@@ -413,6 +413,16 @@ export function createPracticeService({
     return { words };
   }
 
+  // Logs one checked answer of a custom drill for the statistics. Nothing else changes: no card, deck, review log or
+  // error count, and no change event (the statistics are read when shown). NotFoundError when the word is gone.
+  function recordDrillAnswer({ wordId, direction, isCorrect, answer = '', source }) {
+    if (!practiceRepository.findPracticeWordById(wordId)) throw new NotFoundError(`word ${wordId} not found`);
+    const id = practiceRepository.createDrillAnswer({
+      wordId, direction, isCorrect, answer, source, answeredAt: clock.now(),
+    });
+    return { id };
+  }
+
   // The current round: the words of the pinned set, each with its answers since the set opened and its mistakes, and
   // the time from the first answer to the last. Null when no set was pinned or nothing was answered.
   function getRoundSummary() {
@@ -516,6 +526,7 @@ export function createPracticeService({
     rebuildLearningDeck,
     listStrugglingWords,
     getDrillWords,
+    recordDrillAnswer,
     getRoundSummary,
     calculatePracticeStatistics,
   });

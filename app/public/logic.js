@@ -560,6 +560,11 @@ export function buildActivityTiles(activity) {
       value: String(totals.phrase_answers),
       delta: formatDelta(totals.phrase_answers, previous?.phrase_answers, period),
     },
+    {
+      label: 'Тренування',
+      value: String(totals.drill_answers ?? 0),
+      delta: formatDelta(totals.drill_answers ?? 0, previous ? previous.drill_answers ?? 0 : null, period),
+    },
   ];
   // A single day is practised or not, so its count of days says nothing.
   if (period !== 'day') {
@@ -590,8 +595,10 @@ export function buildChartView(chart, period) {
       key: bucket.key,
       heightPercent: Math.round((bucket.answers / maximum) * 100),
       label: isLabelled ? formatBucketLabel(bucket.key, chart.unit, period) : '',
-      detail: `${name}: ${bucket.answers} ${pluralize(bucket.answers, ANSWER_WORDS)} · ${bucket.mistakes} `
-        + `${pluralize(bucket.mistakes, ['помилка', 'помилки', 'помилок'])} · ${formatDuration(bucket.active_seconds)}`,
+      detail: `${name}: ${bucket.answers} ${pluralize(bucket.answers, ANSWER_WORDS)}`
+        + (bucket.drill_answers ? ` (тренування: ${bucket.drill_answers})` : '')
+        + ` · ${bucket.mistakes} ${pluralize(bucket.mistakes, ['помилка', 'помилки', 'помилок'])}`
+        + ` · ${formatDuration(bucket.active_seconds)}`,
     };
   });
   return { title: CHART_TITLES[chart.unit], bars, isEmpty: chart.buckets.every(bucket => bucket.answers === 0) };

@@ -90,6 +90,16 @@ export const drillWordsQuerySchema = z.object({
     .pipe(z.array(identifierParameterSchema).min(1).max(MAXIMUM_DRILL_WORDS)),
 }).strict();
 
+// One checked answer of a custom drill, for the statistics only (the schedule never reads it).
+export const DRILL_SOURCES = Object.freeze(['round', 'deck', 'struggling', 'custom']);
+export const drillAnswerInputSchema = z.object({
+  word_id: identifierSchema,
+  direction: z.enum(['uk_nl', 'nl_uk']),
+  is_correct: z.boolean(),
+  answer: z.string().max(500).optional(),
+  source: z.enum(DRILL_SOURCES),
+}).strict();
+
 export const setCurrentChapterInputSchema = z.object({
   chapter: chapterNumberSchema.describe('textbook chapter the learner is on now, e.g. 7 for chapter 7'),
 }).strict();

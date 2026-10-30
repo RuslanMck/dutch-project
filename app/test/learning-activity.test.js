@@ -49,13 +49,13 @@ test('totals: answers, accuracy, time without pauses, days, and the previous per
   ];
   const day = summarize('day', answers);
   assert.deepEqual(day.totals, {
-    answers: 4, word_answers: 3, phrase_answers: 1, mistakes: 1, accuracy: 0.75, active_seconds: 90,
+    answers: 4, word_answers: 3, phrase_answers: 1, drill_answers: 0, mistakes: 1, accuracy: 0.75, active_seconds: 90,
     days_practised: 1, new_words: 0, learned_words: 0,
   });
   assert.equal(day.previous_totals.answers, 1);
   assert.equal(day.chart.unit, 'hour');
   assert.equal(day.chart.buckets.length, 24);
-  assert.deepEqual(day.chart.buckets[10], { key: '10', answers: 3, mistakes: 1, active_seconds: 90 });
+  assert.deepEqual(day.chart.buckets[10], { key: '10', answers: 3, drill_answers: 0, mistakes: 1, active_seconds: 90 });
   assert.deepEqual(day.hardest_words, [{ id: 2, nl: 'laten', uk: 'залишати', article: null, answers: 2, mistakes: 1 }]);
 
   const week = summarize('week', answers);

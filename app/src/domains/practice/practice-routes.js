@@ -3,6 +3,7 @@
 import express from 'express';
 
 import {
+  drillAnswerInputSchema,
   drillWordsQuerySchema,
   gradePhraseInputSchema,
   gradeWordInputSchema,
@@ -69,6 +70,18 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
   practiceRouter.get('/practice/drill-words', (request, response) => {
     const drillInput = drillWordsQuerySchema.parse(removeBlankQueryValues(request.query));
     response.json(practiceService.getDrillWords({ wordIds: drillInput.ids }));
+  });
+
+  // A checked answer of a custom drill: logged for the statistics, the schedule does not move.
+  practiceRouter.post('/practice/drill-answers', (request, response) => {
+    const drillInput = drillAnswerInputSchema.parse(readRequestBody(request));
+    response.status(201).json(practiceService.recordDrillAnswer({
+      wordId: drillInput.word_id,
+      direction: drillInput.direction,
+      isCorrect: drillInput.is_correct,
+      answer: drillInput.answer ?? '',
+      source: drillInput.source,
+    }));
   });
 
   practiceRouter.get('/practice/priorities/preview', (request, response) => {

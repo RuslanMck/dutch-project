@@ -163,7 +163,7 @@ const ui = {
     strugglingCount: null,           // words the struggling drill would ask, read when the summary shows
   },
   // Custom drill (mode 'custom', or 'struggling' while its list loads). One object per run, see createCustomDrill.
-  // Nothing about the drill is posted.
+  // Only its answers are posted, to the drill log for the statistics; nothing is graded.
   custom: createCustomDrill('idle'),
   rules: { q: '', open: new Set() },  // open rule keys; kept across re-renders
 };
@@ -1366,12 +1366,13 @@ async function loadStrugglingCount() {
 // ---------- 3b · Custom drill (Важкі слова, round-summary drills, decks) ----------
 
 // Practice without a schedule (docs/CUSTOM_PRACTICE_ARCHITECTURE.md §1). The drill grades the typed answers with the
-// same checks as the daily practice, but nothing is posted: no grade, no deck answer, no review log. The only API calls
-// in this section are the reads of the struggling-words list and of the drill words; a test checks that.
+// same checks as the daily practice, but nothing is graded: no grade, no deck answer, no review log. Each checked answer
+// goes to the drill log (postDrillAnswer), which only the statistics read. The other API calls in this section are the
+// reads of the struggling-words list and of the drill words; a test checks that.
 //
 // One drill run is one object (createCustomDrill). status: idle | loading | ready | done | empty | unconfigured | failed.
 // title: the name in the progress line. words: the drill's words as given (the «Ще раз» button uses them again).
-// returnTo: { name, onBack }, see resolveReturnTo. direction, queue, waiting, lastAnsweredId: the two rounds, planned by
+// source: what the drill log calls it (round | deck | struggling | custom, see findDrillSource). returnTo: { name, onBack }, see resolveReturnTo. direction, queue, waiting, lastAnsweredId: the two rounds, planned by
 // planCustomDrill and planNextRound. answered: answerKey of each word's first check; firstTry: words right at their
 // first check, per direction. current: { word, direction, checked, grade, canOverride } of the word on screen.
 const STRUGGLING_DRILL_TITLE = 'Важкі слова';
@@ -1381,6 +1382,7 @@ function createCustomDrill(status) {
     status,
     mode: 'custom',                  // the practice mode select shows while it runs: custom | struggling
     title: '',
+    source: 'custom',
     words: [],
     returnTo: { name: 'practice', onBack: null },
     total: 0,
@@ -1401,6 +1403,14 @@ function resolveReturnTo(returnTo) {
   return { name: returnTo?.name ?? 'practice', onBack: returnTo?.onBack ?? null };
 }
 
+// The drill log's name for a drill: the Важкі слова drill, a deck, a round-summary drill, or any other.
+function findDrillSource({ mode, returnTo }) {
+  if (mode === 'struggling') return 'struggling';
+  if (returnTo.name === 'decks') return 'deck';
+  if (returnTo.name === 'round-summary') return 'round';
+  return 'custom';
+}
+
 function isCustomPracticeMode() {
   return ui.practice.mode === 'custom' || ui.practice.mode === 'struggling';
 }
@@ -1412,11 +1422,13 @@ function isCustomPracticeMode() {
 // Callers check that the learner is still on the tab they started from before calling it.
 function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom' }) {
   const drill = createCustomDrill(words.length ? 'ready' : 'empty');
+  const resolvedReturnTo = resolveReturnTo(returnTo);
   Object.assign(drill, {
     mode,
     title,
+    source: findDrillSource({ mode, returnTo: resolvedReturnTo }),
     words: [...words],
-    returnTo: resolveReturnTo(returnTo),
+    returnTo: resolvedReturnTo,
     total: words.length,
     ...planCustomDrill(words, orderWords),
   });
@@ -1489,7 +1501,7 @@ function submitCustomAnswer() {
   answerCustomWord(result);
 }
 
-// «Не знаю»: the right answer is shown; the word is not right, so it comes back later. Nothing is posted.
+// «Не знаю»: the right answer is shown; the word is not right, so it comes back later. Logged as wrong at «Далі».
 function revealCustomAnswer() {
   const drill = ui.custom;
   if (!drill.current || drill.current.checked) return;
@@ -1518,10 +1530,12 @@ function overrideCustomAnswer() {
 }
 
 // «Далі»: a word right on its check leaves the round; any other word comes back later among the active words. The first
-// check of each word in each direction is the one that counts toward «правильно з першого разу».
+// check of each word in each direction is the one that counts toward «правильно з першого разу». Every check is logged
+// here, after a possible «Я мав рацію».
 function advanceCustomWord() {
   const drill = ui.custom;
   const { current } = drill;
+  logDrillAnswer(drill, current, $('practice-input').value);
   const key = answerKey(current.direction, current.word.id);
   if (!drill.answered.has(key)) {
     drill.answered.add(key);
@@ -1533,6 +1547,18 @@ function advanceCustomWord() {
   showNextCustomWord();
   renderPractice();
   $('practice-input').focus();
+}
+
+// Posts one checked answer to the drill log, for the statistics. A failed post (offline, a word deleted meanwhile) is
+// not retried and never stops the drill: the statistics only miss that answer.
+function logDrillAnswer(drill, current, answerText) {
+  api.postDrillAnswer({
+    word_id: current.word.id,
+    direction: current.direction,
+    is_correct: current.grade === 'good',
+    answer: answerText.trim().slice(0, 500),
+    source: drill.source,
+  }).catch(() => {});
 }
 
 // The question on screen: the Ukrainian in round 1, the Dutch with its article in round 2.

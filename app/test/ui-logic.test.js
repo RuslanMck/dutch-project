@@ -580,6 +580,28 @@ test('buildActivityTiles: values and the comparison with the period before; none
   assert.ok(!buildActivityTiles({ ...activity, period: 'day' }).some(tile => tile.label === 'Днів з практикою'));
 });
 
+test('buildActivityTiles: a «Тренування» tile counts the drill answers; 0 when the server sends none', () => {
+  const totals = {
+    answers: 12, word_answers: 4, phrase_answers: 0, drill_answers: 8, mistakes: 2, accuracy: 0.8, active_seconds: 60,
+    days_practised: 1, new_words: 0, learned_words: 0,
+  };
+  const tiles = buildActivityTiles({ period: 'day', totals, previous_totals: { ...totals, drill_answers: 3 } });
+  assert.deepEqual(tiles.find(tile => tile.label === 'Тренування'),
+    { label: 'Тренування', value: '8', delta: '+5 · учора: 3' });
+  const { drill_answers: _drillAnswers, ...olderTotals } = totals;
+  const older = buildActivityTiles({ period: 'all', totals: olderTotals, previous_totals: null });
+  assert.deepEqual(older.find(tile => tile.label === 'Тренування'), { label: 'Тренування', value: '0', delta: null });
+});
+
+test('buildChartView: a bar with drill answers names them in its detail line', () => {
+  const view = buildChartView({ unit: 'hour', buckets: [
+    { key: '9', answers: 5, drill_answers: 3, mistakes: 1, active_seconds: 120 },
+    { key: '10', answers: 2, drill_answers: 0, mistakes: 0, active_seconds: 60 },
+  ] }, 'day');
+  assert.match(view.bars[0].detail, /5 відповід\S* \(тренування: 3\) · 1 помилка/);
+  assert.doesNotMatch(view.bars[1].detail, /тренування/);
+});
+
 test('buildChartView: heights against the tallest bar, weekday labels for a week, sparse hour labels', () => {
   const week = buildChartView({
     unit: 'day',
@@ -1101,13 +1123,13 @@ test('logic.js has no network or API access, so its drill helpers cannot post an
   assert.doesNotMatch(logicSource, /\bfetch\s*\(|api\.|recordResult|gradePractice/);
 });
 
-test('the custom drill section of app.js calls no grading API (only the two reads)', () => {
+test('the custom drill section of app.js calls no grading API (the two reads and the drill log only)', () => {
   const start = appSource.indexOf('// ---------- 3b · Custom drill');
   const end = appSource.indexOf('// ---------- 4 · Правила ----------');
   assert.ok(start > 0 && end > start, 'section 3b is found');
   const section = appSource.slice(start, end);
   const calls = [...section.matchAll(/\bapi\.(\w+)/g)].map(match => match[1]);
-  assert.deepEqual([...new Set(calls)].sort(), ['getDrillWords', 'getStrugglingWords']);
+  assert.deepEqual([...new Set(calls)].sort(), ['getDrillWords', 'getStrugglingWords', 'postDrillAnswer']);
   assert.doesNotMatch(section, /recordResult|gradePracticeWord|gradePracticePhrase|recordFsrsAnswer|postFsrsGrade|postPhraseGrade|gradeCardPhrase|answerFsrsWord|trackPendingPost/);
 });
 

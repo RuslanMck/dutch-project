@@ -59,6 +59,8 @@ export const getStrugglingWords = () => request('GET', '/api/practice/struggling
 export const getDrillWords = ids => (ids.length
   ? request('GET', `/api/practice/drill-words?ids=${ids.map(enc).join(',')}`)
   : Promise.resolve({ words: [] }));
+// One checked answer of a custom drill, logged for the statistics only (the schedule never reads it).
+export const postDrillAnswer = body => request('POST', '/api/practice/drill-answers', body);
 export const getRoundSummary = () => request('GET', '/api/practice/round-summary');
 export const getStats = () => request('GET', '/api/stats');
 export const getActivity = period => request('GET', `/api/stats/activity?period=${enc(period)}`);
