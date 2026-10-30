@@ -951,7 +951,7 @@ test('updateSentence sets, checks and clears the other orders; a schema change r
   assert.deepEqual([cleared.alt_orders, cleared.order_count], [[], 1]);
 });
 
-test('a sentence saved before the migration has no other orders and one order', () => {
+test('a sentence saved before the migrations has no other orders, one order and no wrong forms', () => {
   const migrationsDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
   const migrationNames = fs.readdirSync(migrationsDirectory).filter(name => name.endsWith('.sql')).sort();
   const database = createDatabaseConnection({ databasePath: ':memory:' });
@@ -962,7 +962,9 @@ test('a sentence saved before the migration has no other orders and one order', 
     INSERT INTO order_sentences (nl, uk, rule, source, nl_key, added_at)
     VALUES ('Ik drink koffie.', 'Я п''ю каву.', 'v2', 'mcp', 'ik drink koffie', 1000)
   `).run();
-  database.exec(fs.readFileSync(path.join(migrationsDirectory, '011-add-alternative-word-orders.sql'), 'utf8'));
+  for (const name of migrationNames.filter(name => name >= '011')) {
+    database.exec(fs.readFileSync(path.join(migrationsDirectory, name), 'utf8'));
+  }
 
   const service = createWordOrderService({
     wordOrderRepository: createWordOrderRepository({ database }),
@@ -975,6 +977,7 @@ test('a sentence saved before the migration has no other orders and one order', 
   const [sentence] = service.listSentences();
   assert.deepEqual(sentence.alt_orders, []);
   assert.equal(sentence.order_count, 1);
+  assert.deepEqual(sentence.wrong_forms, []);
 });
 
 test('generateSentences saves the other orders the model gives', async () => {
@@ -1041,4 +1044,140 @@ test('MCP: add_sentences takes alt_orders, check_word_order matches any order, u
     arguments: { id, alt_orders: ['Naar de bakker gaan we vandaag.'] },
   });
   assert.equal(refused.isError, true);
+});
+
+// ---------- wrong forms ----------
+
+const GAAN = { nl: 'Wij gaan morgen naar de markt.', uk: 'Завтра ми йдемо на ринок.', rule: 'inversion' };
+const GAAN_TILES = ['Wij', 'gaan', 'morgen', 'naar', 'de', 'markt'];
+
+// The tiles of the set's sentence that are not the sentence's own words.
+function extraTilesOf(setSentence, sentenceTiles) {
+  const rest = [...setSentence.tiles];
+  for (const tile of sentenceTiles) rest.splice(rest.indexOf(tile), 1);
+  return rest;
+}
+
+test('the extra tiles of a sentence with three wrong forms are wrong forms only, and they never count as right', () => {
+  const context = createFixture();
+  const [gaan] = context.wordOrderService.addSentences([{ ...GAAN, wrong_forms: ['gaat', 'ga', 'het'] }], {
+    source: 'mcp',
+  }).added;
+  assert.deepEqual(gaan.wrong_forms, ['gaat', 'ga', 'het']);
+  for (let round = 0; round < 5; round++) {
+    const [setSentence] = context.wordOrderService.getSentenceSet().sentences;
+    const extra = extraTilesOf(setSentence, GAAN_TILES);
+    assert.ok(extra.length === 2 || extra.length === 3);
+    assert.ok(extra.every(tile => ['gaat', 'ga', 'het'].includes(tile)), extra.join(' '));
+    assert.deepEqual(Object.keys(setSentence).sort(), ['id', 'order_count', 'rule', 'tiles', 'uk']);
+  }
+  const answer = context.wordOrderService.answerSentence({ id: gaan.id, tiles: ['Wij', 'gaat', 'morgen', 'naar', 'de', 'markt'] });
+  assert.equal(answer.is_correct, false);
+});
+
+test('one wrong form is topped up with random vocabulary words; none gives random words only', () => {
+  const context = createFixture();
+  addFixtureSentences(context, [{ ...GAAN, wrong_forms: ['gaat'] }, { ...KOFFIE }]);
+  const { sentences } = context.wordOrderService.getSentenceSet();
+  const gaanExtra = extraTilesOf(sentences.find(item => item.uk === GAAN.uk), GAAN_TILES);
+  assert.ok(gaanExtra.includes('gaat'));
+  assert.ok(gaanExtra.filter(tile => tile !== 'gaat').every(tile => VOCABULARY_WORDS.includes(tile)));
+  const koffieExtra = extraTilesOf(sentences.find(item => item.uk === KOFFIE.uk), ['Ik', 'drink', 'koffie']);
+  assert.ok(koffieExtra.every(tile => VOCABULARY_WORDS.includes(tile)));
+});
+
+test('a bad wrong form is dropped with a warning and the sentence is still added', () => {
+  const context = createFixture();
+  const result = context.wordOrderService.addSentences([{ ...GAAN, wrong_forms: ['gaat', 'we', 'naar de', 'gaan'] }], {
+    source: 'mcp',
+  });
+  assert.equal(result.added.length, 1);
+  assert.deepEqual(result.added[0].wrong_forms, ['gaat']);
+  assert.deepEqual(result.warnings.map(warning => warning.reason), [
+    'хибна форма: з ним речення теж може бути правильним («we»)',
+    'хибна форма: має бути одним словом («naar de»)',
+    'хибна форма: це слово вже є в реченні («gaan»)',
+  ]);
+});
+
+test('a repeat fills the wrong forms of a sentence saved without them; other forms for a filled one are ignored', () => {
+  const context = createFixture();
+  addFixtureSentences(context, [GAAN]);
+  const filled = context.wordOrderService.addSentences([{ ...GAAN, wrong_forms: ['gaat', 'ga'] }], { source: 'mcp' });
+  assert.equal(filled.updated.length, 1);
+  assert.deepEqual(filled.updated[0].wrong_forms, ['gaat', 'ga']);
+  const same = context.wordOrderService.addSentences([{ ...GAAN, wrong_forms: ['ga', 'GAAT'] }], { source: 'mcp' });
+  assert.deepEqual([same.updated.length, same.skipped.length, same.warnings.length], [0, 1, 0]);
+  const other = context.wordOrderService.addSentences([{ ...GAAN, wrong_forms: ['ging'] }], { source: 'mcp' });
+  assert.equal(other.skipped.length, 1);
+  assert.match(other.warnings[0].reason, /хибні форми проігноровано/);
+  assert.deepEqual(context.wordOrderService.listSentences()[0].wrong_forms, ['gaat', 'ga']);
+});
+
+test('updateSentence sets and clears the wrong forms and refuses a bad one', () => {
+  const context = createFixture();
+  const [gaan] = addFixtureSentences(context, [GAAN]);
+  assert.deepEqual(context.wordOrderService.updateSentence({ id: gaan.id, wrong_forms: ['gaat'] }).wrong_forms, ['gaat']);
+  assert.throws(
+    () => context.wordOrderService.updateSentence({ id: gaan.id, wrong_forms: ['wij'] }),
+    error => error instanceof ValidationError && /«wij»/.test(error.message),
+  );
+  assert.deepEqual(context.wordOrderService.updateSentence({ id: gaan.id, uk: 'Завтра йдемо на ринок.' }).wrong_forms,
+    ['gaat']);
+  assert.deepEqual(context.wordOrderService.updateSentence({ id: gaan.id, wrong_forms: [] }).wrong_forms, []);
+});
+
+test('importMarkdown reads the Хибні форми column', () => {
+  const context = createFixture();
+  const result = context.wordOrderService.importMarkdown([
+    '| Українською | Nederlands | Правило | Хибні форми |',
+    '|---|---|---|---|',
+    `| ${GAAN.uk} | ${GAAN.nl} | inversion | gaat, ga, het |`,
+  ].join('\n'));
+  assert.deepEqual(result.added[0].wrong_forms, ['gaat', 'ga', 'het']);
+});
+
+test('generateSentences saves the wrong forms the model gives and drops a bad one with a warning', async () => {
+  const context = createFixture();
+  const service = createWordOrderService({
+    wordOrderRepository: createWordOrderRepository({ database: context.database }),
+    openRouterClient: {
+      isConfigured: true,
+      completeChat: async () => JSON.stringify({ sentences: [{ ...GAAN, wrong_forms: ['gaat', 'wij'] }] }),
+    },
+    runInTransaction: createTransactionRunner({ database: context.database }),
+    changeEventBus: { publishChange() {} },
+    clock: createCountingClock(),
+    random: mulberry32(WORD_ORDER_RANDOM_SEED),
+  });
+  const result = await service.generateSentences({ count: 5 });
+  assert.deepEqual(result.added[0].wrong_forms, ['gaat']);
+  assert.equal(result.warnings.length, 1);
+});
+
+test('REST and MCP: wrong_forms are saved, listed and changed; a bad one is a 400 or a tool error', async () => {
+  const response = await fetch(`${base}/api/word-order/sentences`, {
+    method: 'POST',
+    headers: { ...BEARER, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sentences: [{ nl: 'Wij lopen naar het park.', uk: 'Ми йдемо до парку.', rule: 'v2',
+      wrong_forms: ['loopt', 'de'] }] }),
+  });
+  assert.equal(response.status, 201);
+  const { id } = (await response.json()).added[0];
+  const refused = await fetch(`${base}/api/word-order/sentences/${id}`, {
+    method: 'PATCH',
+    headers: { ...BEARER, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wrong_forms: ['lopen'] }),
+  });
+  assert.equal(refused.status, 400);
+
+  const client = await connectMcp();
+  const tools = (await client.listTools()).tools;
+  assert.match(tools.find(tool => tool.name === 'add_sentences').description, /wrong_forms/);
+  const listed = await callJson(client, 'list_sentences', { limit: 500 });
+  assert.deepEqual(listed.find(sentence => sentence.id === id).wrong_forms, ['loopt', 'de']);
+  const updated = await callJson(client, 'update_sentence', { id, wrong_forms: ['liep'] });
+  assert.deepEqual(updated.wrong_forms, ['liep']);
+  const bad = await client.callTool({ name: 'update_sentence', arguments: { id, wrong_forms: ['wij'] } });
+  assert.equal(bad.isError, true);
 });

@@ -4,6 +4,7 @@ import * as api from './api.js';
 import {
   advanceDrillQueue,
   buildAlsoOrderLines,
+  formatWrongFormsLine,
   buildWordOrderCheckView,
   chooseFirstPileFocus,
   formatExpectedFormLabel,
@@ -2070,6 +2071,13 @@ function renderWordOrderSentences() {
       also.className = 'muted word-order__also';
       also.textContent = line;
       main.append(also);
+    }
+    const wrongFormsLine = formatWrongFormsLine(sentence.wrong_forms);
+    if (wrongFormsLine) {
+      const forms = document.createElement('div');
+      forms.className = 'muted word-order__also';
+      forms.textContent = wrongFormsLine;
+      main.append(forms);
     }
     const stats = document.createElement('span');
     stats.className = 'muted';

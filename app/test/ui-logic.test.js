@@ -53,6 +53,7 @@ import {
   formatWordOrderSummary,
   buildWordOrderCheckView,
   buildAlsoOrderLines,
+  formatWrongFormsLine,
   formatExpectedFormLabel,
   formatSentenceStats,
   formatImportResult,
@@ -848,6 +849,13 @@ test('formatExpectedFormLabel: the rule the sentence expects, nothing for a sent
   assert.equal(formatExpectedFormLabel('v2'), 'Форма: Дієслово на 2-му місці');
   assert.equal(formatExpectedFormLabel(null), '');
   assert.equal(formatExpectedFormLabel(undefined), '');
+});
+
+test('formatWrongFormsLine: the forms joined by commas, null when there are none', () => {
+  assert.equal(formatWrongFormsLine(['gaat', ' ga ', 'het']), 'хибні форми: gaat, ga, het');
+  assert.equal(formatWrongFormsLine([]), null);
+  assert.equal(formatWrongFormsLine(['  ']), null);
+  assert.equal(formatWrongFormsLine(undefined), null);
 });
 
 test('buildAlsoOrderLines: one muted «також» line per alternative, none for an empty list', () => {

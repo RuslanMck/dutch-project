@@ -304,3 +304,24 @@ subordinate clause before or after the main clause). A sentence therefore has a 
   set; a duplicate of the canonical order rejected; an alternative that breaks the schema's segments rejected.
 - Migration: existing sentences have `alt_orders = '[]'` and `order_count` 1.
 - Page logic: label from order_count; feedback lines for the three cases.
+
+## 10. Wrong forms (the extra tiles)
+
+The extra tiles were random dictionary words, unrelated to the sentence and easy to rule out. Now each sentence can
+carry `wrong_forms`: single words that look like a word of the sentence but are wrong in it (`gaat`, `ga` for `gaan`,
+`mooie` for `mooi`, `het` for a de-word). They are written with the sentence (Claude Project, the `.md` column
+«Хибні форми», `generate_sentences`), like the schema and the alternative orders.
+
+- Storage: migration `013-add-wrong-forms.sql`, `order_sentences.wrong_forms` (JSON array of strings, `'[]'` = none).
+- Validation (`normalizeWrongForms`): one word of letters (2+), not a word of the sentence (case ignored), not a twin
+  of a sentence word (`WRONG_FORM_TWIN_GROUPS`: je/jij/jou/jouw/u, ze/zij, we/wij, me/mij, de/een, het/een, deze/die,
+  dit/dat, er/daar/hier, ook/nog/al: the sentence could be right with it), no repeat, at most 5. de/het and niet/geen
+  are not twins: `het` next to a de-word is a real wrong form. Grammar itself cannot be checked; the authoring rules
+  say every wrong form must make the sentence wrong wherever it goes.
+- Authoring: a bad wrong form is dropped with a warning and the sentence is still added (add_sentences, import,
+  generation). A repeat whose stored sentence has none gets the given ones (updated); different ones for a sentence
+  that has some are ignored with a warning. `update_sentence` / PATCH take `wrong_forms` strictly (a bad one is an
+  error, `[]` clears them).
+- The set: 2 or 3 extra tiles as before. The wrong forms come first (random order); random vocabulary words fill the
+  rest when there are fewer. The set never says which tiles are extra.
+- Page: the sentences list shows a muted «хибні форми: gaat, ga» line.

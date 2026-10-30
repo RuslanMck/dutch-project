@@ -57,6 +57,13 @@ const DIFFERENT_WORDS_REASON = 'інші слова, ніж у реченні';
 const ALREADY_LISTED_REASON = 'такий порядок уже є';
 const SCHEMA_MISMATCH_ORDER_REASON = 'не збігається зі схемою';
 const TOO_MANY_ORDERS_REASON = 'забагато порядків';
+const MAXIMUM_WRONG_FORMS = 5;
+const WRONG_FORMS_NOT_LIST_REASON = 'має бути списком слів';
+const NOT_ONE_WORD_REASON = 'має бути одним словом';
+const IN_SENTENCE_REASON = 'це слово вже є в реченні';
+const TWIN_REASON = 'з ним речення теж може бути правильним';
+const ALREADY_LISTED_FORM_REASON = 'таке слово вже є';
+const TOO_MANY_FORMS_REASON = 'забагато хибних форм';
 // Words that are interchangeable in a sentence: a distractor is never taken from a group that shares a word with the
 // sentence, so the learner could not tell which tile was meant.
 const INTERCHANGEABLE_WORD_GROUPS = Object.freeze([
@@ -68,6 +75,22 @@ const INTERCHANGEABLE_WORD_GROUPS = Object.freeze([
   ['niet', 'geen'],
   ['de', 'het', 'een'],
   ['dit', 'dat', 'deze', 'die'],
+  ['er', 'daar', 'hier'],
+  ['ook', 'nog', 'al'],
+].map(group => Object.freeze(group)));
+
+// Words that can stand for each other in a sentence. A wrong form from a group that shares a word with the sentence is
+// refused, since the sentence could then be right with it too ("wij" for "we", "een" for "het"). Unlike the distractor
+// groups above, de / het and niet / geen are not twins: "het" next to a de-word is a real wrong form.
+const WRONG_FORM_TWIN_GROUPS = Object.freeze([
+  ['je', 'jij', 'jou', 'jouw', 'u'],
+  ['ze', 'zij'],
+  ['we', 'wij'],
+  ['me', 'mij'],
+  ['de', 'een'],
+  ['het', 'een'],
+  ['deze', 'die'],
+  ['dit', 'dat'],
   ['er', 'daar', 'hier'],
   ['ook', 'nog', 'al'],
 ].map(group => Object.freeze(group)));
@@ -168,12 +191,16 @@ export function validateSentence({ nl, uk } = {}) {
   return null;
 }
 
-// Two or three words from the vocabulary that are not in the sentence (three when the first random number is below
-// one half). Returns fewer when the vocabulary has too few candidates.
-export function pickDistractors({ sentenceTiles, vocabulary, random = Math.random }) {
+// Two or three extra tiles (three when the first random number is below one half). The sentence's wrong forms come
+// first, in a random order; random vocabulary words that are not in the sentence fill the rest. Returns fewer when there
+// are too few candidates.
+export function pickDistractors({ sentenceTiles, vocabulary, wrongForms = [], random = Math.random }) {
   const distractorCount = random() < 0.5 ? DISTRACTOR_COUNT_WITH_EXTRA : DISTRACTOR_COUNT_WITHOUT_EXTRA;
+  const pickedForms = shuffleOnce(removeCaseInsensitiveRepeats(wrongForms), random).slice(0, distractorCount);
+  if (pickedForms.length === distractorCount) return pickedForms;
   const sentenceTileKeys = new Set(sentenceTiles.map(normalizeTileForComparison));
   const excludedKeys = interchangeableWordKeys(sentenceTileKeys);
+  for (const form of pickedForms) excludedKeys.add(normalizeTileForComparison(form));
   const candidates = vocabulary
     .map(word => (typeof word === 'string' ? word.trim() : ''))
     .filter(isDistractorCandidate)
@@ -181,7 +208,54 @@ export function pickDistractors({ sentenceTiles, vocabulary, random = Math.rando
       const key = normalizeTileForComparison(word);
       return !sentenceTileKeys.has(key) && !excludedKeys.has(key);
     });
-  return shuffleOnce(removeCaseInsensitiveRepeats(candidates), random).slice(0, distractorCount);
+  const fillers = shuffleOnce(removeCaseInsensitiveRepeats(candidates), random);
+  return [...pickedForms, ...fillers.slice(0, distractorCount - pickedForms.length)];
+}
+
+// Reads a sentence's wrong forms as they were written: single words that look like a word of the sentence but are
+// wrong in it ("gaat" for "gaan", "mooie" for "mooi"). A single string is one form. Returns
+// { wrongForms: [string], rejected: [{ form, reason }] }: a form is kept (trimmed, as written) when it is one word of
+// letters, is not a word of the sentence (case ignored), is not a twin of a sentence word (WRONG_FORM_TWIN_GROUPS), was
+// not listed before, and fewer than MAXIMUM_WRONG_FORMS are kept already. null or undefined is no forms; anything else
+// that is not a list is rejected as a whole.
+export function normalizeWrongForms({ nl, wrongForms } = {}) {
+  if (wrongForms === undefined || wrongForms === null) {
+    return Object.freeze({ wrongForms: Object.freeze([]), rejected: Object.freeze([]) });
+  }
+  const list = typeof wrongForms === 'string' ? [wrongForms] : wrongForms;
+  if (!Array.isArray(list)) {
+    return Object.freeze({
+      wrongForms: Object.freeze([]),
+      rejected: Object.freeze([Object.freeze({ form: '', reason: WRONG_FORMS_NOT_LIST_REASON })]),
+    });
+  }
+  const sentenceKeys = new Set(splitIntoTiles(nl).map(normalizeTileForComparison));
+  const twinKeys = wrongFormTwinKeys(sentenceKeys);
+  const kept = [];
+  const listedKeys = new Set();
+  const rejected = [];
+  for (const value of list) {
+    const form = typeof value === 'string' ? stripEdgePunctuation(value.trim()) : '';
+    const key = normalizeTileForComparison(form);
+    let reason = null;
+    if (!isDistractorCandidate(form)) reason = NOT_ONE_WORD_REASON;
+    else if (sentenceKeys.has(key)) reason = IN_SENTENCE_REASON;
+    else if (twinKeys.has(key)) reason = TWIN_REASON;
+    else if (listedKeys.has(key)) reason = ALREADY_LISTED_FORM_REASON;
+    else if (kept.length >= MAXIMUM_WRONG_FORMS) reason = TOO_MANY_FORMS_REASON;
+    if (reason !== null) {
+      rejected.push(Object.freeze({ form: typeof value === 'string' ? value.trim() : '', reason }));
+      continue;
+    }
+    listedKeys.add(key);
+    kept.push(form);
+  }
+  return Object.freeze({ wrongForms: Object.freeze(kept), rejected: Object.freeze(rejected) });
+}
+
+// The stored wrong forms: JSON text of a list of strings, read the same way as the alternative orders.
+export function parseStoredWrongForms(storedText) {
+  return parseStoredAltOrders(storedText);
 }
 
 // A new array in a random order. When the order comes out unchanged (with two or more distinct tiles), shuffles again,
@@ -206,6 +280,15 @@ function interchangeableWordKeys(sentenceTileKeys) {
     if (group.some(word => sentenceTileKeys.has(word))) group.forEach(word => excludedKeys.add(word));
   }
   return excludedKeys;
+}
+
+// Every word of each twin group that has a word in the sentence.
+function wrongFormTwinKeys(sentenceKeys) {
+  const twinKeys = new Set();
+  for (const group of WRONG_FORM_TWIN_GROUPS) {
+    if (group.some(word => sentenceKeys.has(word))) group.forEach(word => twinKeys.add(word));
+  }
+  return twinKeys;
 }
 
 // True when both lists hold the same words with the same counts, compared lower-case with apostrophes normalised.

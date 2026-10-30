@@ -1,5 +1,5 @@
 // Reads the sentence table of a Markdown file (the format of docs/SENTENCE_GENERATION_PROMPT.md): the Dutch and
-// Ukrainian columns and the optional rule, schema and other-orders columns. Pure: text in, sentences, row errors and
+// Ukrainian columns and the optional rule, schema, other-orders and wrong-forms columns. Pure: text in, sentences, row errors and
 // warnings out.
 import { normalizeRule } from './word-order-tiles.js';
 
@@ -8,6 +8,9 @@ const UKRAINIAN_HEADER = 'українською';
 const RULE_HEADER = 'правило';
 const SCHEMA_HEADER = 'схема';
 const ALTERNATIVE_ORDERS_HEADER = 'інші порядки';
+const WRONG_FORMS_HEADER = 'хибні форми';
+// The wrong forms of a cell are separated by a semicolon or a comma (spaces around it optional).
+const WRONG_FORM_SEPARATOR_PATTERN = /\s*[;,]\s*/;
 // The other orders of a cell are separated by a semicolon (spaces around it optional). A cell that holds only dashes
 // (— – -), немає or none means no other orders.
 const ALTERNATIVE_ORDER_SEPARATOR_PATTERN = /\s*;\s*/;
@@ -21,9 +24,10 @@ const MISSING_TABLE_ERROR = 'не знайдено таблицю з колон�
 const SEPARATOR_CELL_PATTERN = /^:?-+:?$/;
 const SURROUNDING_MARKUP_PATTERN = /^[\s`*_]+|[\s`*_]+$/g;
 
-// Returns { sentences: [{ nl, uk, rule, structure, alt_orders, row }], errors: [string], warnings: [{ nl, reason }] }.
+// Returns { sentences: [{ nl, uk, rule, structure, alt_orders, wrong_forms, row }], errors: [string], warnings: [{ nl, reason }] }.
 // structure is an array of { text, role } or null; a schema cell that does not read as segments gives a warning and no
-// structure. alt_orders is the list of the other orders as written ([] when the cell is empty). row is the number of
+// structure. alt_orders is the list of the other orders as written ([] when the cell is empty), wrong_forms the list
+// of the wrong forms (the same). row is the number of
 // the data row (from 1), so the service can name it in a refusal.
 export function parseSentenceMarkdown(markdownText) {
   const lines = String(markdownText ?? '').split(/\r?\n/);
@@ -56,6 +60,9 @@ export function parseSentenceMarkdown(markdownText) {
       alt_orders: parseAlternativeOrdersText(table.columns.altOrdersIndex === -1
         ? ''
         : cells[table.columns.altOrdersIndex] ?? ''),
+      wrong_forms: parseWrongFormsText(table.columns.wrongFormsIndex === -1
+        ? ''
+        : cells[table.columns.wrongFormsIndex] ?? ''),
       row: rowIndex + 1,
     }));
   });
@@ -94,6 +101,14 @@ export function parseAlternativeOrdersText(cellText) {
   return body.split(ALTERNATIVE_ORDER_SEPARATOR_PATTERN).map(order => order.trim()).filter(order => order !== '');
 }
 
+// The wrong forms of a cell: separated by ';' or ',', an empty cell (or one of the no-order values above) = none. Each is
+// kept as written; the service checks them.
+export function parseWrongFormsText(cellText) {
+  const body = String(cellText ?? '').trim();
+  if (body === '' || NO_ALTERNATIVE_ORDERS_PATTERN.test(body.toLowerCase())) return [];
+  return body.split(WRONG_FORM_SEPARATOR_PATTERN).map(form => form.trim()).filter(form => form !== '');
+}
+
 // The first table whose header has both the Dutch and the Ukrainian column.
 function findSentenceTable(lines) {
   for (let lineIndex = 0; lineIndex + 1 < lines.length; lineIndex++) {
@@ -123,6 +138,7 @@ function findColumns(headerCells) {
     ruleIndex: lowerCaseHeaders.indexOf(RULE_HEADER),
     schemaIndex: lowerCaseHeaders.indexOf(SCHEMA_HEADER),
     altOrdersIndex: lowerCaseHeaders.indexOf(ALTERNATIVE_ORDERS_HEADER),
+    wrongFormsIndex: lowerCaseHeaders.indexOf(WRONG_FORMS_HEADER),
   });
 }
 

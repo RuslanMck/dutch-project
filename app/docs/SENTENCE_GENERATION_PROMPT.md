@@ -36,6 +36,12 @@ in the right order).
   and the blocks may come in another order. A clause that moves can be several segments, as long as each of them stays
   whole (`Omdat ik dorst heb, neem ik een drankje.` fits `omdat + ik + dorst + heb + neem + ik + een drankje`). An
   order that only differs in capitals or punctuation is not another order. At most 5 other orders.
+- Wrong forms: each sentence gets 2 or 3 wrong forms (at most 5) for the `Хибні форми` column. They are shown as extra
+  tiles, so they must look tempting: single words that look like a word of the sentence but are wrong in it. Use the
+  verb in another person or tense (`gaat`, `ga` or `ging` for `gaan`), an adjective with or without -e (`mooie` for
+  `mooi`), singular or plural (`huizen` for `huis`), `het` for a de-word or `de` for a het-word. Each must make the
+  sentence wrong wherever it is put: never a word that could stand in a correct sentence (not `wij` for `we`, not `een`
+  for `het`, not a synonym), and never a word of the sentence itself.
 - No quotes, numbers or names. No commas in the sentence itself; an other order may have the comma after a fronted
   clause. End with `.` or `?`.
 - The Ukrainian is a natural translation, not word by word. Use the informal «ти» unless the sentence is clearly polite.
@@ -67,23 +73,25 @@ A `.md` file named `sentences-YYYY-MM-DD.md` with exactly this table (the app re
 ```markdown
 # Порядок слів — YYYY-MM-DD
 
-| # | Українською | Nederlands | Правило | Схема | Інші порядки |
-|---|---|---|---|---|---|
-| 1 | Завтра ми йдемо на ринок. | Morgen gaan we naar de markt. | inversion | Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце) | We gaan morgen naar de markt. |
-| 2 | Я п'ю каву. | Ik drink koffie. | v2 | Ik (підмет) + drink (дієслово) + koffie (додаток) |  |
+| # | Українською | Nederlands | Правило | Схема | Інші порядки | Хибні форми |
+|---|---|---|---|---|---|---|
+| 1 | Завтра ми йдемо на ринок. | Morgen gaan we naar de markt. | inversion | Morgen (час) + gaan (дієслово) + we (підмет) + naar de markt (місце) | We gaan morgen naar de markt. | gaat; ga; het |
+| 2 | Я п'ю каву. | Ik drink koffie. | v2 | Ik (підмет) + drink (дієслово) + koffie (додаток) |  | drinkt; drinken |
 ```
 
 The `Правило` column is one of: `v2`, `inversion`, `question`, `modal`, `separable`, `negation`, `subordinate`,
 `perfect`. The `Схема` column is the schema in the form above. The `Інші порядки` column holds the other natural orders
-of the sentence separated by `;` (spaces around it optional), or stays empty (or `—`) when there is only one order.
+of the sentence separated by `;` (spaces around it optional), or stays empty (or `—`) when there is only one order. The
+`Хибні форми` column holds the wrong forms separated by `;`.
 
 Then ask me: «Зберегти ці речення в додаток?». When I say yes, call `add_sentences` with all of them: for each sentence
-`nl`, `uk`, `rule`, `structure` and `alt_orders`, the schema as an array of `{ text, role }` objects in order, for example
+`nl`, `uk`, `rule`, `structure`, `alt_orders` and `wrong_forms`, the schema as an array of `{ text, role }` objects in order, for example
 `[{"text":"Morgen","role":"час"},{"text":"gaan","role":"дієслово"},{"text":"we","role":"підмет"},{"text":"naar de markt","role":"місце"}]`,
 and `alt_orders` as an array of strings: the `Інші порядки` cell split on `;` (`[]` when the cell is empty), for example
-`["We gaan morgen naar de markt."]`.
+`["We gaan morgen naar de markt."]`, and `wrong_forms` as an array of strings from the `Хибні форми` cell, for example
+`["gaat", "ga", "het"]`.
 Tell me how many were added, how many were skipped as duplicates, and any warning (a schema that does not match its sentence is
-dropped and the sentence is still added). A sentence with an other order that does not match (other words, a duplicate, or
+dropped and the sentence is still added; so is a bad wrong form). A sentence with an other order that does not match (other words, a duplicate, or
 a broken schema) is skipped with the reason: fix that order and add it again.
 
 **Schemas for sentences saved earlier**

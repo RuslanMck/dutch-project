@@ -18,8 +18,10 @@ import {
   normalizeRuleNames,
   normalizeSentenceKey,
   normalizeStructure,
+  normalizeWrongForms,
   parseStoredAltOrders,
   parseStoredStructure,
+  parseStoredWrongForms,
   pickDistractors,
   shuffleTiles,
   splitIntoTiles,
@@ -35,6 +37,8 @@ const DUPLICATE_REASON = 'вже є';
 const STRUCTURE_MISMATCH_REASON = 'схема не збігається з реченням';
 const IGNORED_ALTERNATIVES_REASON = 'інші порядки проігноровано, бо вони вже збережені; '
   + 'змінити їх можна через update_sentence';
+const IGNORED_WRONG_FORMS_REASON = 'хибні форми проігноровано, бо вони вже збережені; '
+  + 'змінити їх можна через update_sentence';
 const GENERATED_SOURCE = 'openrouter';
 const NOT_CONFIGURED_MESSAGE = 'OpenRouter не налаштовано';
 
@@ -46,7 +50,7 @@ export function createWordOrderService({
   clock,
   random = Math.random,
 }) {
-  // sentenceInputs: [{ nl, uk, rule?, structure?, alt_orders?, row? }]. Returns { added, updated,
+  // sentenceInputs: [{ nl, uk, rule?, structure?, alt_orders?, wrong_forms?, row? }]. Returns { added, updated,
   // skipped: [{ nl, reason }], warnings: [{ nl, reason }] }. A structure that does not read as a schema of the sentence is
   // dropped with a warning; the sentence is still added. A single string alt_orders is one alternative. A new sentence
   // whose alternative orders are not all valid is skipped (its first rejected order is the reason; row, when the input
@@ -56,6 +60,9 @@ export function createWordOrderService({
   // alternative); or its stored alternatives are empty and this input's are usable. A filled repeat is listed in
   // updated. Alternatives that differ from the stored non-empty ones are ignored, with a warning. A sentence added
   // earlier in this same call stays in added only, in its latest state.
+  // wrong_forms (single words, the sentence's extra tiles) never skip a sentence: a bad one is dropped with a warning.
+  // A repeat with no stored wrong forms gets this input's (updated); ones that differ from stored ones are ignored with
+  // a warning.
   function addSentences(sentenceInputs, { source }) {
     const addedIds = [];
     const updatedIds = [];
@@ -74,6 +81,8 @@ export function createWordOrderService({
         const hasBadStructure = sentenceInput.structure !== undefined && sentenceInput.structure !== null
           && structure === null;
         const rule = normalizeRule(sentenceInput.rule);
+        const wrongForms = normalizeWrongForms({ nl, wrongForms: sentenceInput.wrong_forms });
+        addRejectedFormWarnings(warnings, { nl, wrongForms, row: sentenceInput.row });
         const nlKey = normalizeSentenceKey(nl);
         const storedSentence = wordOrderRepository.findSentenceByNlKey(nlKey);
         if (storedSentence) {
@@ -104,13 +113,20 @@ export function createWordOrderService({
             warnings.push({ nl, reason: withRow(IGNORED_ALTERNATIVES_REASON, sentenceInput.row) });
           }
           if (hasBadStructure) warnings.push({ nl, reason: STRUCTURE_MISMATCH_REASON });
-          if (fillsStructure || fillsAltOrders) {
+          const storedWrongForms = parseStoredWrongForms(storedSentence.wrong_forms);
+          const fillsWrongForms = storedWrongForms.length === 0 && wrongForms.wrongForms.length > 0;
+          if (storedWrongForms.length > 0 && wrongForms.wrongForms.length > 0
+            && !sameWords(storedWrongForms, wrongForms.wrongForms)) {
+            warnings.push({ nl, reason: withRow(IGNORED_WRONG_FORMS_REASON, sentenceInput.row) });
+          }
+          if (fillsStructure || fillsAltOrders || fillsWrongForms) {
             wordOrderRepository.updateSentence({
               sentenceId: storedSentence.id,
               uk: storedSentence.uk,
               rule: fillsStructure ? (storedSentence.rule ?? rule) : storedSentence.rule,
               structure: fillsStructure ? structureText(structure) : storedSentence.structure,
               altOrders: fillsAltOrders ? JSON.stringify(fillableAltOrders) : storedSentence.alt_orders,
+              wrongForms: fillsWrongForms ? JSON.stringify(wrongForms.wrongForms) : storedSentence.wrong_forms,
             });
             if (!addedIds.includes(storedSentence.id) && !updatedIds.includes(storedSentence.id)) {
               updatedIds.push(storedSentence.id);
@@ -137,6 +153,7 @@ export function createWordOrderService({
           addedAt: clock.now(),
           structure: structureText(structure),
           altOrders: JSON.stringify(keptAltOrders),
+          wrongForms: JSON.stringify(wrongForms.wrongForms),
         });
         addedIds.push(sentenceId);
       }
@@ -186,10 +203,11 @@ export function createWordOrderService({
   }
 
   // Changes what is given: uk (text), rule (a rule name, or null to clear it), structure (segments, or null to clear
-  // it) and alt_orders (the alternative orders, [] to clear them). Undefined leaves a field as it is. Unlike addSentences
+  // it), alt_orders (the alternative orders, [] to clear them) and wrong_forms (the wrong forms, [] to clear them).
+  // Undefined leaves a field as it is. Unlike addSentences
   // this refuses a bad value (ValidationError). The alternatives are checked against the sentence's schema after the
   // update, so a schema change re-checks the stored alternatives too.
-  function updateSentence({ id, uk, rule, structure, alt_orders: altOrders } = {}) {
+  function updateSentence({ id, uk, rule, structure, alt_orders: altOrders, wrong_forms: wrongForms } = {}) {
     runInTransaction(() => {
       const sentence = wordOrderRepository.findSentenceById(id);
       if (!sentence) throw new NotFoundError(`sentence ${id} not found`);
@@ -208,12 +226,16 @@ export function createWordOrderService({
           structure: nextSegments,
         });
       }
+      const nextWrongForms = wrongForms === undefined
+        ? parseStoredWrongForms(sentence.wrong_forms)
+        : strictWrongForms({ nl: sentence.nl, wrongForms });
       wordOrderRepository.updateSentence({
         sentenceId: id,
         uk: nextUk,
         rule: nextRule,
         structure: nextStructure,
         altOrders: JSON.stringify(nextAltOrders),
+        wrongForms: JSON.stringify(nextWrongForms),
       });
     });
     changeEventBus.publishChange(CHANGE_COLLECTION);
@@ -231,7 +253,8 @@ export function createWordOrderService({
   }
 
   // The next sentences to practise, each with its shuffled tiles and order_count (how many orders are accepted). The
-  // Dutch text, the schema and the orders themselves are not sent.
+  // extra tiles are the sentence's wrong forms, topped up with random vocabulary words. The Dutch text, the schema, the
+  // orders and which tiles are extra are not sent.
   // rules: an array of rule names ('none' = no rule) keeps only sentences whose rule is in it. Unknown names are
   // dropped; when no valid name is left (missing, empty or unknown only), every sentence is kept. total counts the
   // sentences that match, rule_counts all of them.
@@ -241,7 +264,8 @@ export function createWordOrderService({
     const vocabulary = wordOrderRepository.listVocabulary().map(word => word.nl);
     const sentences = wordOrderRepository.listSentencesForSet({ limit: size, rules: ruleFilter }).map(sentence => {
       const sentenceTiles = splitIntoTiles(sentence.nl);
-      const distractors = pickDistractors({ sentenceTiles, vocabulary, random });
+      const wrongForms = parseStoredWrongForms(sentence.wrong_forms);
+      const distractors = pickDistractors({ sentenceTiles, vocabulary, wrongForms, random });
       return {
         id: sentence.id,
         uk: sentence.uk,
@@ -299,16 +323,39 @@ export function createWordOrderService({
   });
 }
 
-// A stored row with its schema read back as an array (or null), its alternative orders as an array of strings and
-// order_count (1 + the alternatives).
+// A stored row with its schema read back as an array (or null), its alternative orders and wrong forms as arrays of
+// strings and order_count (1 + the alternatives).
 function presentSentence(sentence) {
   const altOrders = parseStoredAltOrders(sentence.alt_orders);
   return {
     ...sentence,
     structure: parseStoredStructure(sentence.structure),
     alt_orders: altOrders,
+    wrong_forms: parseStoredWrongForms(sentence.wrong_forms),
     order_count: 1 + altOrders.length,
   };
+}
+
+// Why a wrong form is refused: the reason and, when there is one, the form.
+function wrongFormReason({ form, reason }) {
+  return form === '' ? `хибна форма: ${reason}` : `хибна форма: ${reason} («${form}»)`;
+}
+
+function addRejectedFormWarnings(warnings, { nl, wrongForms, row }) {
+  for (const rejected of wrongForms.rejected) warnings.push({ nl, reason: withRow(wrongFormReason(rejected), row) });
+}
+
+// True when both lists hold the same words, case and list order ignored.
+function sameWords(firstWords, secondWords) {
+  const keysOf = words => words.map(word => word.toLowerCase()).sort().join('\n');
+  return keysOf(firstWords) === keysOf(secondWords);
+}
+
+// The wrong forms as they are stored, or the first rejected one as the error (the whole change is refused).
+function strictWrongForms({ nl, wrongForms }) {
+  const normalized = normalizeWrongForms({ nl, wrongForms });
+  if (normalized.rejected.length > 0) throw new ValidationError(wrongFormReason(normalized.rejected[0]));
+  return normalized.wrongForms;
 }
 
 // Why an alternative order is refused, as the authoring reports it: the reason and, when there is one, the order.

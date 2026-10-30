@@ -18,6 +18,7 @@ Numbered SQL files that build the SQLite schema. The runner applies them in name
 | `010-add-sentence-structure.sql` | `order_sentences.structure`: the sentence's schema as a JSON array of `{ text, role }` segments (NULL = no schema yet). |
 | `011-add-alternative-word-orders.sql` | `order_sentences.alt_orders`: the other natural word orders of a sentence as a JSON array of strings (`'[]'` = only the canonical order). |
 | `012-add-custom-decks.sql` | Custom decks: `custom_decks` (unique name ignoring case) and `custom_deck_words`, the words of each deck in the order added (cascade on delete of a deck or a word). |
+| `013-add-wrong-forms.sql` | `order_sentences.wrong_forms`: wrong forms of the sentence's words (single words, JSON array of strings) used as its extra tiles (`'[]'` = random extra words). |
 
 ## Conventions
 

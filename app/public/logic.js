@@ -740,6 +740,13 @@ export function buildAlsoOrderLines(altOrders) {
   return altOrders.filter(order => typeof order === 'string' && order.trim()).map(order => `також: ${order}`);
 }
 
+// The muted «хибні форми: gaat, ga» line under a sentence in the list, or null when it has none.
+export function formatWrongFormsLine(wrongForms) {
+  if (!Array.isArray(wrongForms)) return null;
+  const forms = wrongForms.filter(form => typeof form === 'string' && form.trim()).map(form => form.trim());
+  return forms.length ? `хибні форми: ${forms.join(', ')}` : null;
+}
+
 // "✓ 3 / 4" for a sentence answered four times, three of them right; "ще не відповідали" before the first answer.
 export function formatSentenceStats({ times_answered: answered = 0, times_correct: correct = 0 }) {
   if (!answered) return 'ще не відповідали';

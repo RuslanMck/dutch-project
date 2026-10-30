@@ -7,6 +7,11 @@ import { identifierParameterSchema, identifierSchema } from './shared-contracts.
 const MAXIMUM_SENTENCE_LENGTH = 1000;
 const MAXIMUM_TILE_LENGTH = 100;
 const MAXIMUM_ALTERNATIVE_ORDERS = 5;
+const MAXIMUM_WRONG_FORMS = 5;
+const WRONG_FORMS_DESCRIPTION = 'single words that look like a word of the sentence but are wrong in it, shown as '
+  + 'extra tiles: another form of a sentence word (verb person or tense, adjective with or without -e, singular or '
+  + 'plural, het for a de-word or de for a het-word). Each must make the sentence wrong wherever it goes: never a '
+  + 'word that could replace one in a correct sentence (wij for we, een for het). Not a word of the sentence; at most 5';
 
 export const wordOrderPathParametersSchema = z.object({ id: identifierParameterSchema });
 
@@ -31,6 +36,9 @@ export const sentenceInputSchema = z.object({
     + 'strings. Each uses exactly the same words and the same schema segments (the segments may come in another order); not the '
     + 'same order with other capitals or punctuation. Example: nl "Ik neem een drankje omdat ik dorst heb." with '
     + 'alt_orders ["Omdat ik dorst heb, neem ik een drankje."]. Leave it out when there is only one order.'),
+  // Any value is accepted: a bad wrong form is dropped with a warning, never a failed call.
+  wrong_forms: z.unknown().optional().describe(`optional, recommended: ${WRONG_FORMS_DESCRIPTION}. Example: nl "Wij gaan `
+    + 'morgen naar de markt." with wrong_forms ["gaat", "ga", "het"]. Without them the extra tiles are random words.'),
 });
 
 export const addSentencesInputSchema = z.object({
@@ -48,6 +56,8 @@ export const updateSentenceInputSchema = z.object({
   alt_orders: z.array(z.string().max(MAXIMUM_SENTENCE_LENGTH)).max(MAXIMUM_ALTERNATIVE_ORDERS).optional()
     .describe('the other natural word orders (strings, at most 5), with the same words and schema segments as the '
       + 'sentence; [] clears them. Checked against the sentence and its schema, a bad one is an error.'),
+  wrong_forms: z.array(z.string().max(MAXIMUM_TILE_LENGTH)).max(MAXIMUM_WRONG_FORMS).optional()
+    .describe(`the wrong forms: ${WRONG_FORMS_DESCRIPTION}; [] clears them. A bad one is an error.`),
 });
 
 export const updateSentenceToolInputSchema = updateSentenceInputSchema.extend({

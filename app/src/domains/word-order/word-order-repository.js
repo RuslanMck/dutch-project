@@ -12,23 +12,24 @@ const RULE_FILTER_SQL = "(@isAllRules = 1 OR COALESCE(rule, 'none') IN (SELECT v
 
 export function createWordOrderRepository({ database }) {
   const insertSentenceStatement = database.prepare(`
-    INSERT INTO order_sentences (nl, uk, rule, source, nl_key, added_at, structure, alt_orders)
-    VALUES (@nl, @uk, @rule, @source, @nlKey, @addedAt, @structure, @altOrders)
+    INSERT INTO order_sentences (nl, uk, rule, source, nl_key, added_at, structure, alt_orders, wrong_forms)
+    VALUES (@nl, @uk, @rule, @source, @nlKey, @addedAt, @structure, @altOrders, @wrongForms)
     ON CONFLICT(nl_key) DO NOTHING
   `);
   const selectSentenceByIdStatement = database.prepare(`
-    SELECT id, nl, uk, rule, source, added_at, structure, alt_orders FROM order_sentences WHERE id = @sentenceId
+    SELECT id, nl, uk, rule, source, added_at, structure, alt_orders, wrong_forms FROM order_sentences WHERE id = @sentenceId
   `);
   const selectSentenceByNlKeyStatement = database.prepare(`
-    SELECT id, nl, uk, rule, source, added_at, structure, alt_orders FROM order_sentences WHERE nl_key = @nlKey
+    SELECT id, nl, uk, rule, source, added_at, structure, alt_orders, wrong_forms FROM order_sentences WHERE nl_key = @nlKey
   `);
   const updateSentenceStatement = database.prepare(`
-    UPDATE order_sentences SET uk = @uk, rule = @rule, structure = @structure, alt_orders = @altOrders
+    UPDATE order_sentences
+    SET uk = @uk, rule = @rule, structure = @structure, alt_orders = @altOrders, wrong_forms = @wrongForms
     WHERE id = @sentenceId
   `);
   const deleteSentenceStatement = database.prepare('DELETE FROM order_sentences WHERE id = @sentenceId');
   const selectSentencesNewestFirstStatement = database.prepare(`
-    SELECT s.id, s.nl, s.uk, s.rule, s.source, s.added_at, s.structure, s.alt_orders,
+    SELECT s.id, s.nl, s.uk, s.rule, s.source, s.added_at, s.structure, s.alt_orders, s.wrong_forms,
       COALESCE(totals.times_answered, 0) AS times_answered,
       COALESCE(totals.times_correct, 0) AS times_correct,
       totals.last_answered_at
@@ -46,7 +47,7 @@ export function createWordOrderRepository({ database }) {
   const selectSentencesForSetStatement = database.prepare(`
     ${LATEST_ANSWER_SQL},
     sentence_queue AS (
-      SELECT s.id, s.nl, s.uk, s.rule, s.alt_orders, s.added_at, latest.answered_at AS last_answered_at,
+      SELECT s.id, s.nl, s.uk, s.rule, s.alt_orders, s.wrong_forms, s.added_at, latest.answered_at AS last_answered_at,
         CASE
           WHEN latest.is_correct = 0 THEN 0
           WHEN latest.answered_at IS NULL THEN 1
@@ -55,7 +56,7 @@ export function createWordOrderRepository({ database }) {
       FROM order_sentences s
       LEFT JOIN latest_answers latest ON latest.sentence_id = s.id AND latest.recency = 1
     )
-    SELECT id, nl, uk, rule, alt_orders FROM sentence_queue
+    SELECT id, nl, uk, rule, alt_orders, wrong_forms FROM sentence_queue
     WHERE ${RULE_FILTER_SQL}
     ORDER BY queue_group,
       CASE queue_group
@@ -79,9 +80,12 @@ export function createWordOrderRepository({ database }) {
   `);
 
   // Returns the new sentence's id, or null when a sentence with the same nl_key is already stored.
-  // structure is the JSON text of the schema, or null; altOrders the JSON text of the alternative orders.
-  function insertSentence({ nl, uk, rule, source, nlKey, addedAt, structure, altOrders }) {
-    const insertResult = insertSentenceStatement.run({ nl, uk, rule, source, nlKey, addedAt, structure, altOrders });
+  // structure is the JSON text of the schema, or null; altOrders and wrongForms the JSON text of the alternative orders
+  // and of the wrong forms.
+  function insertSentence({ nl, uk, rule, source, nlKey, addedAt, structure, altOrders, wrongForms = '[]' }) {
+    const insertResult = insertSentenceStatement.run({
+      nl, uk, rule, source, nlKey, addedAt, structure, altOrders, wrongForms,
+    });
     return insertResult.changes === 0 ? null : Number(insertResult.lastInsertRowid);
   }
 
@@ -93,9 +97,9 @@ export function createWordOrderRepository({ database }) {
     return selectSentenceByNlKeyStatement.get({ nlKey }) ?? null;
   }
 
-  // uk, rule, structure (JSON text or null) and altOrders (JSON text) are written whole.
-  function updateSentence({ sentenceId, uk, rule, structure, altOrders }) {
-    updateSentenceStatement.run({ sentenceId, uk, rule, structure, altOrders });
+  // uk, rule, structure (JSON text or null), altOrders and wrongForms (JSON text) are written whole.
+  function updateSentence({ sentenceId, uk, rule, structure, altOrders, wrongForms }) {
+    updateSentenceStatement.run({ sentenceId, uk, rule, structure, altOrders, wrongForms });
   }
 
   function deleteSentence(sentenceId) {

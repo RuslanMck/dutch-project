@@ -33,20 +33,24 @@ export function registerWordOrderTools({ mcpServer, wordOrderService }) {
       + 'joined by spaces must be exactly the sentence words in order. Give alt_orders when another word order is also '
       + 'natural, e.g. nl "Ik neem een drankje omdat ik dorst heb." with alt_orders ["Omdat ik dorst heb, neem ik een '
       + 'drankje."]: a list of the other orders as strings, each with exactly the same words (case and punctuation may '
-      + 'differ) and the same schema segments, which may come in another order; no order twice; at most 5. Call '
+      + 'differ) and the same schema segments, which may come in another order; no order twice; at most 5. Give each '
+      + 'sentence 2 or 3 wrong_forms: single words that look like a word of the sentence but are wrong in it (another '
+      + 'verb person or tense, an adjective with or without -e, singular or plural, het for a de-word), shown as extra '
+      + 'tiles, e.g. ["gaat", "ga", "het"] for "Wij gaan morgen naar de markt."; never a word that could replace one in a '
+      + 'correct sentence (wij for we, een for het) or a word of the sentence. Call '
       + 'list_sentences first so nothing repeats. Show the sentences to the learner as a Markdown table (Українською, '
-      + 'Nederlands, Правило, Схема, Інші порядки) and save them only after the learner says yes. Repeats and invalid '
+      + 'Nederlands, Правило, Схема, Інші порядки, Хибні форми) and save them only after the learner says yes. Repeats and invalid '
       + 'sentences are skipped and listed in skipped (a bad alternative skips its sentence with the reason); a bad '
-      + 'structure is dropped with a warning; a repeat whose saved sentence has no structure gets this one (updated) when '
+      + 'structure or wrong form is dropped with a warning; a repeat whose saved sentence has no structure gets this one (updated) when '
       + 'its saved alternatives still fit it; a repeat\'s alt_orders are ignored (warning) when the saved sentence has some '
-      + '(update_sentence changes them).',
+      + '(update_sentence changes them); a repeat whose saved sentence has no wrong forms gets these (updated).',
     inputSchema: addSentencesInputSchema.shape,
   }, ({ sentences }) => wordOrderService.addSentences(sentences, { source: 'mcp' }));
 
   registerJsonTool(mcpServer, 'list_sentences', {
     title: 'List word-order sentences',
     description: 'Saved word-order sentences, newest first, with times_answered, times_correct, last_answered_at and '
-      + 'structure (null when none yet). Use it to avoid repeating a sentence, and to find sentences without a structure '
+      + 'structure (null when none yet), alt_orders and wrong_forms. Use it to avoid repeating a sentence, and to find sentences without a structure '
       + 'to give one with update_sentence.',
     inputSchema: listSentencesInputSchema.shape,
     annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -54,11 +58,12 @@ export function registerWordOrderTools({ mcpServer, wordOrderService }) {
 
   registerJsonTool(mcpServer, 'update_sentence', {
     title: 'Update word-order sentence',
-    description: 'Change one saved sentence by id: uk, rule, structure and/or alt_orders. Give only the fields to change; '
-      + 'null clears rule or structure, [] clears alt_orders. A structure must follow the add_sentences rules (segment '
+    description: 'Change one saved sentence by id: uk, rule, structure, alt_orders and/or wrong_forms. Give only the '
+      + 'fields to change; null clears rule or structure, [] clears alt_orders or wrong_forms. A structure must follow the add_sentences rules (segment '
       + 'texts joined by spaces = the Dutch words in order), and alt_orders must use the sentence\'s words and its schema '
       + 'segments, or the call fails; a new structure re-checks the saved alternatives. Use it to add a structure or '
-      + 'alternative orders to sentences saved earlier (list_sentences shows structure null, and alt_orders).',
+      + 'alternative orders or wrong forms to sentences saved earlier (list_sentences shows structure null, alt_orders '
+      + 'and wrong_forms). A bad wrong form fails the call.',
     inputSchema: updateSentenceToolInputSchema.shape,
   }, ({ id, ...changes }) => wordOrderService.updateSentence({ id, ...changes }));
 
@@ -75,7 +80,7 @@ export function registerWordOrderTools({ mcpServer, wordOrderService }) {
   registerJsonTool(mcpServer, 'get_word_order_set', {
     title: 'Get word-order set',
     description: 'The next set of up to 10 sentences to practise: each has id, uk (the Ukrainian to show), rule, tiles (the '
-      + 'shuffled Dutch words plus 2 or 3 extra words) and order_count (how many word orders are accepted, 1 when the '
+      + 'shuffled Dutch words plus 2 or 3 extra words: the sentence\'s wrong forms, topped up with random words) and order_count (how many word orders are accepted, 1 when the '
       + 'sentence has only one). The Dutch sentence, its structure and its orders are not returned. rules (optional) limits '
       + 'the set to those rules, e.g. ["v2","none"]; an empty list or only unknown names mean all rules, as when it is left '
       + 'out. total counts the matching sentences and rule_counts counts all sentences per rule.',
@@ -96,7 +101,8 @@ export function registerWordOrderTools({ mcpServer, wordOrderService }) {
   registerJsonTool(mcpServer, 'generate_sentences', {
     title: 'Generate word-order sentences',
     description: 'Ask the configured LLM (OpenRouter) for new sentences that use the learner\'s words, and save them. Each '
-      + 'comes with its structure and alt_orders (the other natural word orders; a bad one is dropped with a warning). It can '
+      + 'comes with its structure, alt_orders (the other natural word orders) and wrong_forms; a bad one is dropped with a '
+      + 'warning. It can '
       + 'take up to a minute. Fails when '
       + 'OPENROUTER_API_KEY is not set.',
     inputSchema: generateInputSchema.shape,

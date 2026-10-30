@@ -26,6 +26,12 @@ const SYSTEM_PROMPT = [
   '  come in another order. Do not list an order that differs only in capitals or punctuation. The sentence itself is',
   '  the most neutral order. Example: nl "Ik neem een drankje omdat ik dorst heb." with alt_orders',
   '  ["Omdat ik dorst heb, neem ik een drankje."].',
+  '- wrong_forms: 2 or 3 single words (at most 5) that look like a word of the sentence but are wrong in it; they are',
+  '  shown as extra tiles. Use another form of a sentence word: the verb in another person or tense (gaat or ging for',
+  '  gaan), an adjective with or without -e (mooie for mooi), singular or plural (huizen for huis), het for a de-word',
+  '  or de for a het-word. Each must make the sentence wrong wherever it is put, so never a word that could stand in',
+  '  a correct sentence (not wij for we, not een for het, not a synonym). Never a word of the sentence itself.',
+  '  Example: "Wij gaan morgen naar de markt." with wrong_forms ["gaat", "ga", "het"].',
   '- No commas in the sentence itself (nl); an alternative order may have a comma after a fronted clause.',
   '  No quotation marks, digits or names. End with "." or "?".',
   '- The Ukrainian field is a natural translation, not word by word. Use the informal "ти" unless the sentence is',
@@ -37,7 +43,7 @@ const SYSTEM_PROMPT = [
   '  "Deze week" (час), "ben" (дієслово), "ik" (підмет), "jarig" (прикметник).',
   '',
   'Answer with a JSON object only, no text before or after it:',
-  '{"sentences":[{"nl":"...","uk":"...","rule":"...","structure":[{"text":"...","role":"..."}],"alt_orders":["..."]}]}',
+  '{"sentences":[{"nl":"...","uk":"...","rule":"...","structure":[{"text":"...","role":"..."}],"alt_orders":["..."],"wrong_forms":["..."]}]}',
   'The array has exactly the number of items the user asks for.',
 ].join('\n');
 
@@ -59,7 +65,7 @@ export function buildGenerationMessages({
 }
 
 // Returns the sentences with a string nl and uk (rule null when unknown; structure the array of segments as the model
-// wrote it, or null; alt_orders the list as the model wrote it, or []), at most count of them when count is given.
+// wrote it, or null; alt_orders and wrong_forms the lists as the model wrote them, or []), at most count of them when count is given.
 // Throws ValidationError when the answer holds no JSON object or has no sentences array.
 export function parseGeneratedSentences(responseText, { count } = {}) {
   const parsedAnswer = parseJsonObject(responseText);
@@ -133,5 +139,6 @@ function toGeneratedSentence(item) {
     rule: normalizeRule(item.rule),
     structure: Array.isArray(item.structure) ? item.structure : null,
     alt_orders: Array.isArray(item.alt_orders) ? item.alt_orders : [],
+    wrong_forms: Array.isArray(item.wrong_forms) ? item.wrong_forms : [],
   });
 }

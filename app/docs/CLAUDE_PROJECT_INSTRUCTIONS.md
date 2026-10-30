@@ -89,16 +89,22 @@ order. When I ask for sentences, make them with these rules (you cannot read the
   as each segment stays whole. It is not the same order with other capitals or punctuation. At most 5. Example:
   "Morgen gaan we naar de markt." with the alternative "We gaan morgen naar de markt.".
 - The Ukrainian is a natural translation, not word by word, in informal «ти» unless polite.
+- Wrong forms («Хибні форми»), the extra tiles: 2 or 3 single words that look like a word of the sentence but are wrong
+  in it: the verb in another person or tense (`gaat`, `ging` for `gaan`), an adjective with or without -e (`mooie` for
+  `mooi`), singular or plural, `het` for a de-word or `de` for a het-word. Each must make the sentence wrong wherever it
+  goes: never a word that could stand in a correct sentence (not `wij` for `we`, not `een` for `het`, not a synonym),
+  and never a word of the sentence itself. Example: "Wij gaan morgen naar de markt." with `gaat; ga; het`.
 - Each sentence has a schema («Схема»): its words split into ordered segments, each with a Ukrainian role (підмет,
   дієслово, модальне дієслово, допоміжне дієслово, інфінітив, дієприкметник, відокремлювана частина, додаток, прикметник,
   час, місце, спосіб, причина, заперечення, сполучник, питальне слово, частка; частка for particles like misschien, ook,
   toch, maar, even, wel). The segment texts joined by spaces are exactly the sentence's words in order, e.g. `Deze week (час) + ben (дієслово) + ik (підмет) + jarig (прикметник)`.
 - Call `list_sentences` first so nothing repeats. Show the sentences to me as a Markdown table with the columns
-  Українською, Nederlands, Правило, Схема, Інші порядки, and save them with `add_sentences` only after I say yes (pass
-  each schema as `structure`, an array of `{ text, role }`, and the other orders as `alt_orders`, an array of strings).
-  Repeats are skipped and reported; a bad alternative skips its sentence with the reason.
-- When I ask, give schemas to sentences saved earlier: `list_sentences`, then `update_sentence` with `structure` for
-  each one whose structure is null.
+  Українською, Nederlands, Правило, Схема, Інші порядки, Хибні форми, and save them with `add_sentences` only after I
+  say yes (pass each schema as `structure`, an array of `{ text, role }`, the other orders as `alt_orders` and the wrong
+  forms as `wrong_forms`, both arrays of strings). Repeats are skipped and reported; a bad alternative skips its
+  sentence with the reason; a bad wrong form is dropped with a warning.
+- When I ask, give schemas or wrong forms to sentences saved earlier: `list_sentences`, then `update_sentence` with
+  `structure` for each one whose structure is null, or `wrong_forms` for each one whose `wrong_forms` is empty.
 `get_word_order_set` gives the next set (the Dutch and its schema are not returned); its optional `rules` limits it to some
 rules (e.g. `["v2","none"]`; empty or no valid name = all rules). `check_word_order` records my tiles and returns the right order, with the rule and the
 schema, which I see after each answer. `delete_sentence` only when I ask. `generate_sentences` asks the server's LLM for
