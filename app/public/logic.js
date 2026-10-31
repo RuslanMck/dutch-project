@@ -14,10 +14,11 @@ export function normalise(value) {
 
 // Form of an answer used for comparison: normalise, typographic quotes and the Ukrainian apostrophe (ʼ, backtick) -> ',
 // punctuation dropped, spaces collapsed. "hoe gaat het?" and "hoe gaat het" compare equal; "'s ochtends" and "’s ochtends"
-// too; "імʼя" and "ім'я" too.
+// too; "імʼя" and "ім'я" too. Dashes (– — ‑ −) -> -, so "klein - kleiner" typed on a phone matches "klein – kleiner".
 export function normalizeAnswerText(value) {
   return normalise(value)
     .replace(/[’‘ʼ`]/g, "'")
+    .replace(/[‐‑‒–—―−]/g, '-')
     .replace(/[?!.,;:…"()]/g, '')
     .replace(/\s+/g, ' ')
     .trim();

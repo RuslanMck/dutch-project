@@ -296,6 +296,7 @@ test('normalizeAnswerText drops punctuation, maps typographic quotes, collapses 
   assert.equal(normalizeAnswerText('Hoe gaat het?'), 'hoe gaat het');
   assert.equal(normalizeAnswerText(' goed,  dank je wel. En met jou… '), 'goed dank je wel en met jou');
   assert.equal(normalizeAnswerText('(het) "café"!'), 'het café');
+  assert.equal(normalizeAnswerText('klein – kleiner — kleinst ‑ x'), 'klein - kleiner - kleinst - x');
   assert.equal(normalizeAnswerText('’s ochtends'), "'s ochtends");
   assert.equal(normalizeAnswerText("‘s ochtends"), "'s ochtends");
   assert.equal(normalizeAnswerText("'s ochtends"), "'s ochtends");
@@ -1434,4 +1435,10 @@ test('computeQueueProgressPercent is the share of the set done', () => {
   assert.equal(computeQueueProgressPercent(4, 10), 60);
   assert.equal(computeQueueProgressPercent(0, 10), 100);
   assert.equal(computeQueueProgressPercent(3, 0), 0);
+});
+
+test('gradeTranslationAnswer accepts a plain hyphen for the dash in the stored word', () => {
+  const word = { nl: 'klein – kleiner dan – het kleinst', article: '', kind: 'expression', uk: 'маленький' };
+  assert.equal(gradeTranslationAnswer(word, 'klein - kleiner dan - het kleinst').grade, 'good');
+  assert.equal(gradeTranslationAnswer(word, 'kleine - kleiner dan - het kleinste').grade, 'again');
 });
