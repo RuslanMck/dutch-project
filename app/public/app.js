@@ -242,6 +242,24 @@ function trackPendingPost(pendingPosts, post) {
   post.then(settle, settle);
 }
 
+// The row delete mark: the same line icon as everywhere else, not a "×" character.
+const CLOSE_ICON_PATH = 'M6 6l12 12M18 6L6 18';
+const CLOSE_ICON = `<svg class="garden-icon garden-icon--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${CLOSE_ICON_PATH}"/></svg>`;
+
+// The same close icon built with DOM calls, for code that never writes HTML strings.
+function createCloseIcon() {
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNamespace, 'svg');
+  svg.setAttribute('class', 'garden-icon garden-icon--sm');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS(svgNamespace, 'path');
+  path.setAttribute('d', CLOSE_ICON_PATH);
+  svg.append(path);
+  return svg;
+}
+
 // "i" buttons: aria-expanded says whether the text block named by aria-controls is open.
 function setHintOpen(button, isOpen) {
   button.setAttribute('aria-expanded', String(isOpen));
@@ -499,7 +517,7 @@ function renderTable() {
       <td>${esc(word.uk)}</td>
       <td>${nextDateCell}</td>
       <td>${word.priority ? `P${esc(word.priority)}` : ''}</td>
-      <td><button class="del" type="button" data-act="wdel" data-id="${word.id}" aria-label="Видалити слово ${esc(word.nl)}">×</button></td>
+      <td><button class="del" type="button" data-act="wdel" data-id="${word.id}" aria-label="Видалити слово ${esc(word.nl)}">${CLOSE_ICON}</button></td>
     </tr>`;
   }).join('');
 }
@@ -1868,7 +1886,7 @@ function renderPhrases() {
         <div>${esc(phrase.uk)}</div>
         ${phrase.context ? `<div class="muted">${esc(phrase.context)}</div>` : ''}
       </div>
-      <button class="del${armed ? ' armed' : ''}" type="button" data-act="pdel" data-id="${phrase.id}" aria-label="${armed ? 'Підтвердити видалення' : 'Видалити фразу'}">${armed ? 'видалити?' : '×'}</button>
+      <button class="del${armed ? ' armed' : ''}" type="button" data-act="pdel" data-id="${phrase.id}" aria-label="${armed ? 'Підтвердити видалення' : 'Видалити фразу'}">${armed ? 'видалити?' : CLOSE_ICON}</button>
     </li>`;
   }).join('');
 }
@@ -2196,7 +2214,7 @@ function renderWordOrderSentences() {
     del.className = 'del';
     del.dataset.id = String(sentence.id);
     del.setAttribute('aria-label', 'Видалити речення');
-    del.textContent = '×';
+    del.append(createCloseIcon());
     row.append(main, stats, del);
     return row;
   }));
@@ -3009,7 +3027,8 @@ function renderDeckForm() {
     if (!row) continue;
     const item = el('li', '', 'deck-form-word');
     item.append(el('span', formatDeckWordLabel(row.word), 'deck-form-word__text'));
-    const remove = el('button', '×');
+    const remove = el('button', '', 'del');
+    remove.append(createCloseIcon());
     remove.type = 'button';
     remove.dataset.act = 'remove';
     remove.dataset.id = String(id);

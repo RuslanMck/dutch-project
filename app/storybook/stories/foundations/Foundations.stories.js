@@ -42,6 +42,16 @@ ${group.styles.map((style) => `
 </div>`).join('')}`).join(''),
 };
 
+export const Weights = {
+  render: () => `
+<p style="max-width:560px;font-size:14px">Manrope in three weights, chosen by role, never by taste. If you can't name the role, it's <b>regular</b>.</p>
+${Object.entries(tokens.type.weights).map(([name, weight]) => `
+<div style="display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--garden-line)">
+  <div><b style="font-size:13px">--garden-weight-${name}</b><div style="font-size:12px;color:var(--garden-ink-soft)">${weight.value} · ${weight.usage}</div></div>
+  <div style="font-size:20px;font-weight:${weight.value}">Залишилось: 10 · de fiets · Перевірити</div>
+</div>`).join('')}`,
+};
+
 export const Radius = {
   render: () => `
 <div style="display:flex;flex-wrap:wrap;gap:16px">

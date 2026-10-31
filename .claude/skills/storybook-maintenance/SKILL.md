@@ -59,6 +59,15 @@ will not know what drifted.
 - Class names follow the BEM rules in `project-quality-standards` (`references/html-and-css.md`).
 - Small elements stay modest: `garden-radius-sm` (8px) for controls and chips, 6px for tiny badges and chart bar
   tops. Only icon buttons, avatars and thin progress tracks are fully round.
+- **Type:** one font, Manrope (Latin + Cyrillic), so mixed Ukrainian/Dutch lines never switch font. Three weights
+  only, by role, always through the tokens: `--garden-weight-regular` (500) for text you read,
+  `--garden-weight-strong` (700) for text you tap or scan as a label (buttons, nav, chips, field labels, table heads,
+  badges, messages), `--garden-weight-heavy` (800) for headings, the studied word and big numbers. Never a raw
+  `font-weight` number. See Foundations/Tokens → Weights.
+- **Icons:** one line-icon family (Foundations/Icons): 24×24 grid, 2px round stroke, no fill, `currentColor`, class
+  `garden-icon` (22px) or `garden-icon--sm` (18px, only inline beside text). A lone icon sits in `.icon-button`
+  (`--compact` beside a label) with an `aria-label`; "on" (`aria-pressed`/`aria-expanded`) is `garden-ink` on
+  `garden-sand`. No text glyphs or emoji as icons (no «×», «i»). A new icon is added to `Icons.stories.js`.
 - Fonts are self-hosted in `public/fonts/` (served before sign-in, Storybook maps them to `/fonts`); the
   `@font-face` rules are at the top of `garden.css`. Never link a font CDN. A new font file needs its licence beside it.
 - The page `theme-color`, `manifest.webmanifest` colours and `icon.svg` use `garden-primary` / `garden-paper` /
@@ -135,7 +144,8 @@ docker run --rm -it -v "$PWD":/sb -w /sb -p 6006:6006 node:24-bookworm-slim sh -
 
 - [ ] Every UI component or state you added or changed has a story, and its README describes it.
 - [ ] Story markup matches the app's markup (same classes, attributes, structure).
-- [ ] No raw colours, radii or shadows: tokens only, and new tokens have a `usage` with contrast notes.
+- [ ] No raw colours, radii, shadows or font weights: tokens only, and new tokens have a `usage` with contrast notes.
+- [ ] New or changed icons follow Foundations/Icons and are listed there.
 - [ ] Removed components have no story left; renamed ones are renamed in the story folder too.
 - [ ] `public/app.css` was regenerated with `npm run app-css` and committed with its sources.
 - [ ] `npm run build` passes in Docker with no errors, and the app's `npm test` passes.

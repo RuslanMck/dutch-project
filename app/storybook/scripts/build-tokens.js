@@ -17,6 +17,7 @@ const writeSection = (title, tokenList) => {
 writeSection('colour', tokens.color.tokens);
 lines.push('  /* type */');
 for (const [name, stack] of Object.entries(tokens.type.families)) lines.push(`  --font-${name}: ${stack};`);
+for (const [name, weight] of Object.entries(tokens.type.weights)) lines.push(`  --garden-weight-${name}: ${weight.value};`);
 writeSection('spacing', tokens.spacing.tokens);
 writeSection('radius', tokens.radius.tokens);
 writeSection('shadow', tokens.shadow.tokens);

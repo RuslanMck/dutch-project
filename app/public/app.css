@@ -53,7 +53,10 @@
   --role-other: #57534e;
   /* type */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Plus Jakarta Sans", "Avenir Next", system-ui, sans-serif;
+  --font-display: "Manrope", "Avenir Next", system-ui, sans-serif;
+  --garden-weight-regular: 500;
+  --garden-weight-strong: 700;
+  --garden-weight-heavy: 800;
   /* spacing */
   --space-1: 4px;
   --space-1\.5: 6px;
@@ -88,24 +91,33 @@
 
 /* Dutch матеріали — component styles in the Сад look (structure from public/app.css; tokens in tokens.json). */
 
-/* Plus Jakarta Sans, self-hosted from public/fonts (SIL OFL 1.1). Variable font: one file per script covers 500–800.
-   It has no basic Cyrillic, so Ukrainian text uses the next font in the stack. */
+/* Manrope, self-hosted from public/fonts (SIL OFL 1.1). Variable font: one file per script covers 400–800.
+   Cyrillic is included, so Ukrainian and Dutch text use the same font. */
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Manrope';
   font-style: normal;
-  font-weight: 500 800;
+  font-weight: 400 800;
   font-display: swap;
-  src: url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  src: url('/fonts/manrope-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Manrope';
   font-style: normal;
-  font-weight: 500 800;
+  font-weight: 400 800;
   font-display: swap;
-  src: url('/fonts/plus-jakarta-sans-latin-ext.woff2') format('woff2');
+  src: url('/fonts/manrope-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/manrope-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 * { box-sizing: border-box; }
@@ -152,7 +164,7 @@ button.primary {
   background: var(--garden-primary);
   color: var(--garden-on-primary);
   border-color: var(--garden-primary);
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 button.ghost {
@@ -196,7 +208,7 @@ button.ghost {
   background: var(--garden-primary);
   color: var(--garden-on-primary);
   border-color: var(--garden-primary);
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 .stats-range {
@@ -226,7 +238,7 @@ button.ghost {
 .stat-tile__value {
   display: block;
   font-size: 24px;
-  font-weight: 700;
+  font-weight: var(--garden-weight-heavy);
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -394,18 +406,18 @@ table.words td {
 table.words th {
   font-size: 13px;
   color: var(--garden-ink-soft);
-  font-weight: 500;
+  font-weight: var(--garden-weight-strong);
 }
 
 table.words td.w {
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   /* break-word, not anywhere: whole Dutch words set the column's minimum width */
   overflow-wrap: break-word;
 }
 
 .art {
   color: var(--garden-rust);
-  font-weight: 600;
+  font-weight: var(--garden-weight-regular);
 }
 
 .status {
@@ -435,7 +447,7 @@ table.words td.w {
   color: var(--garden-wrong);
   border-color: var(--garden-wrong);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 /* 2 · cards */
@@ -462,7 +474,7 @@ table.words td.w {
 
 .card-nl {
   font-size: 30px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-heavy);
   overflow-wrap: anywhere;
 }
 
@@ -517,7 +529,7 @@ table.words td.w {
   justify-content: center;
   text-align: center;
   font-size: 26px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-heavy);
   padding: 16px 8px;
   overflow-wrap: anywhere;
 }
@@ -525,7 +537,7 @@ table.words td.w {
 .msg {
   min-height: 1.5em;
   margin: 8px 0;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   overflow-wrap: anywhere;
 }
 
@@ -563,7 +575,7 @@ table.words td.w {
 
 .practice-summary__text {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--garden-weight-regular);
   overflow-wrap: anywhere;
 }
 
@@ -574,7 +586,7 @@ table.words td.w {
 
 .practice-round__hardest {
   margin: 12px 0 8px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   overflow-wrap: anywhere;
 }
 
@@ -670,7 +682,7 @@ details.rule > summary::-webkit-details-marker {
 .rule-title {
   flex: 1 1 auto;
   min-width: 0;
-  font-weight: 600;
+  font-weight: var(--garden-weight-heavy);
   overflow-wrap: anywhere;
 }
 
@@ -679,7 +691,7 @@ details.rule > summary::-webkit-details-marker {
   color: var(--garden-raised);
   border-radius: 6px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--garden-weight-strong);
   padding: 2px 8px;
 }
 
@@ -749,7 +761,7 @@ details.rule > summary::-webkit-details-marker {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 .pat-title {
@@ -838,36 +850,12 @@ details.rule > summary::-webkit-details-marker {
   color: var(--garden-ink-soft);
 }
 
-.hint-button {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+/* The inline «i» next to a label: a compact icon button (32px target, 18px icon). */
+.icon-button--compact {
   min-width: 32px;
   min-height: 32px;
-  margin: -6px 0;   /* a 32px target that doesn't push the label row taller */
-  padding: 0;
-  border-color: transparent;
-  border-radius: var(--garden-radius-sm);
-  background: transparent;
-  color: var(--garden-ink-soft);
+  padding: 6px;
 }
-
-.hint-button__icon {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.hint-button:hover { color: var(--garden-ink); }
-.hint-button[aria-expanded="true"] { color: var(--garden-ink); }
-.hint-button[aria-expanded="true"] .hint-button__icon circle { fill: var(--garden-sand); }
 
 .hint {
   margin: 6px 0 0;
@@ -911,21 +899,8 @@ details.rule > summary::-webkit-details-marker {
   padding: 8px;
   background: transparent;
   border-color: transparent;
+  border-radius: var(--garden-radius-sm);
   color: var(--garden-ink-soft);
-}
-
-.icon-button__icon {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.shuffle-button[aria-pressed="true"] {
-  color: var(--garden-rust);
 }
 
 /* delete confirmation dialog */
@@ -964,7 +939,7 @@ button.danger {
   background: var(--garden-wrong);
   border-color: var(--garden-wrong);
   color: var(--garden-raised);
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 /* shared */
@@ -998,7 +973,7 @@ button.danger {
   color: var(--garden-raised);
   padding: 10px 14px;
   border-radius: 10px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-regular);
   overflow-wrap: anywhere;
   z-index: 10;
 }
@@ -1031,7 +1006,7 @@ button.danger {
 
 .login .err {
   color: var(--garden-wrong);
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   margin: 0;
 }
 
@@ -1044,7 +1019,7 @@ button.danger {
 .word-order__uk {
   margin: 4px 0 16px;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-heavy);
   text-align: center;
   overflow-wrap: anywhere;
 }
@@ -1095,7 +1070,7 @@ button.danger {
   padding: 8px 14px;
   margin: 0;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   line-height: 1.2;
   text-align: center;
   overflow-wrap: anywhere;
@@ -1156,7 +1131,7 @@ button.danger {
   display: flex;
   align-items: center;
   min-height: 44px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   cursor: pointer;
 }
 
@@ -1183,7 +1158,7 @@ button.danger {
   align-items: center;
   min-height: 44px;
   padding: 10px 14px;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   cursor: pointer;
 }
 
@@ -1239,7 +1214,7 @@ button.danger {
 
 .word-order__rule {
   margin: 8px 0 0;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   overflow-wrap: anywhere;
 }
 
@@ -1280,7 +1255,7 @@ button.danger {
 }
 
 .word-order__segment-text {
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
   overflow-wrap: anywhere;
 }
 
@@ -1425,7 +1400,7 @@ textarea {
   background: var(--garden-primary);
   border-color: var(--garden-primary);
   color: var(--garden-on-primary);
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 .deck-picker__tools {
@@ -1509,7 +1484,7 @@ textarea {
 
 .deck-bar__count {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--garden-weight-strong);
 }
 
 .deck-form {
@@ -1555,42 +1530,48 @@ textarea {
 }
 
 /* ── Сад: the look. Light-only; gold and sand fill, dark brown writes. ── */
-body { font-family: var(--font-display); font-weight: 500; line-height: 1.5; }
-h1, h2, h3, .top h1, .dialog__title, .stats-card__title, .deck-card__name, .text-title, .deck-picker__title, .practice-round__title { font-weight: 800; letter-spacing: -0.01em; }
-button { border-radius: var(--garden-radius-sm); border-color: transparent; font-weight: 700; }
-button.primary { border-radius: var(--garden-radius); box-shadow: var(--garden-lift); font-weight: 800; }
+body { font-family: var(--font-display); font-weight: var(--garden-weight-regular); line-height: 1.5; }
+
+/* Three weights, by role (tokens.json → type.weights): read = regular, tap or label = strong, heading = heavy. */
+h1, h2, h3, .top h1, .stats-card__title, .dialog__title, .login h1, .text-title { font-weight: var(--garden-weight-heavy); }
+label, th, dt, strong, b, summary, .field > span, .hint-label { font-weight: var(--garden-weight-strong); }
+input, select, textarea, .muted, .hint, .card-uk, .card-ex, .rule-body, .sheet__translation, .sheet__example-uk { font-weight: var(--garden-weight-regular); }
+h1, h2, h3, .top h1, .dialog__title, .stats-card__title, .deck-card__name, .text-title, .deck-picker__title, .practice-round__title { font-weight: var(--garden-weight-heavy); letter-spacing: -0.01em; }
+button { border-radius: var(--garden-radius-sm); border-color: transparent; font-weight: var(--garden-weight-strong); }
+button.primary { border-radius: var(--garden-radius); box-shadow: var(--garden-lift); font-weight: var(--garden-weight-strong); }
 button.ghost { color: var(--garden-ink-soft); }
 input, select, textarea { border-radius: var(--garden-radius-sm); border: 1.5px solid var(--garden-line); }
 input:focus, select:focus, textarea:focus { border-color: var(--garden-primary); }
 .stat-tile, .stats-card, .practice-summary, details.rule, .text-card, .deck-card, .dialog, .word-order__rules {
   border-color: transparent; box-shadow: var(--garden-shadow); border-radius: var(--garden-radius); }
 .card { border-color: transparent; box-shadow: var(--garden-shadow); border-radius: var(--garden-radius-lg); }
-.card-nl { font-weight: 800; }
-.practice-q { font-size: 30px; font-weight: 800; }
+.card-nl { font-weight: var(--garden-weight-heavy); }
+.practice-q { font-size: 30px; font-weight: var(--garden-weight-heavy); }
 .stats-card .stat-tile { box-shadow: none; background: var(--garden-sand); }
-.stat-tile__value { font-weight: 800; }
+.stat-tile__value { font-weight: var(--garden-weight-heavy); }
 .segmented button, .deck-chips button { border-radius: var(--garden-radius-sm); background: var(--garden-sand); }
-.status { border-radius: var(--garden-radius-sm); border-color: transparent; background: var(--garden-sand); color: var(--garden-ink); font-weight: 700; }
+.status { border-radius: var(--garden-radius-sm); border-color: transparent; background: var(--garden-sand); color: var(--garden-ink); font-weight: var(--garden-weight-strong); }
 .status.st-learning { background: var(--garden-primary); color: var(--garden-on-primary); border-color: transparent; }
 .status.st-learned { background: var(--garden-raised); color: var(--garden-forest); border-color: var(--garden-forest); }
-.difficulty-badge { font-weight: 700; background: var(--garden-raised); }
+.difficulty-badge { font-weight: var(--garden-weight-strong); background: var(--garden-raised); }
 .difficulty-badge--hard { background: var(--garden-blush); }
-.badge { font-weight: 800; }
+.badge { font-weight: var(--garden-weight-strong); }
 .hint { background: var(--garden-sand); color: var(--garden-ink); border-radius: var(--garden-radius-sm); }
 .rule-body .ex { border-left: none; border-radius: var(--garden-radius-sm); background: var(--garden-sand); }
 .mh { color: var(--garden-rust); }
 .bar-chart { border-bottom-color: var(--garden-line); }
 .bar-chart__bar { border-radius: 6px 6px 2px 2px; }
-.word-tile { border-radius: var(--garden-radius-sm); border-color: var(--garden-line); border-bottom-color: var(--garden-line); font-weight: 800; }
+.word-tile { border-radius: var(--garden-radius-sm); border-color: var(--garden-line); border-bottom-color: var(--garden-line); font-weight: var(--garden-weight-strong); }
 .word-tile--answer { background: var(--garden-raised); border-bottom-color: var(--garden-primary); }
 .word-order__answer { border-radius: var(--garden-radius); border-color: var(--garden-sand); }
 .word-order__segment { background: var(--garden-raised); border-color: var(--garden-line); border-radius: var(--garden-radius-sm); }
-.word-order__segment-role { font-weight: 700; }
+.word-order__segment-role { font-weight: var(--garden-weight-strong); }
 .notice { border-radius: var(--garden-radius-sm); }
 .deck-bar { border-top-color: var(--garden-line); }
 .del { color: var(--garden-ink-soft); }
-.icon-button { color: var(--garden-ink-soft); }
-.shuffle-button[aria-pressed="true"] { color: var(--garden-ink); background: var(--garden-sand); border-radius: var(--garden-radius-sm); }
+/* Icon buttons: at rest garden-ink-soft; on (aria-pressed / aria-expanded) garden-ink on a garden-sand square. */
+.icon-button:hover { color: var(--garden-ink); }
+.icon-button[aria-pressed="true"], .icon-button[aria-expanded="true"] { color: var(--garden-ink); background: var(--garden-sand); }
 
 /* ---------- Сад layout: bottom bar, Головна, Профіль, word sheet, practice progress (docs/GARDEN_LAYOUT.md) ---------- */
 
@@ -1608,6 +1589,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .garden-icon--filled { fill: currentColor; stroke: none; }
+.garden-icon--sm { width: 18px; height: 18px; }
+.del .garden-icon { display: block; }
 
 /* bottom bar */
 .bottom-nav {
@@ -1637,7 +1620,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   background: transparent;
   color: var(--garden-ink-soft);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: var(--garden-weight-strong);
 }
 
 .bottom-nav__item .garden-icon {
@@ -1676,9 +1659,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   color: var(--garden-ink);
 }
 
-.home-header__greeting { margin: 0; font-size: 30px; line-height: 1.1; font-weight: 800; }
+.home-header__greeting { margin: 0; font-size: 30px; line-height: 1.1; font-weight: var(--garden-weight-heavy); }
 .home-header__greeting:focus, #page-title:focus { outline: none; }
-.home-header__subtitle { margin: 4px 0 0; font-size: 14px; font-weight: 600; }
+.home-header__subtitle { margin: 4px 0 0; font-size: 14px; font-weight: var(--garden-weight-regular); }
 
 .home-search {
   position: relative;
@@ -1728,8 +1711,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .continue-card__text { flex: 1; min-width: 0; }
-.continue-card__title { margin: 0; font-size: 16px; font-weight: 800; }
-.continue-card__line { margin: 2px 0 0; font-size: 13px; color: var(--garden-ink-soft); font-weight: 600; }
+.continue-card__title { margin: 0; font-size: 16px; font-weight: var(--garden-weight-heavy); }
+.continue-card__line { margin: 2px 0 0; font-size: 13px; color: var(--garden-ink-soft); font-weight: var(--garden-weight-regular); }
 
 .continue-card__button {
   width: var(--tap-min);
@@ -1742,7 +1725,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   background: var(--garden-sand);
 }
 
-.continue-card__progress-label { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--garden-ink-soft); }
+.continue-card__progress-label { margin: 6px 0 0; font-size: 12px; font-weight: var(--garden-weight-regular); color: var(--garden-ink-soft); }
 
 .progress-bar {
   height: 10px;
@@ -1761,7 +1744,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   transition: width 0.3s ease;
 }
 
-.home-section-title { margin: 24px 0 10px; font-size: 17px; font-weight: 700; }
+.home-section-title { margin: 24px 0 10px; font-size: 17px; font-weight: var(--garden-weight-heavy); }
 
 .practice-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -1789,8 +1772,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   background: var(--garden-raised);
 }
 
-.practice-tile__name { font-size: 15px; font-weight: 800; }
-.practice-tile__line { font-size: 12px; font-weight: 600; }
+.practice-tile__name { font-size: 15px; font-weight: var(--garden-weight-heavy); }
+.practice-tile__line { font-size: 12px; font-weight: var(--garden-weight-regular); }
 .practice-tile--cards { background: var(--garden-periwinkle); }
 .practice-tile--word-order { background: var(--garden-sand); }
 .practice-tile--phrases { background: var(--garden-peach); }
@@ -1816,7 +1799,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   border-radius: var(--garden-radius-sm);
   background: transparent;
   text-align: left;
-  font-weight: 700;
+  font-weight: var(--garden-weight-strong);
 }
 
 .profile-menu__link:hover { background: var(--garden-tint); }
@@ -1858,8 +1841,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   background: var(--garden-tint);
 }
 
-.sheet__title { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; }
-.sheet__title .art { font-weight: 800; }
+.sheet__title { margin: 0; font-size: 30px; line-height: 1.15; font-weight: var(--garden-weight-heavy); }
+.sheet__title .art { font-weight: var(--garden-weight-heavy); }
 .sheet__translation { margin: 4px 0 0; font-size: 16px; color: var(--garden-ink-soft); }
 
 .sheet__example {
@@ -1869,7 +1852,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   background: var(--garden-sand);
 }
 
-.sheet__example-nl { margin: 0; font-weight: 700; }
+.sheet__example-nl { margin: 0; font-weight: var(--garden-weight-regular); }
 .sheet__example-uk { margin: 2px 0 0; font-size: 13px; }
 
 .sheet__details {
@@ -1885,8 +1868,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   background: var(--garden-paper);
 }
 
-.sheet__detail dt { font-size: 12px; font-weight: 600; color: var(--garden-ink-soft); }
-.sheet__detail dd { margin: 2px 0 0; font-weight: 800; }
+.sheet__detail dt { font-size: 12px; font-weight: var(--garden-weight-strong); color: var(--garden-ink-soft); }
+.sheet__detail dd { margin: 2px 0 0; font-weight: var(--garden-weight-regular); }
 .sheet__actions { margin-top: 16px; display: grid; }
 
 /* practice: progress of the set, and the round's celebration header */
@@ -1900,7 +1883,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   color: var(--garden-ink);
   text-align: center;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: var(--garden-weight-heavy);
 }
 
 /* Above the bottom bar: the error notice and the Колоди selection bar. */
