@@ -41,6 +41,7 @@ import {
   ROUND_DIRECTIONS,
   splitIntoRounds,
   TAB_TITLES,
+  TAB_SUBTITLES,
   buildActivityTiles,
   buildChartView,
   buildOverviewTiles,
@@ -299,6 +300,7 @@ function showTab(name) {
   // Головна has its own gold header with the greeting.
   $('top-header').hidden = ui.tab === 'home';
   $('page-title').textContent = TAB_TITLES[ui.tab];
+  $('page-subtitle').textContent = TAB_SUBTITLES[ui.tab];
   document.title = `${TAB_TITLES[ui.tab]} · Dutch матеріали`;
   window.scrollTo(0, 0);
   if (ui.tab === 'practice') {

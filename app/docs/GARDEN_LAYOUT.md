@@ -18,7 +18,8 @@ Storybook sketches. UI text stays Ukrainian; behaviour of practice, grading and 
 | First screen | Головна for a new visitor; the last tab is still remembered. |
 | Слова | The table stays (bulk editing and sorting). Tapping a word opens a bottom sheet: word with article, translation, example, status, next review, errors, chapter; «Закрити». Delete stays in the row. |
 | Practice | A thin progress bar above the question for the set (FSRS and custom drills), from the words left in the queue. The round summary gets a gold celebration header. |
-| Old drawer | Removed with its JavaScript. The page title header stays on every tab except Головна, which has the gold header. |
+| Old drawer | Removed with its JavaScript. |
+| Page header | Every tab has a gold header band: Головна with «Hoi!» and the search field, the rest with the page title and a one-line subtitle (`TAB_SUBTITLES`). |
 
 ## Phases
 

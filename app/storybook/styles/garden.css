@@ -1572,6 +1572,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .home-header__greeting:focus, #page-title:focus { outline: none; }
 .home-header__subtitle { margin: 4px 0 0; font-size: 14px; font-weight: var(--garden-weight-regular); }
 
+/* Every other tab: the same gold band, shorter (no search field overlapping it). */
+.top {
+  display: block;
+  margin: -12px -16px 16px;
+  padding: 28px 20px 22px;
+  border-radius: 0 0 var(--garden-radius-lg) var(--garden-radius-lg);
+  background: linear-gradient(160deg, var(--garden-primary) 0%, var(--garden-sand) 100%);
+  color: var(--garden-ink);
+}
+.top h1.top__title { font-size: 26px; line-height: 1.15; }
+.top__subtitle { margin: 4px 0 0; font-size: 14px; font-weight: var(--garden-weight-regular); }
+.top__subtitle:empty { display: none; }
+
 .home-search {
   position: relative;
   margin: -30px 4px 0;

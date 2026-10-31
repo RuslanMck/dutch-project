@@ -82,6 +82,7 @@ import {
   sortCatalog,
   toggleSelected,
   TAB_TITLES,
+  TAB_SUBTITLES,
   NAVIGATION_SECTION_FOR_TAB,
   buildHomeSummary,
   buildWordDetailView,
@@ -1366,10 +1367,11 @@ test('api.js exports the deck calls with the REST paths of §2.2–2.3', () => {
 
 // ---------- Сад layout (docs/GARDEN_LAYOUT.md) ----------
 
-test('every tab has a title and belongs to one bottom-bar item', () => {
+test('every tab has a title, a header subtitle and belongs to one bottom-bar item', () => {
   const tabs = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
   for (const tab of tabs) {
     assert.ok(TAB_TITLES[tab], `${tab} has a title`);
+    assert.ok(TAB_SUBTITLES[tab], `${tab} has a header subtitle`);
     assert.ok(['home', 'decks', 'practice', 'stats', 'profile'].includes(NAVIGATION_SECTION_FOR_TAB[tab]), `${tab} has a bar item`);
   }
   assert.equal(findNavigationSection('rules'), 'profile');

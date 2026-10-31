@@ -470,6 +470,21 @@ export const TAB_TITLES = Object.freeze({
   stats: 'Статистика',
 });
 
+// The line under the page title in the gold header (Головна has its own greeting).
+export const TAB_SUBTITLES = Object.freeze({
+  home: 'Що вчимо сьогодні?',
+  profile: 'Слова, правила і тексти',
+  practice: 'Переклад слів за розкладом',
+  decks: 'Свої набори слів',
+  cards: 'Гортай і згадуй',
+  phrases: 'Фрази з діалогів',
+  'word-order': 'Склади речення',
+  table: 'Усі слова з перекладом',
+  rules: 'Граматика з номерами правил',
+  texts: 'Тексти для читання',
+  stats: 'Як іде навчання',
+});
+
 const PERIOD_RANGE_PREFIX = Object.freeze({
   day: 'Сьогодні',
   week: 'Останні 7 днів',

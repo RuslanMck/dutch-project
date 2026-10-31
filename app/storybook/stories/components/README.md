@@ -17,6 +17,7 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `FlashCard/` | Study group. Stories and guidelines. |
 | `HintButton/` | Actions group. Stories and guidelines. |
 | `HomeHeader/` | Navigation group. Stories and guidelines. |
+| `PageHeader/` | Navigation group. Stories and guidelines. |
 | `IconButton/` | Actions group. Stories and guidelines. |
 | `ListItem/` | Content group. Stories and guidelines. |
 | `Message/` | Feedback group. Stories and guidelines. |
