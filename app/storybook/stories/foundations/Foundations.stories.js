@@ -6,69 +6,69 @@ export default {
   parameters: { docs: { description: { component: 'Every token from `tokens/tokens.json`. Сад tokens start with `garden-`; the rest describe the app as built today and are kept for reference.' } } },
 };
 
-const light = (v) => (typeof v === 'object' ? v.light : v);
-const isGarden = (t) => t.name.startsWith('garden-');
-const note = (t) => `<div style="font-size:12px;color:var(--garden-ink-soft);line-height:1.4">${t.usage ?? ''}</div>`;
+const readLightValue = (value) => (typeof value === 'object' ? value.light : value);
+const isGardenToken = (token) => token.name.startsWith('garden-');
+const renderUsage = (token) => `<div style="font-size:12px;color:var(--garden-ink-soft);line-height:1.4">${token.usage ?? ''}</div>`;
 
-const swatches = (list) => `
+const renderSwatches = (tokenList) => `
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
-${list.map((t) => `
+${tokenList.map((token) => `
   <div style="background:var(--garden-raised);border-radius:var(--garden-radius);box-shadow:var(--garden-shadow);overflow:hidden">
-    <div style="height:72px;background:${light(t.value)}"></div>
+    <div style="height:72px;background:${readLightValue(token.value)}"></div>
     <div style="padding:10px 12px;display:grid;gap:4px">
-      <b style="font-size:13px">${t.name}</b>
-      <code style="font-size:12px">${light(t.value)}</code>
-      ${note(t)}
+      <b style="font-size:13px">${token.name}</b>
+      <code style="font-size:12px">${readLightValue(token.value)}</code>
+      ${renderUsage(token)}
     </div>
   </div>`).join('')}
 </div>`;
 
 export const Colours = {
-  render: () => swatches(tokens.color.tokens.filter(isGarden)),
+  render: () => renderSwatches(tokens.color.tokens.filter(isGardenToken)),
 };
 
 export const ColoursAppToday = {
   name: 'Colours (app today)',
-  render: () => swatches(tokens.color.tokens.filter((t) => !isGarden(t))),
+  render: () => renderSwatches(tokens.color.tokens.filter((token) => !isGardenToken(token))),
 };
 
 export const Typography = {
-  render: () => tokens.type.groups.map((g) => `
-<h3 style="margin:24px 0 8px">${g.name}</h3>
-${g.styles.map((s) => `
+  render: () => tokens.type.groups.map((group) => `
+<h3 style="margin:24px 0 8px">${group.name}</h3>
+${group.styles.map((style) => `
 <div style="display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--garden-line)">
-  <div><b style="font-size:13px">${s.name}</b><div style="font-size:12px;color:var(--garden-ink-soft)">${s.fontSize} / ${s.fontWeight}</div></div>
-  <div style="font-family:var(--font-${g.family ?? 'display'});font-size:${s.fontSize};font-weight:${s.fontWeight};line-height:${s.lineHeight}">${s.sample ?? 'de fiets'}</div>
+  <div><b style="font-size:13px">${style.name}</b><div style="font-size:12px;color:var(--garden-ink-soft)">${style.fontSize} / ${style.fontWeight}</div></div>
+  <div style="font-family:var(--font-${group.family ?? 'display'});font-size:${style.fontSize};font-weight:${style.fontWeight};line-height:${style.lineHeight}">${style.sample ?? 'de fiets'}</div>
 </div>`).join('')}`).join(''),
 };
 
 export const Radius = {
   render: () => `
 <div style="display:flex;flex-wrap:wrap;gap:16px">
-${tokens.radius.tokens.map((t) => `
+${tokens.radius.tokens.map((token) => `
   <div style="width:150px;display:grid;gap:6px">
-    <div style="height:72px;background:var(--garden-sand);border-radius:${t.value}"></div>
-    <b style="font-size:13px">${t.name} · ${t.value}</b>${note(t)}
+    <div style="height:72px;background:var(--garden-sand);border-radius:${token.value}"></div>
+    <b style="font-size:13px">${token.name} · ${token.value}</b>${renderUsage(token)}
   </div>`).join('')}
 </div>`,
 };
 
 export const Spacing = {
-  render: () => tokens.spacing.tokens.map((t) => `
+  render: () => tokens.spacing.tokens.map((token) => `
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-  <code style="width:90px;font-size:12px">${t.name}</code>
-  <div style="height:14px;width:${t.value};background:var(--garden-primary);border-radius:3px"></div>
-  <span style="font-size:12px">${t.value}</span>
+  <code style="width:90px;font-size:12px">${token.name}</code>
+  <div style="height:14px;width:${token.value};background:var(--garden-primary);border-radius:3px"></div>
+  <span style="font-size:12px">${token.value}</span>
 </div>`).join(''),
 };
 
 export const Shadows = {
   render: () => `
 <div style="display:flex;flex-wrap:wrap;gap:24px">
-${tokens.shadow.tokens.map((t) => `
+${tokens.shadow.tokens.map((token) => `
   <div style="width:200px;display:grid;gap:10px">
-    <div style="height:90px;background:var(--garden-raised);border-radius:var(--garden-radius);box-shadow:${light(t.value)}"></div>
-    <b style="font-size:13px">${t.name}</b>${note(t)}
+    <div style="height:90px;background:var(--garden-raised);border-radius:var(--garden-radius);box-shadow:${readLightValue(token.value)}"></div>
+    <b style="font-size:13px">${token.name}</b>${renderUsage(token)}
   </div>`).join('')}
 </div>`,
 };

@@ -86,7 +86,7 @@ docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim sh -c "npm ci && np
 | `.env.example` | Template for `.env`, listing every environment variable with a comment. |
 | `.env` | The real secrets and data path for this server. Git-ignored; never committed. |
 | `.gitignore` | Keeps dependencies, personal data, databases, secrets and import reports out of git. |
-| `.dockerignore` | Keeps dependencies, data, secrets, tests and docs out of the Docker build context. |
+| `.dockerignore` | Keeps dependencies, data, secrets, tests, docs and Storybook out of the Docker build context. |
 
 ## Folders
 
@@ -98,3 +98,4 @@ docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim sh -c "npm ci && np
 | `scripts/` | Command-line tools, such as the artifact-export import. |
 | `test/` | `node --test` suites for the server, the import and the browser logic. |
 | `docs/` | Background documents, such as the migration handoff spec. |
+| `storybook/` | Storybook for the Сад components and tokens (own `package.json`, not in the app image). Keep it in sync with every UI change; see the `storybook-maintenance` skill. |

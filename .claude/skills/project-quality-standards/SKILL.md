@@ -19,6 +19,7 @@ new and touched code. `references/current-state.md` lists the known deviations a
    | Any name: file, folder, variable, function, table, column, CSS class, HTML id | `references/naming.md` |
    | Layout, quotes, imports, SQL/HTML/CSS/JSON/Markdown/YAML style | `references/formatting.md` |
    | `public/` pages, markup, styles | `references/html-and-css.md` |
+   | UI components, tokens, anything in `app/storybook/` | the `storybook-maintenance` skill |
    | Migrations, tables, views, indexes, queries | `references/database.md` |
    | Adding, moving or deleting any file | `references/folder-readme.md` |
    | Planning a refactor of existing code | `references/current-state.md` |
@@ -75,5 +76,6 @@ commit.
 - [ ] HTML uses semantic tags, labels and typed buttons, with scoped ids and BEM classes.
 - [ ] Schema changes are a new migration that follows the database naming.
 - [ ] Every folder touched has an up-to-date `README.md`.
+- [ ] UI changes are reflected in Storybook in the same commit (`storybook-maintenance` skill), and its build passes.
 - [ ] Tests cover the change (`node --test`), and `npm test` passes in Docker.
 - [ ] If a contract that Claude uses changed (MCP tool names or arguments, REST fields), the skills and docs that mention it are updated.

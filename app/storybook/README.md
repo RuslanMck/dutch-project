@@ -1,6 +1,16 @@
 # Storybook — Сад components
 
+> Agents: read the `storybook-maintenance` skill (`.claude/skills/storybook-maintenance/`) before any UI change. A UI change is not done until Storybook shows it.
+
 The Dutch app's component library: tokens, every component, and the planned screens, in the Сад look. It is separate from the app (its own `package.json`), so it adds nothing to the app's image.
+
+## Files
+
+| File | What it does |
+|---|---|
+| `package.json` | Storybook dependencies and the `tokens`, `storybook` and `build` scripts. Separate from the app. |
+| `package-lock.json` | Locked dependency versions. |
+| `.gitignore` | Keeps `node_modules/`, `storybook-static/` and the generated `styles/tokens.css` out of git. |
 
 ## Layout
 
