@@ -752,16 +752,34 @@ details.rule > summary::-webkit-details-marker {
 
 .hint-button {
   flex: 0 0 auto;
-  min-width: 36px;
-  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  margin: -6px 0;   /* a 32px target that doesn't push the label row taller */
   padding: 0;
-  border-radius: 999px;
-  border-color: var(--garden-primary);
+  border-color: transparent;
+  border-radius: var(--garden-radius-sm);
   background: transparent;
-  color: var(--garden-rust);
-  font-size: 15px;
-  font-weight: 700;
+  color: var(--garden-ink-soft);
 }
+
+.hint-button__icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hint-button:hover { color: var(--garden-ink); }
+.hint-button[aria-expanded="true"] { color: var(--garden-ink); }
+.hint-button[aria-expanded="true"] .hint-button__icon circle { fill: var(--garden-sand); }
 
 .hint {
   margin: 6px 0 0;
@@ -1471,7 +1489,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .difficulty-badge--hard { background: var(--garden-blush); }
 .badge { font-weight: 800; }
 .hint { background: var(--garden-sand); color: var(--garden-ink); border-radius: var(--garden-radius-sm); }
-.hint-button { border-color: var(--garden-ink-soft); color: var(--garden-ink); background: var(--garden-raised); }
 .rule-body .ex { border-left: none; border-radius: var(--garden-radius-sm); background: var(--garden-sand); }
 .mh { color: var(--garden-rust); }
 .bar-chart { border-bottom-color: var(--garden-line); }
