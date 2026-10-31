@@ -1884,6 +1884,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .sheet__detail dt { font-size: 12px; font-weight: var(--garden-weight-strong); color: var(--garden-ink-soft); }
 .sheet__detail dd { margin: 2px 0 0; font-weight: var(--garden-weight-regular); }
 .sheet__actions { margin-top: 16px; display: grid; }
+.sheet__actions--pair { grid-template-columns: 1fr 1fr; gap: 10px; }
+.sheet__edit { margin: 14px 0 0; }
+.sheet__edit .sheet__actions { margin-top: 6px; }
 
 /* practice: progress of the set, and the round's celebration header */
 .practice-progress-bar { margin: 4px 0 8px; }

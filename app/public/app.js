@@ -5,6 +5,7 @@ import {
   buildHomeSummary,
   computeQueueProgressPercent,
   buildWordDetailView,
+  buildWordEditPatch,
   findNavigationSection,
   formatStrugglingTileLine,
   advanceDrillQueue,
@@ -524,17 +525,19 @@ function renderTable() {
   }).join('');
 }
 
-// A live refresh while the sheet is open shows the word's new values, or closes the sheet if it was deleted.
+// A live refresh while the sheet is open shows the word's new values, or closes the sheet if it was deleted. An open
+// edit form is left as it is.
 function syncOpenWordSheet() {
   if (!$('word-sheet').open) return;
   const word = state.words.find(stored => stored.id === ui.table.sheetWordId);
-  if (word) openWordSheet(word);
-  else $('word-sheet').close();
+  if (!word) $('word-sheet').close();
+  else if ($('word-sheet-edit').hidden) openWordSheet(word);
 }
 
-// The word sheet: details of one word. Read-only; delete stays in the table row.
+// The word sheet: details of one word, and «Змінити» to edit it. Delete stays in the table row.
 function openWordSheet(word) {
   ui.table.sheetWordId = word.id;
+  setWordSheetEditing(false);
   const view = buildWordDetailView(word);
   const title = $('word-sheet-title');
   title.innerHTML = `${view.article ? `<span class="art">${esc(view.article)}</span> ` : ''}${esc(view.dutch)}`;
@@ -545,7 +548,70 @@ function openWordSheet(word) {
   $('word-sheet-example-uk').textContent = view.exampleUkrainian;
   $('word-sheet-details').innerHTML = view.details
     .map(([label, value]) => `<div class="sheet__detail"><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('');
-  $('word-sheet').showModal();
+  if (!$('word-sheet').open) $('word-sheet').showModal();
+}
+
+// The sheet shows either the word's details or its edit form.
+function setWordSheetEditing(isEditing) {
+  $('word-sheet-edit').hidden = !isEditing;
+  $('word-sheet-view-actions').hidden = isEditing;
+  $('word-sheet-translation').hidden = isEditing;
+  $('word-sheet-details').hidden = isEditing;
+  if (isEditing) $('word-sheet-example').hidden = true;
+}
+
+function startWordEdit() {
+  const word = state.words.find(stored => stored.id === ui.table.sheetWordId);
+  if (!word) return;
+  const form = $('word-sheet-edit');
+  for (const field of ['nl', 'uk', 'section', 'example_nl', 'example_uk']) form.elements[field].value = word[field] ?? '';
+  form.elements.article.value = word.article || '';
+  setWordSheetEditing(true);
+  form.elements.uk.focus();
+}
+
+// Saves only the changed fields, then shows the details again. The practice on screen gets the new texts at once.
+async function saveWordEdit() {
+  const form = $('word-sheet-edit');
+  const word = state.words.find(stored => stored.id === ui.table.sheetWordId);
+  if (!word) return;
+  const values = Object.fromEntries(['nl', 'uk', 'article', 'section', 'example_nl', 'example_uk']
+    .map(field => [field, form.elements[field].value]));
+  const { patch, error } = buildWordEditPatch(word, values);
+  if (error) {
+    form.elements[error].focus();
+    return;
+  }
+  if (!Object.keys(patch).length) {
+    openWordSheet(word);
+    return;
+  }
+  const updated = await act(() => api.updateWord(word.id, patch), ['words', 'topics']);
+  if (!updated) return;
+  applyWordEditToPractice(updated);
+  const fresh = state.words.find(stored => stored.id === word.id);
+  if (fresh) openWordSheet(fresh);
+}
+
+// The practice and the drill hold their own copies of the words: the edited texts replace theirs.
+function applyWordEditToPractice(updated) {
+  const changes = { nl: updated.nl, uk: updated.uk, article: updated.article || '' };
+  const session = ui.fsrs;
+  const drill = ui.custom;
+  const lists = [session.queue, drill.words, drill.queue];
+  for (const direction of ROUND_DIRECTIONS) lists.push(session.waiting[direction], drill.waiting[direction]);
+  const copies = lists.flat();
+  if (session.current) copies.push(session.current.word);
+  if (drill.current) copies.push(drill.current.word);
+  if (ui.practice.current?.word) copies.push(ui.practice.current.word);
+  for (const copy of copies) if (copy?.id === updated.id) Object.assign(copy, changes);
+  renderPractice();
+}
+
+// The word on the practice screen that «Змінити» opens: the daily practice's, the article quiz's or the drill's.
+function findEditablePracticeWord() {
+  if (isCustomPracticeMode()) return ui.custom.current?.word ?? null;
+  return findCurrentPracticeWord();
 }
 
 // ---------- 2 · Картки ----------
@@ -1330,6 +1396,7 @@ function renderPractice() {
   $('practice-progress-hint-button').hidden = !isFsrs;
   if (!isFsrs) setHintOpen($('practice-progress-hint-button'), false);
   $('practice-delete-button').hidden = !findCurrentPracticeWord();
+  $('practice-edit-button').hidden = !findEditablePracticeWord();
   // Only the round 2 of the FSRS practice and of the custom drill show «Я мав рацію» (renderFsrsPractice,
   // renderCustomPractice). The drill's own blocks are shown by renderCustomPractice.
   $('practice-override-button').hidden = true;
@@ -2425,6 +2492,15 @@ function bindEvents() {
   $('home-continue-button').addEventListener('click', () => showTab('practice'));
   $('home-tile-struggling-button').addEventListener('click', handleHomeStrugglingTile);
   // A tap on the dimmed area around the word sheet closes it.
+  $('word-sheet-edit-button').addEventListener('click', startWordEdit);
+  $('word-sheet-edit-cancel').addEventListener('click', () => {
+    const word = state.words.find(stored => stored.id === ui.table.sheetWordId);
+    if (word) openWordSheet(word);
+  });
+  $('word-sheet-edit').addEventListener('submit', event => {
+    event.preventDefault();
+    saveWordEdit();
+  });
   $('word-sheet').addEventListener('click', event => {
     if (event.target === $('word-sheet')) $('word-sheet').close();
   });
@@ -2561,6 +2637,13 @@ function bindEvents() {
   $('practice-struggling-button').addEventListener('click', handleStrugglingButtonClick);
   $('practice-drill-again-button').addEventListener('click', restartCustomDrill);
   $('practice-drill-back-button').addEventListener('click', leaveCustomDrill);
+  $('practice-edit-button').addEventListener('click', () => {
+    const practiceWord = findEditablePracticeWord();
+    const word = practiceWord && state.words.find(stored => stored.id === practiceWord.id);
+    if (!word) return;
+    openWordSheet(word);
+    startWordEdit();
+  });
   $('practice-delete-button').addEventListener('click', () => {
     const word = findCurrentPracticeWord();
     if (word) askDeleteWord(word, () => deleteWordEverywhere(word.id));

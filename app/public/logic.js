@@ -1074,6 +1074,28 @@ export function buildWordDetailView(word) {
   };
 }
 
+// The PATCH body of the word edit form: only the fields that changed, texts trimmed. Dutch and Ukrainian may not be
+// empty (null is returned with the field to fix); a cleared example or chapter is sent as ''.
+export function buildWordEditPatch(word, values) {
+  const nl = String(values.nl ?? '').trim();
+  const uk = String(values.uk ?? '').trim();
+  if (!nl) return { error: 'nl' };
+  if (!uk) return { error: 'uk' };
+  const next = {
+    nl,
+    uk,
+    article: values.article || '',
+    section: String(values.section ?? '').trim(),
+    example_nl: String(values.example_nl ?? '').trim(),
+    example_uk: String(values.example_uk ?? '').trim(),
+  };
+  const patch = {};
+  for (const [field, value] of Object.entries(next)) {
+    if (value !== String(word[field] ?? '')) patch[field] = value;
+  }
+  return { patch };
+}
+
 // The practice progress bar: share of the set already done, from the words still queued and the most queued so far.
 export function computeQueueProgressPercent(queueLength, peakQueueLength) {
   if (!peakQueueLength) return 0;

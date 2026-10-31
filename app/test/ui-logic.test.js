@@ -11,6 +11,7 @@ import {
   levenshtein,
   checkAnswer,
   gradeTranslationAnswer,
+  buildWordEditPatch,
   renderRuleBody,
   formatDutchWithArticle,
   revealTranslationAnswer,
@@ -1441,4 +1442,16 @@ test('gradeTranslationAnswer accepts a plain hyphen for the dash in the stored w
   const word = { nl: 'klein – kleiner dan – het kleinst', article: '', kind: 'expression', uk: 'маленький' };
   assert.equal(gradeTranslationAnswer(word, 'klein - kleiner dan - het kleinst').grade, 'good');
   assert.equal(gradeTranslationAnswer(word, 'kleine - kleiner dan - het kleinste').grade, 'again');
+});
+
+test('buildWordEditPatch sends only the changed fields, trimmed, and refuses an empty word or translation', () => {
+  const word = { nl: 'klein', uk: 'малий', article: '', section: '6.1', example_nl: null, example_uk: 'Він малий.' };
+  const same = { nl: 'klein', uk: 'малий', article: '', section: '6.1', example_nl: '', example_uk: 'Він малий.' };
+  assert.deepEqual(buildWordEditPatch(word, same), { patch: {} });
+  assert.deepEqual(buildWordEditPatch(word, { ...same, uk: '  маленький ', example_uk: '' }),
+    { patch: { uk: 'маленький', example_uk: '' } });
+  assert.deepEqual(buildWordEditPatch(word, { ...same, article: 'het', section: ' 7 ' }),
+    { patch: { article: 'het', section: '7' } });
+  assert.deepEqual(buildWordEditPatch(word, { ...same, nl: '  ' }), { error: 'nl' });
+  assert.deepEqual(buildWordEditPatch(word, { ...same, uk: '' }), { error: 'uk' });
 });

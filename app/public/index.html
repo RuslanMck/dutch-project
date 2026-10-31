@@ -266,7 +266,8 @@
         aria-valuemin="0" aria-valuemax="100" hidden><span id="practice-progress-fill" class="progress-bar__fill"></span></div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
       <form id="practice-form" class="row-form" autocomplete="off">
-        <input id="practice-input" type="text" autocapitalize="none" spellcheck="false" aria-label="Відповідь">
+        <input id="practice-input" type="text" autocomplete="off" autocapitalize="none" autocorrect="off"
+          spellcheck="false" aria-label="Відповідь">
         <button id="practice-btn" class="primary" type="submit">Перевірити</button>
       </form>
       <button id="practice-skip-button" class="practice-skip" type="button" hidden>Не знаю</button>
@@ -283,6 +284,11 @@
         </button>
         <button id="practice-progress-hint-button" class="icon-button" type="button" aria-expanded="false"
           aria-controls="practice-progress-hint" aria-label="Пояснення до залишку" data-hint-button><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg></button>
+        <button id="practice-edit-button" class="icon-button" type="button" aria-label="Змінити слово" hidden>
+          <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/>
+          </svg>
+        </button>
         <button id="practice-delete-button" class="icon-button" type="button" aria-label="Видалити слово" hidden>
           <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>
@@ -481,7 +487,42 @@
     <p id="word-sheet-example-uk" class="sheet__example-uk"></p>
   </div>
   <dl id="word-sheet-details" class="sheet__details"></dl>
-  <form method="dialog" class="sheet__actions">
+  <form id="word-sheet-edit" class="form sheet__edit" autocomplete="off" hidden>
+    <label class="field">
+      <span>Слово</span>
+      <input name="nl" required autocapitalize="none" autocorrect="off" spellcheck="false">
+    </label>
+    <label class="field">
+      <span>Артикль</span>
+      <select name="article">
+        <option value="">—</option>
+        <option value="de">de</option>
+        <option value="het">het</option>
+      </select>
+    </label>
+    <label class="field wide">
+      <span>Переклад</span>
+      <input name="uk" required>
+    </label>
+    <label class="field">
+      <span>Глава</span>
+      <input name="section" inputmode="decimal" placeholder="6.1">
+    </label>
+    <label class="field wide">
+      <span>Приклад NL</span>
+      <input name="example_nl" autocapitalize="none" autocorrect="off" spellcheck="false">
+    </label>
+    <label class="field wide">
+      <span>Приклад UK</span>
+      <input name="example_uk">
+    </label>
+    <div class="sheet__actions sheet__actions--pair wide">
+      <button id="word-sheet-edit-cancel" class="ghost" type="button">Скасувати</button>
+      <button class="primary" type="submit">Зберегти</button>
+    </div>
+  </form>
+  <form id="word-sheet-view-actions" method="dialog" class="sheet__actions sheet__actions--pair">
+    <button id="word-sheet-edit-button" class="ghost" type="button">Змінити</button>
     <button id="word-sheet-close" class="primary" type="submit">Закрити</button>
   </form>
 </dialog>
