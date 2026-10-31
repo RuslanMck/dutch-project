@@ -15,8 +15,8 @@ This skill works together with `project-quality-standards`; where they differ, t
 |---|---|
 | Adding a UI component or a new variant/state of one | Add or extend its story and README in `stories/components/<Name>/` |
 | Changing markup in `public/index.html` or a view in `public/app.js` | Update the matching story's markup so class names and structure match |
-| Changing a style in `public/app.css` or `styles/garden.css` | Keep both consistent (see "Styles" below) and check the affected stories |
-| Changing a colour, radius, spacing, size, shadow or font | Edit `tokens/tokens.json` only, then rebuild |
+| Changing any style | Edit `styles/garden.css` (never `public/app.css`), run `npm run app-css`, check the affected stories |
+| Changing a colour, radius, spacing, size, shadow or font | Edit `tokens/tokens.json` only, then `npm run app-css` and rebuild |
 | Removing a component | Delete its story folder and README in the same commit |
 | Building a screen that exists as a sketch | Turn its parts into component stories, then trim or delete the sketch |
 | Only touching server code, the database or MCP tools | Nothing here, unless UI output changes |
@@ -27,6 +27,7 @@ This skill works together with `project-quality-standards`; where they differ, t
 app/storybook/
   tokens/tokens.json        source of truth for every token (light-only Сад values + legacy "app today")
   scripts/build-tokens.js   generates styles/tokens.css (git-ignored, never edit by hand)
+  scripts/build-app-css.js  generates ../public/app.css from tokens.css + garden.css
   styles/garden.css         component styles in the Сад look
   styles/stories.css        layout helpers for stories only (.r, .col, .wide) — never used by the app
   stories/Introduction.mdx  start page
@@ -52,13 +53,14 @@ will not know what drifted.
 - `styles/tokens.css` is generated; run `npm run tokens` (the `storybook` and `build` scripts do it first).
 
 ### 3. Styles
-- `styles/garden.css` holds the Сад component styles. `public/app.css` is the app's current stylesheet. Until Сад
-  ships, a style change for Сад goes in `garden.css`; a fix to the live app goes in `app.css` **and**, if the same
-  rule exists in `garden.css`, there too.
-- When Сад ships to the app, `garden.css` + `tokens.css` replace `app.css`, and this rule becomes "one stylesheet".
+- The app's stylesheet `public/app.css` is **generated**: `npm run app-css` in `app/storybook/` writes it from
+  `styles/tokens.css` + `styles/garden.css`. Never edit `app.css` by hand; edit `garden.css` or `tokens.json`, run
+  `npm run app-css`, and commit both the source and the regenerated `app.css`.
 - Class names follow the BEM rules in `project-quality-standards` (`references/html-and-css.md`).
 - Small elements stay modest: `garden-radius-sm` (8px) for controls and chips, 6px for tiny badges and chart bar
   tops. Only icon buttons, avatars and thin progress tracks are fully round.
+- The page `theme-color`, `manifest.webmanifest` colours and `icon.svg` use `garden-primary` / `garden-paper` /
+  `garden-ink`; change them with the tokens.
 
 ### 4. One folder per component
 `stories/components/<Name>/` contains exactly:
@@ -117,6 +119,12 @@ There is no Node on the VPS host; run everything in a container from `app/storyb
 docker run --rm -v "$PWD":/sb -w /sb node:24-bookworm-slim sh -c "npm install && npm run build"
 ```
 
+Regenerate the app's stylesheet (mounts `app/` so the script can write `public/app.css`; run from `app/`):
+
+```bash
+docker run --rm -v "$PWD":/app -w /app/storybook node:24-bookworm-slim sh -c "npm install && npm run app-css"
+```
+
 ```bash
 docker run --rm -it -v "$PWD":/sb -w /sb -p 6006:6006 node:24-bookworm-slim sh -c "npm install && npm run storybook -- --host 0.0.0.0"
 ```
@@ -127,7 +135,8 @@ docker run --rm -it -v "$PWD":/sb -w /sb -p 6006:6006 node:24-bookworm-slim sh -
 - [ ] Story markup matches the app's markup (same classes, attributes, structure).
 - [ ] No raw colours, radii or shadows: tokens only, and new tokens have a `usage` with contrast notes.
 - [ ] Removed components have no story left; renamed ones are renamed in the story folder too.
-- [ ] `npm run build` passes in Docker with no errors.
+- [ ] `public/app.css` was regenerated with `npm run app-css` and committed with its sources.
+- [ ] `npm run build` passes in Docker with no errors, and the app's `npm test` passes.
 - [ ] You looked at the changed stories (dev server, or a Playwright screenshot of
       `iframe.html?id=<story-id>&viewMode=story` on the static build).
 - [ ] Folder READMEs in `app/storybook/` list any added or removed files.

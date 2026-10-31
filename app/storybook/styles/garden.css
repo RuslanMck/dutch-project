@@ -355,7 +355,8 @@ table.words th {
 
 table.words td.w {
   font-weight: 600;
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: whole Dutch words set the column's minimum width */
+  overflow-wrap: break-word;
 }
 
 .art {

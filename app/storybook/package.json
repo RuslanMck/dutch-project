@@ -7,7 +7,8 @@
   "scripts": {
     "tokens": "node scripts/build-tokens.js",
     "storybook": "npm run tokens && storybook dev -p 6006 --no-open",
-    "build": "npm run tokens && storybook build -o storybook-static"
+    "build": "npm run tokens && storybook build -o storybook-static",
+    "app-css": "npm run tokens && node scripts/build-app-css.js"
   },
   "devDependencies": {
     "@storybook/addon-essentials": "8.6.14",

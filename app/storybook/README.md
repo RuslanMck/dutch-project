@@ -45,4 +45,4 @@ docker run --rm -v "$PWD":/sb -w /sb node:24-bookworm-slim sh -c "npm install &&
 - **A component's examples or guidelines:** edit `stories/components/<Name>/`.
 - **A new component:** add `stories/components/<Name>/<Name>.stories.js` with `title: 'Components/<Group>/<Name>'` and a `README.md`.
 
-The live app still uses `public/app.css` (the earlier look). When Сад ships, `garden.css` and `tokens.css` replace it.
+The app's `public/app.css` is generated from here: run `npm run app-css` after changing tokens or `garden.css` (see the `storybook-maintenance` skill).
