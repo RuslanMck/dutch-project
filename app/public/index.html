@@ -16,47 +16,79 @@
 <body>
 <div class="app">
 
-  <header class="top">
-    <button id="menu-open-button" class="icon-button menu-button" type="button" aria-label="Відкрити меню"
-      aria-controls="nav-drawer" aria-expanded="false">
-      <svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M4 6h16M4 12h16M4 18h16"/>
-      </svg>
-    </button>
-    <h1 id="page-title">Dutch матеріали</h1>
+  <header id="top-header" class="top">
+    <h1 id="page-title" tabindex="-1">Dutch матеріали</h1>
   </header>
-
-  <div id="nav-backdrop" class="drawer-backdrop" hidden></div>
-  <nav id="nav-drawer" class="drawer" aria-label="Розділи" role="dialog" aria-modal="true" hidden>
-    <div class="drawer__header">
-      <span class="drawer__brand">Dutch матеріали</span>
-      <button id="menu-close-button" class="icon-button" type="button" aria-label="Закрити меню">
-        <svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M6 6l12 12M18 6L6 18"/>
-        </svg>
-      </button>
-    </div>
-    <div class="tabs drawer__links">
-      <button type="button" class="drawer__link" data-tab="practice">Практика</button>
-      <button type="button" class="drawer__link" data-tab="decks">Колоди</button>
-      <button type="button" class="drawer__link" data-tab="cards">Картки</button>
-      <button type="button" class="drawer__link" data-tab="phrases">Фрази</button>
-      <button type="button" class="drawer__link" data-tab="word-order">Порядок слів</button>
-      <button type="button" class="drawer__link" data-tab="table">Таблиця</button>
-      <button type="button" class="drawer__link" data-tab="rules">Правила</button>
-      <button type="button" class="drawer__link" data-tab="texts">Тексти</button>
-      <button type="button" class="drawer__link" data-tab="stats">Статистика</button>
-    </div>
-    <form class="drawer__footer" method="post" action="/auth/logout">
-      <button class="ghost" type="submit">Вийти</button>
-    </form>
-  </nav>
 
   <div id="notice" class="notice" role="alert" hidden></div>
 
   <main>
+    <!-- 0 · Головна -->
+    <section id="tab-home" class="tab home" data-tab="home" aria-labelledby="home-greeting" hidden>
+      <div class="home-header">
+        <h1 id="home-greeting" class="home-header__greeting" tabindex="-1">Hoi!</h1>
+        <p class="home-header__subtitle">Що вчимо сьогодні?</p>
+      </div>
+      <form id="home-search-form" class="home-search" role="search">
+        <label class="sr-only" for="home-search-input">Пошук слова</label>
+        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4"/></svg>
+        <input id="home-search-input" type="search" placeholder="Пошук слова…" autocomplete="off" autocapitalize="none"
+          spellcheck="false">
+      </form>
+
+      <section class="continue-card" aria-labelledby="home-continue-title">
+        <div class="continue-card__top">
+          <span class="continue-card__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg></span>
+          <div class="continue-card__text">
+            <h2 id="home-continue-title" class="continue-card__title">Практика на сьогодні</h2>
+            <p id="home-continue-line" class="continue-card__line"></p>
+          </div>
+          <button id="home-continue-button" class="continue-card__button" type="button" aria-label="Відкрити практику"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+        <div class="progress-bar" role="progressbar" aria-labelledby="home-progress-label" aria-valuemin="0" aria-valuemax="100"
+          id="home-progress"><span id="home-progress-fill" class="progress-bar__fill"></span></div>
+        <p id="home-progress-label" class="continue-card__progress-label"></p>
+      </section>
+
+      <h2 class="home-section-title">Тренування</h2>
+      <div class="practice-tiles">
+        <button class="practice-tile practice-tile--cards" type="button" data-tab="cards">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h12v14H7zM4 7v13h12"/></svg></span>
+          <span class="practice-tile__name">Картки</span>
+          <span id="home-tile-cards" class="practice-tile__line"></span>
+        </button>
+        <button class="practice-tile practice-tile--word-order" type="button" data-tab="word-order">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg></span>
+          <span class="practice-tile__name">Порядок слів</span>
+          <span id="home-tile-word-order" class="practice-tile__line"></span>
+        </button>
+        <button class="practice-tile practice-tile--phrases" type="button" data-tab="phrases">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
+          <span class="practice-tile__name">Фрази</span>
+          <span id="home-tile-phrases" class="practice-tile__line"></span>
+        </button>
+        <button id="home-tile-struggling-button" class="practice-tile practice-tile--struggling" type="button">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg></span>
+          <span class="practice-tile__name">Важкі слова</span>
+          <span id="home-tile-struggling" class="practice-tile__line"></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 0b · Профіль -->
+    <section id="tab-profile" class="tab" data-tab="profile" hidden>
+      <nav class="profile-menu" aria-label="Інші розділи">
+        <button class="profile-menu__link" type="button" data-tab="table"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Слова</span></button>
+        <button class="profile-menu__link" type="button" data-tab="rules"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg><span>Правила</span></button>
+        <button class="profile-menu__link" type="button" data-tab="texts"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg><span>Тексти</span></button>
+      </nav>
+      <form class="profile-logout" method="post" action="/auth/logout">
+        <button class="ghost" type="submit">Вийти</button>
+      </form>
+    </section>
+
     <!-- 1 · Таблиця -->
-    <section id="tab-table" class="tab" data-tab="table">
+    <section id="tab-table" class="tab" data-tab="table" hidden>
       <form id="word-form" class="form" autocomplete="off">
         <label class="field">
           <span>Слово</span>
@@ -229,6 +261,8 @@
         </select>
         <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" — основна практика. Сесія — це слова, які ви зараз вивчаєте: вона триває, навіть кілька днів, доки всі слова не вивчені; прогрес зберігається. Нове слово треба назвати правильно 2 рази; кожна помилка додає ще один раз, до 6, а правильні відповіді зберігаються. Повтори теж рахуються. Набір іде у два раунди: спершу UA → NL, потім NL → UA; слово вивчене, коли його знаєте в обидва боки. Вивчене слово йде за розкладом повторень; якщо ви його забули, воно повертається в сесію. Коли всі нові слова сесії вивчені, одразу приходять наступні 10. "Артикль" — це тренування, яке нічого не змінює. "Важкі слова" — тренування слів, на які ви останнього разу відповіли неправильно або важко; нічого не змінює.</p>
       </div>
+      <div id="practice-progress-bar" class="progress-bar practice-progress-bar" role="progressbar" aria-label="Прогрес набору"
+        aria-valuemin="0" aria-valuemax="100" hidden><span id="practice-progress-fill" class="progress-bar__fill"></span></div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
       <form id="practice-form" class="row-form" autocomplete="off">
         <input id="practice-input" type="text" autocapitalize="none" spellcheck="false" aria-label="Відповідь">
@@ -416,6 +450,14 @@
       <div id="texts-list"></div>
     </section>
   </main>
+
+  <nav id="bottom-nav" class="bottom-nav" aria-label="Розділи">
+    <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg><span>Головна</span></button>
+    <button class="bottom-nav__item" type="button" data-tab="decks" data-nav="decks"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h12v14H7zM4 7v13h12"/></svg><span>Колоди</span></button>
+    <button class="bottom-nav__play" type="button" data-tab="practice" data-nav="practice" aria-label="Практика"><svg class="garden-icon garden-icon--filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></button>
+    <button class="bottom-nav__item" type="button" data-tab="stats" data-nav="stats"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Статистика</span></button>
+    <button class="bottom-nav__item" type="button" data-tab="profile" data-nav="profile"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zM4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span>Профіль</span></button>
+  </nav>
 </div>
 
 <dialog id="delete-dialog" class="dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-text">
@@ -425,6 +467,22 @@
     <button id="delete-dialog-cancel" type="button">Скасувати</button>
     <button id="delete-dialog-confirm" class="danger" type="button">Видалити</button>
   </div>
+</dialog>
+
+<dialog id="word-sheet" class="sheet" aria-labelledby="word-sheet-title">
+  <div class="sheet__grab" aria-hidden="true"></div>
+  <div class="sheet__head">
+    <h2 id="word-sheet-title" class="sheet__title"></h2>
+  </div>
+  <p id="word-sheet-translation" class="sheet__translation"></p>
+  <div id="word-sheet-example" class="sheet__example" hidden>
+    <p id="word-sheet-example-nl" class="sheet__example-nl"></p>
+    <p id="word-sheet-example-uk" class="sheet__example-uk"></p>
+  </div>
+  <dl id="word-sheet-details" class="sheet__details"></dl>
+  <form method="dialog" class="sheet__actions">
+    <button id="word-sheet-close" class="primary" type="submit">Закрити</button>
+  </form>
 </dialog>
 
 <script type="module" src="app.js"></script>

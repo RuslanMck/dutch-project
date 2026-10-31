@@ -82,6 +82,13 @@ import {
   sortCatalog,
   toggleSelected,
   TAB_TITLES,
+  NAVIGATION_SECTION_FOR_TAB,
+  buildHomeSummary,
+  buildWordDetailView,
+  computeQueueProgressPercent,
+  findNavigationSection,
+  formatStrugglingTileLine,
+  formatWordTotal,
 } from '../public/logic.js';
 
 test('esc escapes HTML special characters', () => {
@@ -1337,7 +1344,7 @@ test('the decks section of app.js uses textContent only and reads or writes deck
   assert.doesNotMatch(section, /recordResult|gradePracticeWord|gradePracticePhrase|postFsrsGrade|postPhraseGrade/);
 });
 
-test('every decks element id used by app.js exists in index.html, and the drawer links to the tab', () => {
+test('every decks element id used by app.js exists in index.html, and the bottom bar links to the tab', () => {
   const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
   const start = appSource.indexOf('// ---------- 7 · Колоди ----------');
   const end = appSource.indexOf('// ---------- start ----------');
@@ -1345,7 +1352,7 @@ test('every decks element id used by app.js exists in index.html, and the drawer
   assert.ok(used.size > 15, 'the section uses many ids');
   for (const id of used) assert.match(html, new RegExp(`id="${id}"`), `index.html has #${id}`);
   assert.match(html, /<section id="tab-decks" class="tab" data-tab="decks"/);
-  assert.match(html, /class="drawer__link" data-tab="decks">Колоди</);
+  assert.match(html, /class="bottom-nav__item" type="button" data-tab="decks" data-nav="decks">/);
 });
 
 test('api.js exports the deck calls with the REST paths of §2.2–2.3', () => {
@@ -1355,4 +1362,74 @@ test('api.js exports the deck calls with the REST paths of §2.2–2.3', () => {
     assert.match(apiSource, new RegExp(`export const ${name} = `), `${name} is exported`);
     assert.ok(apiSource.includes(route), `${name} uses ${route}`);
   }
+});
+
+// ---------- Сад layout (docs/GARDEN_LAYOUT.md) ----------
+
+test('every tab has a title and belongs to one bottom-bar item', () => {
+  const tabs = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
+  for (const tab of tabs) {
+    assert.ok(TAB_TITLES[tab], `${tab} has a title`);
+    assert.ok(['home', 'decks', 'practice', 'stats', 'profile'].includes(NAVIGATION_SECTION_FOR_TAB[tab]), `${tab} has a bar item`);
+  }
+  assert.equal(findNavigationSection('rules'), 'profile');
+  assert.equal(findNavigationSection('word-order'), 'home');
+  assert.equal(findNavigationSection('unknown'), 'home');
+});
+
+test('a new set, a new round and a refill each start the practice progress bar from zero', () => {
+  assert.match(functionBody(appSource, 'async function loadFsrsBatch(sessionId) {'), /peakQueueLength: 0/);
+  assert.match(functionBody(appSource, 'function startNextRound(holder) {'), /holder\.peakQueueLength = 0/);
+  assert.match(functionBody(appSource, "async function refillFsrsQueue(continueMessage = '') {"), /session\.peakQueueLength = 0/);
+});
+
+test('every tab is reachable: the bottom bar, the home tiles and the Профіль links name them all', () => {
+  const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
+  const linked = new Set([...html.matchAll(/<button[^>]*data-tab="([\w-]+)"/g)].map(match => match[1]));
+  for (const tab of Object.keys(NAVIGATION_SECTION_FOR_TAB)) assert.ok(linked.has(tab), `a button opens ${tab}`);
+  assert.doesNotMatch(html, /drawer/);
+});
+
+test('buildHomeSummary counts due, learning and started words', () => {
+  const now = 1_000;
+  const words = [
+    { status: 'learning', due_at: 500 },
+    { status: 'learned', due_at: 900 },
+    { status: 'learned', due_at: 5_000 },
+    { status: 'new', due_at: null },
+  ];
+  const summary = buildHomeSummary({ words, phraseCount: 3, now });
+  assert.equal(summary.line, 'До повторення: 2 · вчу: 1');
+  assert.equal(summary.startedPercent, 75);
+  assert.equal(summary.progressLabel, 'Почато 3 з 4 слів · 75%');
+  assert.equal(summary.cardsLine, '4 слова');
+  assert.equal(summary.phrasesLine, '3 фрази');
+  assert.equal(buildHomeSummary({ now }).startedPercent, 0);
+});
+
+test('formatWordTotal and formatStrugglingTileLine use Ukrainian plurals', () => {
+  assert.equal(formatWordTotal(1), '1 слово');
+  assert.equal(formatWordTotal(12), '12 слів');
+  assert.equal(formatStrugglingTileLine(null), 'Тренування без оцінок');
+  assert.equal(formatStrugglingTileLine(0), 'Немає важких слів');
+  assert.equal(formatStrugglingTileLine(22), '22 слова');
+});
+
+test('buildWordDetailView lists status, next review, errors and the optional chapter and topic', () => {
+  const view = buildWordDetailView({
+    nl: 'fiets', uk: 'велосипед', article: 'de', status: 'learning', next_due_on: null,
+    error_count: 2, section: '6.1', topic: '', example_nl: 'Ik fiets.', example_uk: '',
+  });
+  assert.equal(view.article, 'de');
+  assert.equal(view.exampleDutch, 'Ik fiets.');
+  assert.deepEqual(view.details.map(([label]) => label), ['Статус', 'Наступне повторення', 'Помилок', 'Глава']);
+  assert.equal(view.details[1][1], '—');
+  assert.equal(view.details[2][1], '2');
+});
+
+test('computeQueueProgressPercent is the share of the set done', () => {
+  assert.equal(computeQueueProgressPercent(10, 10), 0);
+  assert.equal(computeQueueProgressPercent(4, 10), 60);
+  assert.equal(computeQueueProgressPercent(0, 10), 100);
+  assert.equal(computeQueueProgressPercent(3, 0), 0);
 });

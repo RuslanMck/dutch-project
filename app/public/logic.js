@@ -457,12 +457,14 @@ function formatDutch(word) {
 // ---------- statistics page ----------
 
 export const TAB_TITLES = Object.freeze({
+  home: 'Головна',
+  profile: 'Профіль',
   practice: 'Практика',
   decks: 'Колоди',
   cards: 'Картки',
   phrases: 'Фрази',
   'word-order': 'Порядок слів',
-  table: 'Таблиця',
+  table: 'Слова',
   rules: 'Правила',
   texts: 'Тексти',
   stats: 'Статистика',
@@ -988,4 +990,76 @@ export function clearSelected() {
 // The sticky bar's count: "Обрано: 3".
 export function formatSelectedCount(count) {
   return `Обрано: ${count}`;
+}
+
+// ---------- Сад layout: bottom navigation and home (docs/GARDEN_LAYOUT.md) ----------
+
+// The bottom-bar item each tab belongs to: home tiles under Головна, the Профіль links under Профіль.
+export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
+  home: 'home',
+  cards: 'home',
+  'word-order': 'home',
+  phrases: 'home',
+  decks: 'decks',
+  practice: 'practice',
+  stats: 'stats',
+  profile: 'profile',
+  table: 'profile',
+  rules: 'profile',
+  texts: 'profile',
+});
+
+export function findNavigationSection(tab) {
+  return NAVIGATION_SECTION_FOR_TAB[tab] ?? 'home';
+}
+
+// The home screen's numbers. words: the word list (status, due_at); now: milliseconds. The bar shows started words.
+export function buildHomeSummary({ words = [], phraseCount = 0, now }) {
+  const dueCount = words.filter(word => word.due_at != null && word.due_at <= now && word.status !== 'new').length;
+  const learningCount = words.filter(word => word.status === 'learning').length;
+  // Started = left the «new» status. (Статистика's «Слів вивчено» counts finished learning decks, a different measure.)
+  const startedCount = words.filter(word => word.status !== 'new').length;
+  const startedPercent = words.length ? Math.round((startedCount / words.length) * 100) : 0;
+  return {
+    line: `До повторення: ${dueCount} · вчу: ${learningCount}`,
+    startedPercent,
+    progressLabel: `Почато ${startedCount} з ${words.length} слів · ${startedPercent}%`,
+    cardsLine: formatWordTotal(words.length),
+    phrasesLine: `${phraseCount} ${pluralize(phraseCount, ['фраза', 'фрази', 'фраз'])}`,
+  };
+}
+
+export function formatWordTotal(count) {
+  return `${count} ${pluralize(count, ['слово', 'слова', 'слів'])}`;
+}
+
+// The Важкі слова tile: null while the count is unknown (not read yet, or the read failed).
+export function formatStrugglingTileLine(count) {
+  if (count == null) return 'Тренування без оцінок';
+  return count ? formatWordTotal(count) : 'Немає важких слів';
+}
+
+// The word sheet on Слова: what each row shows. word: one word of the list.
+export function buildWordDetailView(word) {
+  const details = [
+    ['Статус', formatLearningStatus(word.status)],
+    ['Наступне повторення', formatShortDate(word.next_due_on) || '—'],
+    ['Помилок', String(word.error_count ?? 0)],
+  ];
+  if (word.section) details.push(['Глава', word.section]);
+  if (word.topic) details.push(['Тема', word.topic]);
+  return {
+    article: word.article || '',
+    dutch: word.nl,
+    translation: word.uk,
+    exampleDutch: word.example_nl || '',
+    exampleUkrainian: word.example_uk || '',
+    details,
+  };
+}
+
+// The practice progress bar: share of the set already done, from the words still queued and the most queued so far.
+export function computeQueueProgressPercent(queueLength, peakQueueLength) {
+  if (!peakQueueLength) return 0;
+  return Math.round(((peakQueueLength - queueLength) / peakQueueLength) * 100);
 }

@@ -180,70 +180,6 @@ button.ghost {
   line-height: 1.2;
 }
 
-/* navigation drawer */
-.menu-button {
-  margin-left: -8px;
-}
-
-.drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  background: rgba(59, 34, 22, 0.3);
-}
-
-.drawer {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 21;
-  display: flex;
-  flex-direction: column;
-  width: min(300px, 85vw);
-  padding: 12px;
-  background: var(--garden-raised);
-  border-right: 1px solid var(--garden-line);
-  overflow-y: auto;
-}
-
-.drawer__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0 8px 8px;
-}
-
-.drawer__brand {
-  font-weight: 700;
-}
-
-.drawer__links {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.drawer__link {
-  width: 100%;
-  min-height: 48px;
-  padding: 10px 12px;
-  text-align: left;
-  background: transparent;
-  border-color: transparent;
-  font-size: 17px;
-}
-
-.drawer__link[aria-current="page"] {
-  background: var(--garden-primary);
-  color: var(--garden-on-primary);
-  font-weight: 600;
-}
-
-.drawer__footer {
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid var(--garden-line);
-}
-
 /* statistics */
 .segmented {
   display: grid;
@@ -1616,8 +1552,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .stats-card .stat-tile { box-shadow: none; background: var(--garden-sand); }
 .stat-tile__value { font-weight: 800; }
 .segmented button, .deck-chips button { border-radius: var(--garden-radius-sm); background: var(--garden-sand); }
-.drawer { border-right: none; box-shadow: var(--garden-shadow); }
-.drawer__link { border-radius: var(--garden-radius-sm); background: transparent; }
 .status { border-radius: var(--garden-radius-sm); border-color: transparent; background: var(--garden-sand); color: var(--garden-ink); font-weight: 700; }
 .status.st-learning { background: var(--garden-primary); color: var(--garden-on-primary); border-color: transparent; }
 .status.st-learned { background: var(--garden-raised); color: var(--garden-forest); border-color: var(--garden-forest); }
@@ -1640,3 +1574,318 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .del { color: var(--garden-ink-soft); }
 .icon-button { color: var(--garden-ink-soft); }
 .shuffle-button[aria-pressed="true"] { color: var(--garden-ink); background: var(--garden-sand); border-radius: var(--garden-radius-sm); }
+
+/* ---------- Сад layout: bottom bar, Головна, Профіль, word sheet, practice progress (docs/GARDEN_LAYOUT.md) ---------- */
+
+.app { padding-bottom: 112px; }   /* room for the bottom bar */
+
+.garden-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.garden-icon--filled { fill: currentColor; stroke: none; }
+
+/* bottom bar */
+.bottom-nav {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(608px, calc(100% - 24px));
+  height: 68px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  background: var(--garden-raised);
+  border-radius: var(--garden-radius-lg);
+  box-shadow: var(--garden-shadow);
+}
+
+.bottom-nav__item {
+  min-height: var(--tap-min);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--garden-ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bottom-nav__item .garden-icon {
+  box-sizing: content-box;
+  padding: 3px 14px;
+  border-radius: var(--garden-radius-sm);
+}
+
+.bottom-nav__item[aria-current="page"] { color: var(--garden-ink); }
+.bottom-nav__item[aria-current="page"] .garden-icon { background: var(--garden-sand); }
+
+.bottom-nav__play {
+  justify-self: center;
+  width: 60px;
+  height: 60px;
+  margin-top: -34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 5px solid var(--garden-paper);
+  border-radius: 50%;
+  background: var(--garden-primary);
+  color: var(--garden-on-primary);
+  box-shadow: var(--garden-lift);
+}
+
+.bottom-nav__play[aria-current="page"] { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
+
+/* Головна */
+.home-header {
+  margin: -12px -16px 0;
+  padding: 32px 20px 56px;
+  border-radius: 0 0 var(--garden-radius-lg) var(--garden-radius-lg);
+  background: linear-gradient(160deg, var(--garden-primary) 0%, var(--garden-sand) 100%);
+  color: var(--garden-ink);
+}
+
+.home-header__greeting { margin: 0; font-size: 30px; line-height: 1.1; font-weight: 800; }
+.home-header__greeting:focus, #page-title:focus { outline: none; }
+.home-header__subtitle { margin: 4px 0 0; font-size: 14px; font-weight: 600; }
+
+.home-search {
+  position: relative;
+  margin: -30px 4px 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--garden-raised);
+  border-radius: var(--garden-radius);
+  box-shadow: var(--garden-shadow);
+  color: var(--garden-ink-soft);
+}
+
+.home-search input {
+  flex: 1;
+  min-height: 48px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--garden-ink);
+}
+
+.home-search input:focus { outline: none; }
+.home-search:focus-within { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
+
+.continue-card {
+  margin-top: 18px;
+  padding: 16px;
+  background: var(--garden-raised);
+  border-radius: var(--garden-radius);
+  box-shadow: var(--garden-shadow);
+}
+
+.continue-card__top { display: flex; align-items: center; gap: 12px; }
+
+.continue-card__icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-primary);
+  color: var(--garden-on-primary);
+}
+
+.continue-card__text { flex: 1; min-width: 0; }
+.continue-card__title { margin: 0; font-size: 16px; font-weight: 800; }
+.continue-card__line { margin: 2px 0 0; font-size: 13px; color: var(--garden-ink-soft); font-weight: 600; }
+
+.continue-card__button {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-sand);
+}
+
+.continue-card__progress-label { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--garden-ink-soft); }
+
+.progress-bar {
+  height: 10px;
+  margin-top: 14px;
+  border-radius: 5px;
+  background: var(--garden-tint);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--garden-primary);
+  transition: width 0.3s ease;
+}
+
+.home-section-title { margin: 24px 0 10px; font-size: 17px; font-weight: 700; }
+
+.practice-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.practice-tile {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--garden-radius);
+  text-align: left;
+  color: var(--garden-ink);
+}
+
+.practice-tile__icon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--garden-raised);
+}
+
+.practice-tile__name { font-size: 15px; font-weight: 800; }
+.practice-tile__line { font-size: 12px; font-weight: 600; }
+.practice-tile--cards { background: var(--garden-periwinkle); }
+.practice-tile--word-order { background: var(--garden-sand); }
+.practice-tile--phrases { background: var(--garden-peach); }
+.practice-tile--struggling { background: var(--garden-blush); }
+
+/* Профіль */
+.profile-menu {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: var(--garden-raised);
+  border-radius: var(--garden-radius);
+  box-shadow: var(--garden-shadow);
+}
+
+.profile-menu__link {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--garden-radius-sm);
+  background: transparent;
+  text-align: left;
+  font-weight: 700;
+}
+
+.profile-menu__link:hover { background: var(--garden-tint); }
+.profile-logout { margin-top: 16px; }
+
+/* Слова: the word opens its sheet */
+.word-link {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.word-link:hover { text-decoration: underline; }
+
+.sheet {
+  width: min(640px, 100%);
+  max-width: 100%;
+  max-height: 85vh;
+  margin: auto auto 0;
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom));
+  border: none;
+  border-radius: var(--garden-radius-lg) var(--garden-radius-lg) 0 0;
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+}
+
+.sheet::backdrop { background: color-mix(in srgb, var(--garden-ink) 35%, transparent); }
+
+.sheet__grab {
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 14px;
+  border-radius: 3px;
+  background: var(--garden-tint);
+}
+
+.sheet__title { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; }
+.sheet__title .art { font-weight: 800; }
+.sheet__translation { margin: 4px 0 0; font-size: 16px; color: var(--garden-ink-soft); }
+
+.sheet__example {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--garden-radius);
+  background: var(--garden-sand);
+}
+
+.sheet__example-nl { margin: 0; font-weight: 700; }
+.sheet__example-uk { margin: 2px 0 0; font-size: 13px; }
+
+.sheet__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.sheet__detail {
+  padding: 10px 12px;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-paper);
+}
+
+.sheet__detail dt { font-size: 12px; font-weight: 600; color: var(--garden-ink-soft); }
+.sheet__detail dd { margin: 2px 0 0; font-weight: 800; }
+.sheet__actions { margin-top: 16px; display: grid; }
+
+/* practice: progress of the set, and the round's celebration header */
+.practice-progress-bar { margin: 4px 0 8px; }
+
+.practice-round__title {
+  margin: 0 0 4px;
+  padding: 18px 16px;
+  border-radius: var(--garden-radius);
+  background: linear-gradient(160deg, var(--garden-primary) 0%, var(--garden-sand) 100%);
+  color: var(--garden-ink);
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+/* Above the bottom bar: the error notice and the Колоди selection bar. */
+.notice { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; }
+.deck-bar { bottom: calc(88px + env(safe-area-inset-bottom)); }

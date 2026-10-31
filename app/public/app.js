@@ -2,6 +2,11 @@
 // and keeps user input (form text, card index, practice question, open rules) across re-renders.
 import * as api from './api.js';
 import {
+  buildHomeSummary,
+  computeQueueProgressPercent,
+  buildWordDetailView,
+  findNavigationSection,
+  formatStrugglingTileLine,
   advanceDrillQueue,
   buildAlsoOrderLines,
   formatWrongFormsLine,
@@ -71,7 +76,7 @@ import {
   toggleSelected,
 } from './logic.js';
 
-const TABS = ['table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
+const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -105,12 +110,13 @@ const $ = id => document.getElementById(id);
 const state = { words: [], topics: [], rules: [], patterns: [], phrases: [], texts: [], loaded: false };
 
 const ui = {
-  tab: 'table',
+  tab: 'home',
+  home: { strugglingCount: null },  // Головна: the Важкі слова tile's count, null while unknown
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
   // Statistics page: the chosen period, its activity and the vocabulary counts, and the bar tapped in the chart.
   stats: { period: 'week', status: 'idle', activity: null, overview: null, selectedBarKey: null },
   armed: null,                       // { kind: 'phrase', id }: the phrase row waiting for a second click on delete
-  table: { q: '', topic: '' },
+  table: { q: '', topic: '', sheetWordId: null },   // sheetWordId: the word shown in the open word sheet
   // Cards: 'words' shows today's practice batch without grades; 'phrases' grades like the practice does.
   cards: {
     mode: 'words',
@@ -245,6 +251,8 @@ function setHintOpen(button, isOpen) {
 // ---------- tabs ----------
 
 const RENDER = {
+  home: renderHome,
+  profile: () => {},
   table: renderTable,
   cards: renderCards,
   practice: renderPractice,
@@ -261,23 +269,26 @@ function render() {
 }
 
 function showTab(name) {
-  ui.tab = TABS.includes(name) ? name : 'table';
+  ui.tab = TABS.includes(name) ? name : 'home';
   ui.armed = null;                   // switching tabs disarms the phrase delete
   try { localStorage.setItem('tab', ui.tab); } catch { /* storage unavailable */ }
-  for (const t of TABS) {
-    $(`tab-${t}`).hidden = t !== ui.tab;
-    const link = document.querySelector(`.tabs [data-tab="${t}"]`);
-    if (t === ui.tab) link.setAttribute('aria-current', 'page');
-    else link.removeAttribute('aria-current');
+  for (const t of TABS) $(`tab-${t}`).hidden = t !== ui.tab;
+  const section = findNavigationSection(ui.tab);
+  for (const item of document.querySelectorAll('#bottom-nav [data-nav]')) {
+    if (item.dataset.nav === section) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
   }
+  // Головна has its own gold header with the greeting.
+  $('top-header').hidden = ui.tab === 'home';
   $('page-title').textContent = TAB_TITLES[ui.tab];
   document.title = `${TAB_TITLES[ui.tab]} · Dutch матеріали`;
-  setDrawerOpen(false);
+  window.scrollTo(0, 0);
   if (ui.tab === 'practice') {
     // An idle custom drill (none running, or one that was left) never shows here: the daily practice does.
     if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = 'fsrs';
     ensureFsrsSession();
   }
+  if (ui.tab === 'home') loadHomeStrugglingCount();
   if (ui.tab === 'cards') ensureCardsBatch();
   if (ui.tab === 'stats') loadStats();
   if (ui.tab === 'decks') loadDeckList();
@@ -285,19 +296,48 @@ function showTab(name) {
   render();
 }
 
-// ---------- navigation drawer ----------
+function focusTabHeading() {
+  (ui.tab === 'home' ? $('home-greeting') : $('page-title')).focus();
+}
 
-// While the drawer is open the page behind it is inert: Tab stays in the menu and screen readers read only the menu.
-function setDrawerOpen(isOpen) {
-  const wasOpen = !$('nav-drawer').hidden;
-  $('nav-drawer').hidden = !isOpen;
-  $('nav-backdrop').hidden = !isOpen;
-  for (const element of document.querySelectorAll('.app > :not(#nav-drawer):not(#nav-backdrop)')) {
-    element.inert = isOpen;
+// ---------- Головна ----------
+
+// The Важкі слова tile's count: read each time Головна opens; unknown (null) until it arrives or when it fails.
+async function loadHomeStrugglingCount() {
+  try {
+    const listing = await api.getStrugglingWords();
+    ui.home.strugglingCount = listing.count;
+  } catch {
+    ui.home.strugglingCount = null;
   }
-  $('menu-open-button').setAttribute('aria-expanded', String(isOpen));
-  if (isOpen) document.querySelector('.tabs [aria-current="page"]')?.focus();
-  else if (wasOpen) $('menu-open-button').focus();
+  if (ui.tab === 'home') renderHome();
+}
+
+function renderHome() {
+  const summary = buildHomeSummary({ words: state.words, phraseCount: state.phrases.length, now: Date.now() });
+  $('home-continue-line').textContent = summary.line;
+  $('home-progress').setAttribute('aria-valuenow', String(summary.startedPercent));
+  $('home-progress-fill').style.width = `${summary.startedPercent}%`;
+  $('home-progress-label').textContent = summary.progressLabel;
+  $('home-tile-cards').textContent = summary.cardsLine;
+  $('home-tile-word-order').textContent = formatRuleFilterSummary(wordOrder.rules);
+  $('home-tile-phrases').textContent = summary.phrasesLine;
+  $('home-tile-struggling').textContent = formatStrugglingTileLine(ui.home.strugglingCount);
+}
+
+// The home search opens Слова with the query in its search field.
+function handleHomeSearch(event) {
+  event.preventDefault();
+  const query = $('home-search-input').value.trim();
+  ui.table.q = query;
+  $('table-q').value = query;
+  $('home-search-input').value = '';
+  showTab('table');
+}
+
+function handleHomeStrugglingTile() {
+  showTab('practice');
+  handleStrugglingButtonClick();
 }
 
 // ---------- statistics ----------
@@ -443,6 +483,7 @@ function renderTable() {
       (!nq || normalise(word.nl).includes(nq) || normalise(word.uk).includes(nq)))
     .sort((a, b) => a.added_at - b.added_at);
 
+  syncOpenWordSheet();
   const body = $('words-body');
   if (!rows.length) {
     const emptyMessage = state.words.length ? 'Нічого не знайдено.' : 'Слів поки немає.';
@@ -453,7 +494,7 @@ function renderTable() {
     const nextDate = formatShortDate(word.next_due_on);
     const nextDateCell = nextDate ? `<time datetime="${esc(word.next_due_on)}">${esc(nextDate)}</time>` : '';
     return `<tr>
-      <td class="w">${word.article ? `<span class="art">${esc(word.article)}</span> ` : ''}${esc(word.nl)}</td>
+      <td class="w"><button class="word-link" type="button" data-act="wopen" data-id="${word.id}">${word.article ? `<span class="art">${esc(word.article)}</span> ` : ''}${esc(word.nl)}</button></td>
       <td>${esc(word.section || '')}</td>
       <td>${esc(word.uk)}</td>
       <td>${nextDateCell}</td>
@@ -461,6 +502,30 @@ function renderTable() {
       <td><button class="del" type="button" data-act="wdel" data-id="${word.id}" aria-label="Видалити слово ${esc(word.nl)}">×</button></td>
     </tr>`;
   }).join('');
+}
+
+// A live refresh while the sheet is open shows the word's new values, or closes the sheet if it was deleted.
+function syncOpenWordSheet() {
+  if (!$('word-sheet').open) return;
+  const word = state.words.find(stored => stored.id === ui.table.sheetWordId);
+  if (word) openWordSheet(word);
+  else $('word-sheet').close();
+}
+
+// The word sheet: details of one word. Read-only; delete stays in the table row.
+function openWordSheet(word) {
+  ui.table.sheetWordId = word.id;
+  const view = buildWordDetailView(word);
+  const title = $('word-sheet-title');
+  title.innerHTML = `${view.article ? `<span class="art">${esc(view.article)}</span> ` : ''}${esc(view.dutch)}`;
+  $('word-sheet-translation').textContent = view.translation;
+  const hasExample = Boolean(view.exampleDutch || view.exampleUkrainian);
+  $('word-sheet-example').hidden = !hasExample;
+  $('word-sheet-example-nl').textContent = view.exampleDutch;
+  $('word-sheet-example-uk').textContent = view.exampleUkrainian;
+  $('word-sheet-details').innerHTML = view.details
+    .map(([label, value]) => `<div class="sheet__detail"><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('');
+  $('word-sheet').showModal();
 }
 
 // ---------- 2 · Картки ----------
@@ -858,6 +923,7 @@ async function loadFsrsBatch(sessionId) {
     sessionId,
     direction: 'uk_nl',
     queue: [],
+    peakQueueLength: 0,
     waiting: { uk_nl: [], nl_uk: [] },
     lastAnsweredId: null,
     answered: new Set(),
@@ -898,6 +964,7 @@ function startNextRound(holder) {
   const next = planNextRound(holder, holder.lastAnsweredId);
   if (!next) return null;
   Object.assign(holder, next);
+  holder.peakQueueLength = 0;        // each round fills its own progress bar
   return next.direction;
 }
 
@@ -943,6 +1010,7 @@ async function showRoundSummaryOrRefill() {
   if (round?.is_complete && round.finished_in_session_id === sessionId) {
     session.round = round;
     session.status = 'round-done';
+    session.peakQueueLength = 0;
     renderPractice();
     return;
   }
@@ -976,6 +1044,7 @@ async function refillFsrsQueue(continueMessage = '') {
   const sessionId = session.sessionId;
   session.current = null;
   session.status = 'loading';
+  session.peakQueueLength = 0;       // the next set fills its own progress bar
   renderPractice();
   // The last answer must be stored first: the set is planned from the store.
   await Promise.allSettled([...session.pendingGradePosts]);
@@ -1246,6 +1315,7 @@ function renderPractice() {
   $('practice-override-button').hidden = true;
   $('practice-drill-summary').hidden = true;
   $('practice-custom-note').hidden = true;
+  $('practice-progress-bar').hidden = true;      // the FSRS practice and the custom drill show it again
   if (isFsrs) renderFsrsPractice();
   else if (mode === 'art') renderArticlePractice();
   else renderCustomPractice();
@@ -1322,6 +1392,7 @@ function renderFsrsPractice() {
   $('practice-progress').textContent = isReady
     ? formatRoundProgress({ direction: session.direction, queueLength: session.queue.length })
     : '';
+  renderPracticeProgressBar(session, isReady);
   $('practice-schedule').textContent = formatScheduleLine(current);
   $('practice-score').textContent = '';
   $('practice-summary').hidden = session.status !== 'done';
@@ -1336,6 +1407,17 @@ function renderFsrsPractice() {
   $('practice-q').hidden = isRoundDone;
   $('practice-meta').hidden = isRoundDone;
   if (isRoundDone) renderRoundSummary();
+}
+
+// The bar above the question: how much of the set (or drill) is done. holder: ui.fsrs or the custom drill.
+function renderPracticeProgressBar(holder, isReady) {
+  const bar = $('practice-progress-bar');
+  bar.hidden = !isReady;
+  if (!isReady) return;
+  holder.peakQueueLength = Math.max(holder.peakQueueLength || 0, holder.queue.length);
+  const percent = computeQueueProgressPercent(holder.queue.length, holder.peakQueueLength);
+  bar.setAttribute('aria-valuenow', String(percent));
+  $('practice-progress-fill').style.width = `${percent}%`;
 }
 
 function renderPracticeSummary() {
@@ -1591,6 +1673,7 @@ function renderCustomPractice() {
   $('practice-progress').textContent = isReady
     ? formatCustomDrillProgress({ title: drill.title, direction: drill.direction, queueLength: drill.queue.length })
     : '';
+  renderPracticeProgressBar(drill, isReady);
   $('practice-custom-note').hidden = !isReady;
   $('practice-schedule').textContent = '';
   $('practice-score').textContent = '';
@@ -2310,15 +2393,20 @@ function buildWordOrderRuleList() {
 // ---------- wiring ----------
 
 function bindEvents() {
-  document.querySelector('.tabs').addEventListener('click', event => {
+  // Bottom bar, home tiles and the Профіль links: any button with a data-tab opens that tab.
+  document.addEventListener('click', event => {
     const button = event.target.closest('button[data-tab]');
-    if (button) showTab(button.dataset.tab);
+    if (!button) return;
+    showTab(button.dataset.tab);
+    // A home tile or a Профіль link is hidden by the switch: move focus to the new tab's heading.
+    if (!button.closest('#bottom-nav')) focusTabHeading();
   });
-  $('menu-open-button').addEventListener('click', () => setDrawerOpen(true));
-  $('menu-close-button').addEventListener('click', () => setDrawerOpen(false));
-  $('nav-backdrop').addEventListener('click', () => setDrawerOpen(false));
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !$('nav-drawer').hidden) setDrawerOpen(false);
+  $('home-search-form').addEventListener('submit', handleHomeSearch);
+  $('home-continue-button').addEventListener('click', () => showTab('practice'));
+  $('home-tile-struggling-button').addEventListener('click', handleHomeStrugglingTile);
+  // A tap on the dimmed area around the word sheet closes it.
+  $('word-sheet').addEventListener('click', event => {
+    if (event.target === $('word-sheet')) $('word-sheet').close();
   });
   $('stats-periods').addEventListener('click', handleStatsPeriodClick);
   // A mouse already selected the bar on hover, so its click keeps it; a tap toggles it.
@@ -2377,6 +2465,12 @@ function bindEvents() {
     renderTable();
   });
   $('words-body').addEventListener('click', event => {
+    const opener = event.target.closest('button[data-act="wopen"]');
+    if (opener) {
+      const word = state.words.find(stored => stored.id === Number(opener.dataset.id));
+      if (word) openWordSheet(word);
+      return;
+    }
     const button = event.target.closest('button[data-act="wdel"]');
     if (!button) return;
     const word = state.words.find(stored => stored.id === Number(button.dataset.id));
@@ -3063,8 +3157,8 @@ function init() {
   bindEvents();
   bindDeckEvents();
   renderShuffleButton();
-  let saved = 'table';
-  try { saved = localStorage.getItem('tab') || 'table'; } catch { /* storage unavailable */ }
+  let saved = 'home';
+  try { saved = localStorage.getItem('tab') || 'home'; } catch { /* storage unavailable */ }
   showTab(saved);
   refresh(ALL_KEYS).catch(error => notice(error.message || 'Не вдалося завантажити дані'));
   api.subscribe(collection => {

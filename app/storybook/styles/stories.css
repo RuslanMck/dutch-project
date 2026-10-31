@@ -2,3 +2,8 @@
 .r { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .col { max-width: 420px; }
 .wide { max-width: 640px; }
+
+/* The bottom bar and the word sheet are fixed / modal in the app; in a story they sit in the page. */
+.story-static-nav { padding-top: 40px; max-width: 420px; }
+.story-static-nav .bottom-nav { position: static; transform: none; width: 100%; }
+.story-static-sheet .sheet--story { position: static; margin: 0; }
