@@ -17,6 +17,9 @@ import { createApiRouter } from './create-api-router.js';
 const PUBLIC_DIRECTORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
 const LOGIN_PAGE_PATH = path.join(PUBLIC_DIRECTORY, 'login.html');
 const PUBLIC_FILE_NAMES_BEFORE_SIGN_IN = Object.freeze(['app.css', 'icon.svg', 'manifest.webmanifest']);
+// The login page uses these too. Font files never change name, so browsers may cache them for a year.
+const PUBLIC_FONT_DIRECTORY = path.join(PUBLIC_DIRECTORY, 'fonts');
+const FONT_CACHE_MAX_AGE = '365d';
 const JSON_BODY_LIMIT = '2mb';
 
 // services: from create-domain-services.js, on the same changeEventBus.
@@ -45,6 +48,7 @@ export function createApplication({ configuration, services, changeEventBus, clo
   for (const fileName of PUBLIC_FILE_NAMES_BEFORE_SIGN_IN) {
     application.get(`/${fileName}`, (request, response) => response.sendFile(path.join(PUBLIC_DIRECTORY, fileName)));
   }
+  application.use('/fonts', express.static(PUBLIC_FONT_DIRECTORY, { maxAge: FONT_CACHE_MAX_AGE, immutable: true }));
   application.use(createRequireAuthentication({ apiToken: configuration.apiToken, sessionCookie }));
   application.use('/api', createApiRouter({ ...services, changeEventBus, logger }));
   application.use(express.static(PUBLIC_DIRECTORY, { index: 'index.html' }));

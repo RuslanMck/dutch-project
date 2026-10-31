@@ -59,6 +59,8 @@ will not know what drifted.
 - Class names follow the BEM rules in `project-quality-standards` (`references/html-and-css.md`).
 - Small elements stay modest: `garden-radius-sm` (8px) for controls and chips, 6px for tiny badges and chart bar
   tops. Only icon buttons, avatars and thin progress tracks are fully round.
+- Fonts are self-hosted in `public/fonts/` (served before sign-in, Storybook maps them to `/fonts`); the
+  `@font-face` rules are at the top of `garden.css`. Never link a font CDN. A new font file needs its licence beside it.
 - The page `theme-color`, `manifest.webmanifest` colours and `icon.svg` use `garden-primary` / `garden-paper` /
   `garden-ink`; change them with the tokens.
 

@@ -62,6 +62,15 @@ test('unauthenticated API call gets 401 JSON, page requests redirect to /login',
   assert.equal(page.headers.get('location'), '/login');
 });
 
+test('the self-hosted fonts are served before sign-in, with a long cache', async () => {
+  const r = await fetch(`${base}/fonts/plus-jakarta-sans-latin.woff2`, noRedirect);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'font/woff2');
+  assert.match(r.headers.get('cache-control'), /immutable/);
+  const missing = await fetch(`${base}/fonts/nope.woff2`, noRedirect);
+  assert.notEqual(missing.status, 200);
+});
+
 test('GET /login serves the login page', async () => {
   const r = await fetch(`${base}/login`);
   assert.equal(r.status, 200);
