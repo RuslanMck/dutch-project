@@ -1,0 +1,4 @@
+/* Layout helpers used only by the stories. */
+.r { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.col { max-width: 420px; }
+.wide { max-width: 640px; }

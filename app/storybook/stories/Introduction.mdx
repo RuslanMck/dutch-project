@@ -1,0 +1,21 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Introduction" />
+
+# Dutch матеріали — Сад
+
+The component library for the Dutch app in its **Сад** (garden) look: a light cream page, gold and sand fills, soft tiles, bold Plus Jakarta Sans, and dark brown only for text and small marks.
+
+- **Foundations** — every token, read live from `tokens/tokens.json`.
+- **Components** — the app's parts with the markup from `public/index.html`, styled by `styles/garden.css`. Each page shows the component's guidelines.
+- **Sketches** — screens planned but not built yet.
+
+## Where to change things
+
+| To change | Edit |
+| --- | --- |
+| A colour, radius, size or shadow | `tokens/tokens.json` (`styles/tokens.css` is generated from it) |
+| How a component looks | `styles/garden.css` |
+| A component's examples or guidelines | `stories/components/<Name>/` |
+
+Сад is light-only: each colour has the same value in both themes.
