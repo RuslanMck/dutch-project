@@ -563,6 +563,7 @@ test('buildRoundSummaryView: totals, the hardest word, the paused span only when
     ['Помилок', '3'],
   ]);
   assert.equal(view.hardestText, 'Найважче слово: laten — залишати (3 помилки)');
+  assert.equal(view.wordsLabel, 'Слова набору (2): важко 1 · легко 1');
   assert.deepEqual(view.words[1], {
     dutch: 'de kat', ukrainian: 'кіт', difficulty: 'easy', difficultyLabel: 'легко',
     detail: 'відповідей: 2 · UA→NL: 0 · NL→UA: 0',

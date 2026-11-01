@@ -590,6 +590,30 @@ table.words td.w {
   overflow-wrap: anywhere;
 }
 
+.practice-round__words-box > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--garden-weight-strong);
+  cursor: pointer;
+}
+
+.practice-round__words-box > summary::-webkit-details-marker { display: none; }
+
+/* A chevron at the end of the line, turned up while the list is open. */
+.practice-round__words-box > summary::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.practice-round__words-box[open] > summary::after { transform: rotate(-135deg); }
+
 .practice-round__words {
   list-style: none;
   margin: 0;

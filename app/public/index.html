@@ -314,7 +314,10 @@
         <h2 id="practice-round-title" class="practice-round__title"></h2>
         <ul id="practice-round-stats" class="practice-summary__list"></ul>
         <p id="practice-round-hardest" class="practice-round__hardest"></p>
-        <ul id="practice-round-words" class="practice-round__words"></ul>
+        <details id="practice-round-words-box" class="practice-round__words-box">
+          <summary id="practice-round-words-summary"></summary>
+          <ul id="practice-round-words" class="practice-round__words"></ul>
+        </details>
         <div id="practice-round-drills" class="practice-round__drills" hidden>
           <button id="practice-round-hard-button" class="practice-summary__extra-button" type="button" hidden></button>
           <button id="practice-round-hard-medium-button" class="practice-summary__extra-button" type="button"
@@ -322,6 +325,8 @@
         </div>
         <button id="practice-round-next-button" class="primary practice-summary__extra-button" type="button">Наступний
           набір</button>
+        <button id="practice-round-finish-button" class="ghost practice-summary__extra-button" type="button">Завершити
+          на сьогодні</button>
       </section>
       <button id="practice-restart-button" class="primary practice-restart" type="button" hidden>Почати знову</button>
     </section>

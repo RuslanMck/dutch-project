@@ -1108,12 +1108,27 @@ function handleRoundNextClick() {
   refillFsrsQueue();
 }
 
+// «Завершити на сьогодні»: leaves the summary for Головна. The session stays; opening Практика later plans the next set.
+function handleRoundFinishClick() {
+  ui.fsrs.round = null;
+  ui.fsrs.status = 'idle';
+  showTab('home');
+}
+
 function renderRoundSummary() {
   const view = buildRoundSummaryView(ui.fsrs.round);
   $('practice-round-title').textContent = view.title;
   $('practice-round-stats').innerHTML = view.stats.map(([label, value]) =>
     `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
   $('practice-round-hardest').textContent = view.hardestText;
+  $('practice-round-words-summary').textContent = view.wordsLabel;
+  // A new summary starts folded; a re-render of the same one keeps the learner's choice.
+  const box = $('practice-round-words-box');
+  const roundKey = String(ui.fsrs.round.finished_at);
+  if (box.dataset.round !== roundKey) {
+    box.dataset.round = roundKey;
+    box.open = false;
+  }
   $('practice-round-words').innerHTML = view.words.map(word => `
     <li class="practice-round__word">
       <span><strong>${esc(word.dutch)}</strong> — ${esc(word.ukrainian)}</span>
@@ -2653,6 +2668,7 @@ function bindEvents() {
   $('practice-round-hard-button').addEventListener('click', () => handleRoundDrillClick('hard'));
   $('practice-round-hard-medium-button').addEventListener('click', () => handleRoundDrillClick('hard-medium'));
   $('practice-round-next-button').addEventListener('click', handleRoundNextClick);
+  $('practice-round-finish-button').addEventListener('click', handleRoundFinishClick);
 
   // Правила
   $('rules-q').addEventListener('input', event => {

@@ -448,7 +448,13 @@ export function buildRoundSummaryView(round) {
     difficultyLabel: DIFFICULTY_LABELS[word.difficulty],
     detail: `відповідей: ${word.answer_count} · UA→NL: ${word.mistakes?.uk_nl ?? 0} · NL→UA: ${word.mistakes?.nl_uk ?? 0}`,
   }));
-  return { title: 'Вітаємо! Набір завершено 🎉', stats, hardestText, words };
+  // The list is folded by default; its summary line counts the words per difficulty («важко 1 · середньо 2 · легко 7»).
+  const difficultyCounts = ['hard', 'medium', 'easy']
+    .map(difficulty => [DIFFICULTY_LABELS[difficulty], words.filter(word => word.difficulty === difficulty).length])
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => `${label} ${count}`);
+  const wordsLabel = `Слова набору (${words.length})${difficultyCounts.length ? `: ${difficultyCounts.join(' · ')}` : ''}`;
+  return { title: 'Вітаємо! Набір завершено 🎉', stats, hardestText, words, wordsLabel };
 }
 
 function formatDutch(word) {
