@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildOfflineSet,
   buildSetWordIds,
+  buildGradePostBody,
   restorePracticeSnapshot,
   formatOfflineBanner,
   formatDroppedNotice,
@@ -1581,7 +1582,38 @@ test('the page wires the offline support: banner, service worker, outbox for gra
   assert.match(html, /<div id="offline-banner"[^>]*role="status"[^>]*hidden>/);
   assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png">/);
   assert.match(appSource, /serviceWorker\.register\('\/sw\.js'\)/);
-  assert.match(functionBody(appSource, 'async function postFsrsGrade(current, answer) {'), /queueOfflineAnswer\('grade', GRADES_URL, body\)/);
+  assert.match(functionBody(appSource, 'async function postFsrsGrade(current, answer) {'), /queueOfflineAnswer\('grade', GRADES_URL, buildBody\(true\)\)/);
   assert.match(functionBody(appSource, 'function bindLogout() {'), /type: 'clear-data'/);
   assert.match(functionBody(appSource, 'function bindLogout() {'), /askConfirm/);
+});
+
+const gradeBodyInput = {
+  wordId: 7, grade: 'good', answer: 'huis', sessionId: 's1', direction: 'uk_nl', clientAnswerId: 'c1', answeredAt: 1000,
+  setWordIds: [7, 8], setOpenedAt: 900,
+};
+
+test('buildGradePostBody: a direct post of an ordinary set has no answered_at and no set_word_ids', () => {
+  const body = buildGradePostBody({ ...gradeBodyInput, isQueued: false, offlineSet: false });
+  assert.deepEqual(body, {
+    word_id: 7, grade: 'good', answer: 'huis', session_id: 's1', direction: 'uk_nl', client_answer_id: 'c1',
+  });
+});
+
+test('buildGradePostBody: a queued answer carries answered_at, set ids only for an offline set', () => {
+  const ordinary = buildGradePostBody({ ...gradeBodyInput, isQueued: true, offlineSet: false });
+  assert.equal(ordinary.answered_at, 1000);
+  assert.ok(!('set_word_ids' in ordinary) && !('set_opened_at' in ordinary));
+  const offline = buildGradePostBody({ ...gradeBodyInput, isQueued: true, offlineSet: true });
+  assert.deepEqual([offline.answered_at, offline.set_word_ids, offline.set_opened_at], [1000, [7, 8], 900]);
+});
+
+test('buildGradePostBody: an offline set sends its ids and open time on a direct post too, without answered_at', () => {
+  const body = buildGradePostBody({ ...gradeBodyInput, isQueued: false, offlineSet: true });
+  assert.ok(!('answered_at' in body));
+  assert.deepEqual([body.set_word_ids, body.set_opened_at, body.client_answer_id], [[7, 8], 900, 'c1']);
+});
+
+test('restorePracticeSnapshot returns the time the set was opened', () => {
+  const restored = restorePracticeSnapshot({ snapshot: { ...baseSnapshot, setOpenedAt: 1234 }, calendarDate: '2026-11-02' });
+  assert.equal(restored.setOpenedAt, 1234);
 });

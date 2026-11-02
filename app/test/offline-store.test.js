@@ -1,7 +1,7 @@
 // Tests for public/offline-store.js: the in-memory store (Node has no IndexedDB) and flushOutbox with fake posts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMemoryStore, flushOutbox, getStore, offlineStore } from '../public/offline-store.js';
+import { MAX_ATTEMPTS, createMemoryStore, flushOutbox, getStore, offlineStore } from '../public/offline-store.js';
 
 const statusError = status => Object.assign(new Error(`status ${status}`), { status });
 
@@ -129,4 +129,59 @@ test('flushOutbox runs one at a time: a second call gets the running one', async
 test('flushOutbox with an empty outbox does nothing', async () => {
   const result = await flushOutbox({ store: createMemoryStore(), post: async () => { throw new Error('no post expected'); } });
   assert.deepEqual(result, { sent: 0, dropped: 0, remaining: 0, needsLogin: false });
+});
+
+test('flushOutbox picks up entries enqueued during the flush', async () => {
+  const store = await createFilledStore(1);
+  const posted = [];
+  const result = await flushOutbox({
+    store,
+    post: async url => {
+      posted.push(url);
+      if (url === '/a') await store.enqueue({ kind: 'grade', url: '/late', body: {}, created_at: 50 });
+    },
+  });
+  assert.deepEqual(posted, ['/a', '/late']);
+  assert.deepEqual(result, { sent: 2, dropped: 0, remaining: 0, needsLogin: false });
+});
+
+test('flushOutbox counts the remaining entries from the store, entries added meanwhile included', async () => {
+  const store = await createFilledStore(2);
+  const progress = [];
+  await flushOutbox({
+    store,
+    post: async url => { if (url === '/a') await store.enqueue({ kind: 'grade', url: '/late', body: {}, created_at: 50 }); },
+    onProgress: entry => progress.push(entry.remaining),
+  });
+  assert.deepEqual(progress, [2, 1, 0]);
+});
+
+test('an entry failing with a 5xx is kept with its attempts and dropped after the fifth', async () => {
+  const store = await createFilledStore(2);
+  const failing = async url => { if (url === '/a') throw statusError(500); };
+  for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const result = await flushOutbox({ store, post: failing });
+    assert.equal(result.remaining, 2);
+    assert.equal((await store.listAll())[0].attempts, attempt);
+  }
+  const result = await flushOutbox({ store, post: failing });
+  assert.deepEqual(result, { sent: 1, dropped: 1, remaining: 0, needsLogin: false });
+});
+
+test('a network error is not an attempt', async () => {
+  const store = await createFilledStore(1);
+  for (let index = 0; index < 8; index += 1) {
+    await flushOutbox({ store, post: async () => { throw Object.assign(new Error('offline'), { offline: true, status: 0 }); } });
+  }
+  const [entry] = await store.listAll();
+  assert.ok(!entry.attempts);
+});
+
+test('listAll orders by body.answered_at (created_at when missing), then seq', async () => {
+  const store = createMemoryStore();
+  await store.enqueue({ kind: 'grade', url: '/late-answer', body: { answered_at: 300 }, created_at: 310 });
+  await store.enqueue({ kind: 'grade', url: '/slow-post', body: { answered_at: 100 }, created_at: 400 });
+  await store.enqueue({ kind: 'drill', url: '/no-time', body: {}, created_at: 200 });
+  await store.enqueue({ kind: 'drill', url: '/tie', body: {}, created_at: 200 });
+  assert.deepEqual((await store.listAll()).map(entry => entry.url), ['/slow-post', '/no-time', '/tie', '/late-answer']);
 });

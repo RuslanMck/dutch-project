@@ -93,9 +93,11 @@ export function createPracticeService({
   // answer moves the word's deck in its direction and is kept in deck_answers. Returns the word's new state with its
   // deck (describeDeckPositions, has_learned, has_learned_direction) and is_repeat.
   // The offline fields (REST): answeredAt is the time of the answer (default now), clientAnswerId makes a repeated
-  // answer return the first response, setWordIds is the set practised offline (see gradeFirstInSessionInTransaction).
+  // answer return the first response, setWordIds is the set practised offline and setOpenedAt when it started (see
+  // gradeFirstInSessionInTransaction).
   function gradeWord({
     wordId, grade, answer, sessionId, direction = UK_TO_NL_DIRECTION, answeredAt, clientAnswerId, setWordIds,
+    setOpenedAt,
   }) {
     assertDirection(direction);
     answeredAt = resolveAnsweredAt(answeredAt, clock.now());
@@ -104,7 +106,7 @@ export function createPracticeService({
       clientAnswerId,
       kind: CLIENT_ANSWER_KIND_GRADE,
       operation: () => gradeWordInTransaction({
-        settings, wordId, grade, answer, sessionId, direction, answeredAt, setWordIds,
+        settings, wordId, grade, answer, sessionId, direction, answeredAt, setWordIds, setOpenedAt,
       }),
     }));
     if (!isReplay) changeEventBus.publishChange('words');
@@ -114,12 +116,16 @@ export function createPracticeService({
   // Picks the case of the answer from the word's review log of today, whatever the session: no log (first grade), a log
   // whose other direction is not answered yet (the first answer in the other direction), or a repeat. With answeredAt
   // the answer is dated then, and refused when the word has an answer later than that.
-  function gradeWordInTransaction({ settings, wordId, grade, answer, sessionId, direction, answeredAt, setWordIds }) {
+  function gradeWordInTransaction({
+    settings, wordId, grade, answer, sessionId, direction, answeredAt, setWordIds, setOpenedAt,
+  }) {
     const word = getPracticeWordRowOrThrow(wordId);
     if (answeredAt !== undefined) assertNoLaterAnswer(wordId, answeredAt);
     const timestamp = answeredAt ?? clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
-    const gradeContext = { settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds };
+    const gradeContext = {
+      settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds, setOpenedAt,
+    };
     const reviewLog = practiceRepository.findLatestReviewLogSince({
       wordId,
       sinceTimestamp: findStartOfDay(today, settings.timeZone),
@@ -136,12 +142,13 @@ export function createPracticeService({
   // direction is still to be answered, and a review word may not be asked the other way later. The card keeps its own
   // due day for the second direction.
   // setWordIds (offline, REST): when no set is open today, the set is pinned to these words instead of the planned one.
+  // setOpenedAt (offline, REST): when the phone's set started, so the answers it got before this grade count for it.
   function gradeFirstInSessionInTransaction({
-    settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds,
+    settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds, setOpenedAt,
   }) {
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
     const plan = pinWordSet({
-      settings, today, gradedWordIds, timestamp, preferredWordIds: setWordIds, gradedWordId: word.id,
+      settings, today, gradedWordIds, timestamp, preferredWordIds: setWordIds, gradedWordId: word.id, setOpenedAt,
     });
     // A set is 10 words at most: a New word outside the open set waits for a later set.
     if (plan.isOpen && word.fsrs_card === null && !plan.wordIds.includes(word.id)) {
@@ -535,15 +542,20 @@ export function createPracticeService({
   // preferredWordIds (offline): the set the phone practised. It is pinned when no set is open, and also when one is
   // open but the graded word belongs to the phone's set and not to the open one: offline the phone cannot see the
   // learning deck, so it may finish a set the server still holds open. The words left in that set stay in the learning
-  // deck, and the deck comes first in a later set.
-  function pinWordSet({ settings, today, gradedWordIds, timestamp, preferredWordIds = [], gradedWordId = null }) {
+  // deck, and the deck comes first in a later set. A set that is the same as the open one is not pinned again.
+  // setOpenedAt: the time the phone's set started (see resolvePinnedOpenedAt); the set opens then.
+  function pinWordSet({
+    settings, today, gradedWordIds, timestamp, preferredWordIds = [], gradedWordId = null, setOpenedAt,
+  }) {
     const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds });
     const preferredExistingWordIds = keepExistingWordIds(preferredWordIds, settings.newPerDay);
     const hasPhoneMovedOn = plan.isOpen && preferredExistingWordIds.includes(gradedWordId)
-      && !plan.wordIds.includes(gradedWordId) && !plan.practiceSet.itemIds.includes(gradedWordId);
+      && !plan.wordIds.includes(gradedWordId) && !plan.practiceSet.itemIds.includes(gradedWordId)
+      && !areSameWordIds(preferredExistingWordIds, plan.practiceSet.itemIds);
     if (plan.isOpen && !hasPhoneMovedOn) return plan;
     if (preferredExistingWordIds.length) {
-      const practiceSet = openPracticeSet({ today, openedAt: timestamp, itemIds: preferredExistingWordIds });
+      const openedAt = resolvePinnedOpenedAt(setOpenedAt, timestamp);
+      const practiceSet = openPracticeSet({ today, openedAt, itemIds: preferredExistingWordIds });
       practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
       return Object.freeze({ ...plan, isOpen: true, practiceSet, wordIds: practiceSet.itemIds });
     }
@@ -552,6 +564,21 @@ export function createPracticeService({
       practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
     }
     return plan;
+  }
+
+  // The opened_at of a set pinned from the phone's set: its set_opened_at when given, not older than 7 days before the
+  // answer and clamped to now (a later time is now); otherwise the answer's time.
+  function resolvePinnedOpenedAt(setOpenedAt, timestamp) {
+    if (setOpenedAt === undefined) return timestamp;
+    const clampedOpenedAt = Math.min(setOpenedAt, clock.now());
+    if (clampedOpenedAt < timestamp - ANSWERED_AT_MAXIMUM_AGE_MS) return timestamp;
+    return Math.min(clampedOpenedAt, timestamp);
+  }
+
+  // Whether two lists of word ids hold the same ids in the same order.
+  function areSameWordIds(firstWordIds, secondWordIds) {
+    return firstWordIds.length === secondWordIds.length
+      && firstWordIds.every((wordId, index) => wordId === secondWordIds[index]);
   }
 
   // The ids (without repeats, in the given order) of the words that exist, at most limit.

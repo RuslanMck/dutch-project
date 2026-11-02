@@ -4,8 +4,8 @@
 const APP_VERSION = '__APP_VERSION__';
 const SHELL_CACHE = `shell-${APP_VERSION}`;
 const API_CACHE = 'api-v1';
-const NAVIGATION_TIMEOUT_MS = 4000;
-const API_TIMEOUT_MS = 6000;
+const NAVIGATION_TIMEOUT_MS = 10000;
+const API_TIMEOUT_MS = 15000;
 
 const SHELL_URLS = [
   '/',
@@ -26,11 +26,23 @@ const SHELL_URLS = [
   '/fonts/manrope-latin.woff2',
 ];
 
+// Only a plain 200 answer that did not come through a redirect is stored (signed out, '/' redirects to /login).
+function isStorable(response) {
+  return response.status === 200 && !response.redirected;
+}
+
+// Practice answers the page never reads from a cache: they are not stored (they also grew the cache without limit).
+function isUncachedApi(url) {
+  return url.searchParams.has('session_id')
+    || url.pathname === '/api/practice/round-summary'
+    || url.pathname === '/api/practice/spare-words';
+}
+
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
     // One missing file (for example an optional one) must not fail the whole install.
-    await Promise.all(SHELL_URLS.map(url => cache.add(url).catch(() => {})));
+    await Promise.all(SHELL_URLS.map(url => precacheShellFile(cache, url)));
     await self.skipWaiting();
   })());
 });
@@ -61,7 +73,9 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/auth/') || url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(handleNavigation(request));
+    // Signed-out cleanup: the login page is shown, so the cached practice answers are removed (without delaying it).
+    if (url.pathname === '/login') event.waitUntil(caches.delete(API_CACHE));
+    event.respondWith(handleNavigation(event, request));
     return;
   }
   if (url.pathname.startsWith('/api/')) {
@@ -70,6 +84,16 @@ self.addEventListener('fetch', event => {
   }
   event.respondWith(handleShell(request));
 });
+
+// Install precache of one file: fetched without the HTTP cache, stored only when it is a plain 200. Failures are ignored.
+async function precacheShellFile(cache, url) {
+  try {
+    const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+    if (isStorable(response)) await cache.put(url, response);
+  } catch (error) {
+    // The file is simply not cached; the page still works online.
+  }
+}
 
 // Rejects if the promise does not settle within ms.
 function withTimeout(promise, ms) {
@@ -82,11 +106,18 @@ function withTimeout(promise, ms) {
   });
 }
 
-// Network first (4 s); offline or slow, the cached index.html. A redirect (to /login) passes through.
-async function handleNavigation(request) {
+// Network first (10 s); offline or slow, the cached index.html. A redirect (to /login) passes through.
+// A fresh 200 answer for / or /index.html refreshes the cached '/index.html' for the next offline launch.
+async function handleNavigation(event, request) {
   const network = fetch(request);
   try {
-    return await withTimeout(network, NAVIGATION_TIMEOUT_MS);
+    const response = await withTimeout(network, NAVIGATION_TIMEOUT_MS);
+    const { pathname } = new URL(request.url);
+    if ((pathname === '/' || pathname === '/index.html') && isStorable(response)) {
+      // Clone now, before the page reads the body.
+      event.waitUntil(storeShellPage(response.clone()));
+    }
+    return response;
   } catch (error) {
     const cached = await caches.match('/index.html', { cacheName: SHELL_CACHE });
     if (cached) return cached;
@@ -94,11 +125,16 @@ async function handleNavigation(request) {
   }
 }
 
+async function storeShellPage(response) {
+  const cache = await caches.open(SHELL_CACHE);
+  await cache.put('/index.html', response);
+}
+
 // Network first, falling back to the cache; a good answer refreshes the cached copy.
 async function handleShell(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (isStorable(response)) {
       const cache = await caches.open(SHELL_CACHE);
       cache.put(request, response.clone()).catch(() => {});
     }
@@ -110,19 +146,23 @@ async function handleShell(request) {
   }
 }
 
-// Network first (6 s). A 200 answer is stored with its time; offline, the stored copy with X-Offline-Cache.
+// Network first (15 s). A 200 answer is stored with its time, except the uncached answers (see isUncachedApi); offline,
+// the stored copy with X-Offline-Cache. No stored answer (or an uncached one) → a 503 JSON.
 async function handleApi(event, request) {
+  const uncached = isUncachedApi(new URL(request.url));
   try {
     const response = await withTimeout(fetch(request), API_TIMEOUT_MS);
-    if (response.status === 200) {
+    if (!uncached && isStorable(response)) {
       // Clone now, before the page reads the body.
       event.waitUntil(storeApiAnswer(request, response.clone()));
     }
     return response;
   } catch (error) {
-    const cache = await caches.open(API_CACHE);
-    const cached = await cache.match(request);
-    if (cached) return offlineCopy(cached);
+    if (!uncached) {
+      const cache = await caches.open(API_CACHE);
+      const cached = await cache.match(request);
+      if (cached) return offlineCopy(cached);
+    }
     return new Response(JSON.stringify({ error: "Немає зв'язку", offline: true }), {
       status: 503,
       headers: { 'Content-Type': 'application/json' },

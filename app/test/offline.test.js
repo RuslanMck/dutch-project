@@ -1,7 +1,7 @@
 // Server side of the offline app: the app version and the service worker route, the client answer receipts (a repeated
-// answer is stored once), answers dated by the phone (answered_at), the set the phone practised offline (set_word_ids),
-// the spare words, and the MCP grade_word schema, which takes none of the offline fields. Fuzz is off, so due dates are
-// exact.
+// answer is stored once), answers dated by the phone (answered_at), the set the phone practised offline (set_word_ids
+// and when it started, set_opened_at), the spare words, and the MCP grade_word schema, which takes none of the offline
+// fields. Fuzz is off, so due dates are exact.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import fs from 'node:fs';
@@ -331,6 +331,54 @@ test('set_word_ids replaces an open set when the graded word is in the phone\'s 
   });
 });
 
+test('a phone set pinned by its spare word opens at set_opened_at, so the answers it got earlier count for it', () => {
+  const context = createOfflineContext();
+  const wordIds = addWords(context, '6.1', Array.from({ length: 12 }, (_, index) => `woord-${index + 1}`));
+  context.practiceService.migrateToFsrs({ isDryRun: false });
+  const setStartedAt = Date.parse('2026-10-24T12:01:00+02:00');
+  return withServer(context, async base => {
+    await getJson(base, '/api/practice/batch?session_id=offline-4');
+    const openSet = readWordSetSetting(context);
+    const learningWordId = openSet.item_ids[0];
+    const spareWordId = wordIds.find(wordId => !openSet.item_ids.includes(wordId));
+    const phoneSetWordIds = [learningWordId, spareWordId];
+    const gradeOffline = (wordId, answeredAt) => postJson(base, '/api/practice/grades', {
+      word_id: wordId, grade: 'good', session_id: 'offline-4', answered_at: answeredAt,
+      set_word_ids: phoneSetWordIds, set_opened_at: setStartedAt,
+    });
+    context.clock.moveTo('2026-10-24T12:10:00+02:00');
+
+    // The learning word is in the open set, so it does not pin the phone's set yet.
+    assert.equal((await gradeOffline(learningWordId, setStartedAt + 60_000)).status, 200);
+    assert.deepEqual(readWordSetSetting(context).item_ids, openSet.item_ids);
+
+    // The spare word is outside the open set: the phone's set is pinned and opens at the phone's set_opened_at.
+    assert.equal((await gradeOffline(spareWordId, setStartedAt + 4 * 60_000)).status, 200);
+    const storedSet = readWordSetSetting(context);
+    assert.deepEqual(storedSet.item_ids, phoneSetWordIds);
+    assert.equal(storedSet.opened_at, setStartedAt);
+
+    // The learning word's answer, given before the spare word, counts for the new set: both answers are in the round.
+    const { round } = await (await getJson(base, '/api/practice/round-summary')).json();
+    assert.equal(round.answer_count, 2);
+  });
+});
+
+test('set_opened_at older than 7 days is not used: the phone\'s set opens at the answer\'s time', () => {
+  const context = createOfflineContext();
+  const [kat, hond] = addWords(context, '6.1', ['kat', 'hond']);
+  context.practiceService.migrateToFsrs({ isDryRun: false });
+  const now = Date.parse(MORNING_IN_AMSTERDAM);
+  return withServer(context, async base => {
+    const response = await postJson(base, '/api/practice/grades', {
+      word_id: hond, grade: 'good', session_id: 'offline-5', set_word_ids: [hond, kat],
+      set_opened_at: now - 8 * MILLISECONDS_PER_DAY,
+    });
+    assert.equal(response.status, 200);
+    assert.equal(readWordSetSetting(context).opened_at, now);
+  });
+});
+
 test('spare words: the next set\'s words outside the open set, up to new_per_day, and read only', () => {
   const context = createOfflineContext();
   addWords(context, '6.1', Array.from({ length: 25 }, (_, index) => `woord-${index + 1}`));
@@ -390,4 +438,5 @@ test('the MCP grade_word schema takes none of the offline fields', () => {
   assert.equal(withOfflineField('client_answer_id').success, false);
   assert.equal(withOfflineField('answered_at').success, false);
   assert.equal(withOfflineField('set_word_ids').success, false);
+  assert.equal(withOfflineField('set_opened_at').success, false);
 });

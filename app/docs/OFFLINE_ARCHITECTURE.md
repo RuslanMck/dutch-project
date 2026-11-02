@@ -46,6 +46,9 @@ CREATE INDEX index_client_answer_receipts_on_created_at ON client_answer_receipt
   clock running fast must not lose the answer); more than 7 days in the past is refused (ValidationError, 400). Missing =
   now (today's behaviour).
 - `set_word_ids` (grades only): array of 1–20 word ids, the set the phone practised offline (§3.4).
+- `set_opened_at` (grades only, REST only; not in the MCP `grade_word` schema): integer ms, when the phone's set started.
+  Used only when a set is pinned from `set_word_ids` (below). Later than now counts as now; more than 7 days before the
+  answer is ignored (the answer's time is used instead).
 
 Grading with `answered_at` uses it everywhere the grade now uses `clock.now()`: the FSRS review time, the review log,
 the deck answer, the calendar day (`today`) and the set pinning. A grade whose word already has a review log or a deck
@@ -55,8 +58,12 @@ moves backwards. Drill answers store `answered_at` as their time.
 `set_word_ids`: in `gradeFirstInSessionInTransaction`, when the planner finds **no open set** for that day (the stored
 set is from another day or has no pending word), the set is pinned to these ids instead of the planned one: keep the
 ids that exist, in the given order, without repeats, at most `newPerDay`; `openedOn` = that day, `openedAt` =
-`answered_at`. When an open set exists the field is ignored and today's rule applies (a New word outside the open set →
-409).
+`set_opened_at` when given (clamped to now, not older than 7 days before the answer), else `answered_at`. The same
+applies when an open set exists but the graded word is in `set_word_ids` and not in the open set (the phone has moved
+on): the set is pinned from `set_word_ids` with that `openedAt`. The learning words of the open set are answered in
+place and do not pin: the first spare word does, so `set_opened_at` keeps the answers the phone gave before it. A
+`set_word_ids` equal to the open set's ids does not pin again. When an open set exists and the graded word is in it,
+the field is ignored and today's rule applies (a New word outside the open set → 409).
 
 ### 1.3 Spare words — `GET /api/practice/spare-words?session_id=…`
 
@@ -73,7 +80,9 @@ version filled in and `no-cache`; `/api/version`; a grade with `client_answer_id
 the same body; drill answer the same; `answered_at` in the future / older than 7 days → 400; a grade earlier than the
 word's last answer → 409; `answered_at` of yesterday puts the review log and the calendar day on yesterday;
 `set_word_ids` pins the set when none is open and is ignored when one is; spare words exclude the current set and the
-session's graded words and respect the size; MCP `grade_word` schema unchanged.
+session's graded words and respect the size; MCP `grade_word` schema unchanged; a phone set pinned by its spare word
+opens at `set_opened_at` so the learning word's earlier answer counts; `set_opened_at` older than 7 days falls back to
+the answer's time.
 
 ## 2. Service worker — `public/sw.js`
 
@@ -81,14 +90,21 @@ session's graded words and respect the size; MCP `grade_word` schema unchanged.
   `shell-*` caches and call `clients.claim()`; `install` precaches the shell and calls `skipWaiting()`.
 - Shell: `/`, `/index.html`, `/app.js`, `/api.js`, `/logic.js`, `/offline-store.js`, `/app.css`, `/icon.svg`,
   `/manifest.webmanifest`, the PNG icons, the font files used by `app.css` (list them explicitly).
-- **Navigations** (`request.mode === 'navigate'`): network first; on a network error or no answer within 4 s, the cached
-  `/index.html`. A redirect to `/login` from the network passes through (signed out).
+- **Stored answers**: only a response with status 200 and `redirected === false` is stored, both in the install precache
+  (each URL on its own, `fetch(url, { credentials: 'same-origin', cache: 'no-store' })`, failures ignored) and in the
+  shell and API handlers. A redirect to `/login` or any other status is never stored.
+- **Navigations** (`request.mode === 'navigate'`): network first; on a network error or no answer within 10 s, the cached
+  `/index.html`. A redirect to `/login` from the network passes through (signed out). A fresh 200 answer for `/` or
+  `/index.html` is also stored as `/index.html` in the shell cache (the offline launch gets the latest HTML).
+- **Navigation to `/login`**: deletes `api-v1` (signed-out cleanup), via `event.waitUntil`, without delaying the response.
 - **Shell files and fonts** (same origin, GET, not `/api/`): network first, falling back to the cache; a good network
-  answer refreshes the cache entry.
-- **GET `/api/*`** except `/api/events` and `/api/health`: network first with a 6 s timeout; a 200 answer is stored in
-  `api-v1` under its full URL; on a network error or timeout the stored answer is returned with the extra header
+  answer (per the rule above) refreshes the cache entry.
+- **GET `/api/*`** except `/api/events` and `/api/health`: network first with a 15 s timeout (also on a rejection); a 200
+  answer is stored in `api-v1` under its full URL, except `/api/practice/round-summary`, `/api/practice/spare-words`
+  and any URL whose query has `session_id` (never stored, so the cache does not grow; the page never reads them from
+  cache). On a network error or timeout the stored answer is returned with the extra header
   `X-Offline-Cache: <ms when stored>` (store the time in a header of the cached copy, e.g. `X-Stored-At`). No stored
-  answer → a 503 JSON `{ "error": "Немає зв'язку", "offline": true }`.
+  answer (or an excluded URL) → a 503 JSON `{ "error": "Немає зв'язку", "offline": true }`.
 - Never touches non-GET requests, other origins, `/api/events`, `/auth/*`, `/mcp`.
 - Message `{ type: 'clear-data' }` deletes `api-v1` (logout).
 
@@ -97,7 +113,8 @@ session's graded words and respect the size; MCP `grade_word` schema unchanged.
 ### 3.1 Registration, version, logout
 
 - `app.js` registers `/sw.js` when `serviceWorker` exists (after load; failures ignored).
-- On logout submit (`.profile-logout`): post `clear-data` to the worker, clear the outbox and snapshot stores
+- On logout submit (`.profile-logout`): post `clear-data` to the worker, delete the `api-v1` cache from the page
+  (`caches.delete('api-v1')`, awaited), clear the outbox and snapshot stores
   (`offline-store.js`), then let the form submit. If the outbox holds answers, ask first (askConfirm): «N відповідей
   ще не надіслано. Вийти й видалити їх?».
 
@@ -111,32 +128,41 @@ session's graded words and respect the size; MCP `grade_word` schema unchanged.
 
 ### 3.3 Outbox and snapshot — `public/offline-store.js` (IndexedDB `dutch-offline`, with an in-memory fallback)
 
-- Store `outbox`: `{ seq (auto), kind: 'grade' | 'drill', url, body, created_at }`. `enqueue`, `listAll` (by seq),
-  `remove(seq)`, `count`, `clear`.
+- Store `outbox`: `{ seq (auto), kind: 'grade' | 'drill', url, body, created_at, attempts }`. `enqueue`, `listAll`
+  (sorted by `body.answered_at`, `created_at` when missing, then seq: a slow online post that failed and was queued late
+  keeps its real place), `remove(seq)`, `setAttempts(seq, n)`, `count`, `clear`.
 - Store `snapshot`: one record per key: `practice` (§3.4), `spare` (spare words + calendar date + session id).
-- `flushOutbox({ post, onProgress })`: posts entries **one at a time in seq order**. 2xx or 409 or 400 → remove (a 409 or
-  400 is counted as `dropped`); network error → stop (try later); 401 → stop and report `needsLogin`. Only one flush runs
-  at a time. Returns `{ sent, dropped, remaining, needsLogin }`.
+- `flushOutbox({ post, onProgress })`: posts entries **one at a time** in `listAll` order and lists again until the store is
+  empty (entries enqueued during the flush are sent too). 2xx → remove; 409, 400, 404, 422 → remove and count as `dropped`;
+  network error (offline) → stop (try later, not an attempt); 401 → stop and report `needsLogin`; any other failure (5xx,
+  unexpected status) → `attempts` + 1 on the entry and stop, and at 5 attempts the entry is dropped (counted as `dropped`).
+  `onProgress` gets `remaining` counted from the store. Only one flush runs at a time. Returns
+  `{ sent, dropped, remaining, needsLogin }`.
+- The page keeps `outbox.isFlushing`: while a flush runs (and while `pendingCount` > 0) `shouldQueueAnswers()` is true
+  and `isReadyForLiveRead()` waits for the flush, so a new answer never overtakes a queued one. `pendingCount` is always
+  set from `store.count()`. After a full flush the practice posts directly again.
 - Flush triggers: app start, the `online` event, every 30 s while entries remain and `navigator.onLine`, after each
   enqueue when online. After a flush that sent anything, refresh `words` and the stats.
-- Every grade and drill answer gets `client_answer_id` (`crypto.randomUUID()` or the existing `createSessionId`) and
-  `answered_at = Date.now()` **when the learner answers**, online or not, so a retried post is never counted twice.
+- Every grade and drill answer gets `client_answer_id` (`createSessionId`) so a retried post is never counted twice.
+  `answered_at` (the time of the answer on the phone) is sent **only with answers that go through the outbox**; a direct
+  online post omits it and the server uses its own time. Grades are built by `buildGradePostBody` (logic.js).
 
 ### 3.4 Practice offline (`app.js`, pure helpers in `logic.js`)
 
-- `postFsrsGrade`: on an `offline` error the grade is enqueued (with `set_word_ids` = the words of the set on screen)
+- `postFsrsGrade`: on an `offline` error the grade is enqueued (with `answered_at`; `set_word_ids` and `set_opened_at` only when the set on screen was built offline or restored from a snapshot)
   instead of being rolled back; the word then follows the existing no-schedule path (`grade !== 'good'` stays in the
   round). Other errors behave as today.
 - Custom drills: `logDrillAnswer` enqueues on an offline error.
 - **Snapshot**: after a batch loads and after every answer, save `{ sessionId, calendarDate, words (the batch words with
-  directions_left), answeredKeys, tally, introducedCount, offlineSet: bool }` under `practice`. When `getPracticeBatch`
+  directions_left), answeredKeys, tally, introducedCount, offlineSet: bool, setOpenedAt }` under `practice`. When `getPracticeBatch`
   fails offline, a snapshot of the same calendar date and session restores the set (words whose both directions are
   answered are left out); otherwise the practice shows «Немає зв'язку. Практика продовжиться, щойно з'явиться інтернет».
 - **Spare words**: after each batch loads online, fetch `getSpareWords(sessionId)` and save them under `spare`.
 - **Offline next set**: «Наступний набір» while offline (or the batch request failing offline) builds a set with
   `buildOfflineSet({ stillLearning, spare, setSize })` (logic.js): first the words of the finished set that are still
   learning (graded again or hard in this set), then spare words not already in it, up to `setSize`; it is practised like a
-  normal set and every grade carries `set_word_ids` = its ids. No spare words saved → the message above.
+  normal set and every grade (queued or direct) carries `set_word_ids` = its ids and `set_opened_at` (ms, when the phone
+  started the set; kept in the snapshot). An ordinary online set never sends them. No spare words saved → the message above.
 - The round summary works offline from local data (the server summary is fetched only when online; offline it shows the
   local tally). The drill buttons stay.
 
@@ -152,7 +178,7 @@ session's graded words and respect the size; MCP `grade_word` schema unchanged.
 
 ### 3.6 Warm-up for reading offline
 
-After sign-in and on each `online` event (at most once every 10 minutes): fetch in the background the lists the tabs
+After sign-in and on each `online` event (at most once every 10 minutes; the last time is kept in `localStorage`, so a page load within 10 minutes skips it): fetch in the background the lists the tabs
 use (words, topics, rules, mistake patterns, phrases, texts, decks, the deck word catalog, stats, activity for the
 default period) and, for each deck, its drill words, so the service worker has them. Errors ignored.
 

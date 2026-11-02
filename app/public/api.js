@@ -118,7 +118,7 @@ export const getPracticeBatch = (sessionId, { allowOfflineCache = false } = {}) 
 export const getSpareWords = sessionId =>
   request('GET', `/api/practice/spare-words?session_id=${enc(sessionId)}`, undefined, { rejectOfflineCache: true });
 export const getAppVersion = () => request('GET', '/api/version');
-// body: word_id, grade, answer, session_id, direction, and optionally client_answer_id, answered_at, set_word_ids.
+// body: word_id, grade, answer, session_id, direction, and optionally client_answer_id, answered_at (queued answers only), set_word_ids and set_opened_at (offline sets only).
 export const gradePracticeWord = body => request('POST', '/api/practice/grades', body);
 export const getPracticeStats = () => request('GET', '/api/practice/stats');
 export const getPhraseBatch = sessionId => request('GET', `/api/practice/phrases/batch?session_id=${enc(sessionId)}`);
@@ -129,7 +129,7 @@ export const getDrillWords = ids => (ids.length
   ? request('GET', `/api/practice/drill-words?ids=${ids.map(enc).join(',')}`)
   : Promise.resolve({ words: [] }));
 // One checked answer of a custom drill, logged for the statistics only (the schedule never reads it). The body may carry
-// client_answer_id and answered_at (a retried post is counted once, with the time of the answer).
+// client_answer_id (a retried post is counted once) and, for a queued answer, answered_at (the time of the answer).
 export const postDrillAnswer = body => request('POST', '/api/practice/drill-answers', body);
 export const getRoundSummary = () => request('GET', '/api/practice/round-summary', undefined, { rejectOfflineCache: true });
 export const getStats = () => request('GET', '/api/stats');

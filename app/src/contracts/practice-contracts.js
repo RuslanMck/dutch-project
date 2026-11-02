@@ -66,7 +66,7 @@ export const gradeWordToolInputSchema = gradeWordFieldsSchema.extend({
 
 // The offline fields (REST only; the MCP tool takes none of them). client_answer_id makes a repeated post harmless;
 // answered_at is the time the learner answered (ms since epoch; missing = now); set_word_ids is the set the phone
-// practised offline, pinned when no set is open today.
+// practised offline, pinned when no set is open today; set_opened_at is when that set started (ms, REST grades only).
 export const clientAnswerIdSchema = z.string().min(8, 'at least 8 characters').max(100)
   .describe('id the phone gives each answer, so a repeated post is stored once');
 export const answeredAtSchema = z.number().int().nonnegative()
@@ -78,6 +78,8 @@ export const gradeWordInputSchema = gradeWordFieldsSchema.extend({
   answered_at: answeredAtSchema.optional(),
   set_word_ids: z.array(identifierSchema).min(1).max(MAXIMUM_SET_WORD_IDS).optional()
     .describe('the set practised offline, in order: pinned when no set is open today'),
+  set_opened_at: answeredAtSchema.optional()
+    .describe('when the set practised offline started, ms since epoch: the set opens then'),
 }).strict();
 
 // A phrase has no article or answer text, so its grade takes no answer field; it is still graded per direction.

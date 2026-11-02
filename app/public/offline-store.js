@@ -9,6 +9,16 @@ const SNAPSHOT_STORE = 'snapshot';
 // Statuses whose answer will never be accepted: the entry is dropped instead of blocking the ones behind it.
 const DROPPED_STATUSES = [400, 404, 409, 422];
 
+// Failed tries (5xx or an unexpected status) after which an entry is dropped instead of blocking the ones behind it.
+export const MAX_ATTEMPTS = 5;
+
+// The order entries are sent in: by the time of the answer (a slow online post that failed and was queued late keeps its
+// real place; entries without answered_at use the time they were queued), then by seq.
+function sortEntries(entries) {
+  const timeOf = entry => (Number.isFinite(entry.body?.answered_at) ? entry.body.answered_at : entry.created_at ?? 0);
+  return entries.sort((a, b) => timeOf(a) - timeOf(b) || a.seq - b.seq);
+}
+
 // A store that keeps everything in memory. Same methods as the IndexedDB store.
 export function createMemoryStore() {
   let entries = [];
@@ -22,8 +32,11 @@ export function createMemoryStore() {
       entries.push(stored);
       return stored.seq;
     },
-    async listAll() { return entries.map(entry => ({ ...entry })); },
+    async listAll() { return sortEntries(entries.map(entry => ({ ...entry }))); },
     async remove(seq) { entries = entries.filter(entry => entry.seq !== seq); },
+    async setAttempts(seq, attempts) {
+      entries = entries.map(entry => (entry.seq === seq ? { ...entry, attempts } : entry));
+    },
     async count() { return entries.length; },
     async clear() { entries = []; },
     async saveSnapshot(key, value) { snapshots.set(key, value); },
@@ -61,9 +74,13 @@ function createIndexedDbStore(database) {
     enqueue: entry => runTransaction(database, OUTBOX_STORE, 'readwrite', store => store.add({ ...entry })),
     async listAll() {
       const entries = await runTransaction(database, OUTBOX_STORE, 'readonly', store => store.getAll());
-      return entries.sort((a, b) => a.seq - b.seq);
+      return sortEntries(entries);
     },
     remove: seq => runTransaction(database, OUTBOX_STORE, 'readwrite', store => store.delete(seq)),
+    async setAttempts(seq, attempts) {
+      const entry = await runTransaction(database, OUTBOX_STORE, 'readonly', store => store.get(seq));
+      if (entry) await runTransaction(database, OUTBOX_STORE, 'readwrite', store => store.put({ ...entry, attempts }));
+    },
     count: () => runTransaction(database, OUTBOX_STORE, 'readonly', store => store.count()),
     clear: () => runTransaction(database, OUTBOX_STORE, 'readwrite', store => store.clear()),
     saveSnapshot: (key, value) => runTransaction(database, SNAPSHOT_STORE, 'readwrite', store => store.put({ key, value })),
@@ -105,7 +122,7 @@ export function getStore() {
 }
 
 // The shared store as an object whose methods wait for getStore(), so callers need no await to get it.
-const STORE_METHODS = ['enqueue', 'listAll', 'remove', 'count', 'clear', 'saveSnapshot', 'loadSnapshot', 'deleteSnapshot',
+const STORE_METHODS = ['enqueue', 'listAll', 'remove', 'setAttempts', 'count', 'clear', 'saveSnapshot', 'loadSnapshot', 'deleteSnapshot',
   'clearSnapshots'];
 export const offlineStore = Object.fromEntries(STORE_METHODS.map(method => [
   method,
@@ -115,37 +132,54 @@ export const offlineStore = Object.fromEntries(STORE_METHODS.map(method => [
 // Flushes run one at a time: a second call while one runs gets the running one's result.
 let runningFlush = null;
 
-// Posts the outbox entries one at a time in seq order. post(url, body) resolves on 2xx and throws an Error with status
-// otherwise. A 2xx or an answer that will never be accepted (400, 404, 409, 422) removes the entry (the latter counts as
-// dropped); 401 stops with needsLogin; any other error (network down, 5xx) stops until the next try.
-// onProgress({ sent, dropped, remaining }) is called after each removed entry.
+// Posts the outbox entries one at a time, in the order of listAll (time of the answer, then seq), and lists again until
+// the outbox is empty, so entries added during the flush are sent too. post(url, body) resolves on 2xx and throws an Error
+// with status otherwise. A 2xx or an answer that will never be accepted (400, 404, 409, 422) removes the entry (the latter
+// counts as dropped); 401 stops with needsLogin; a network error (offline) stops until the next try; any other error (5xx)
+// counts as an attempt on the entry and stops, and after MAX_ATTEMPTS the entry is dropped.
+// onProgress({ sent, dropped, remaining }) is called after each removed entry (remaining is counted in the store).
 // Returns { sent, dropped, remaining, needsLogin }.
 export function flushOutbox({ store, post, onProgress } = {}) {
   if (runningFlush) return runningFlush;
   runningFlush = (async () => {
     const activeStore = store || await getStore();
-    const entries = await activeStore.listAll();
     let sent = 0;
     let dropped = 0;
-    let remaining = entries.length;
     let needsLogin = false;
-    for (const entry of entries) {
-      try {
-        await post(entry.url, entry.body);
-        sent += 1;
-      } catch (error) {
-        if (error && error.status === 401) {
-          needsLogin = true;
-          break;
+    let stopped = false;
+    while (!stopped) {
+      const entries = await activeStore.listAll();
+      if (entries.length === 0) break;
+      for (const entry of entries) {
+        try {
+          await post(entry.url, entry.body);
+          sent += 1;
+        } catch (error) {
+          if (error && error.status === 401) {
+            needsLogin = true;
+            stopped = true;
+            break;
+          }
+          if (error && DROPPED_STATUSES.includes(error.status)) {
+            dropped += 1;
+          } else if (error && (error.offline || error.status === 0)) {
+            stopped = true;
+            break;
+          } else {
+            const attempts = (entry.attempts || 0) + 1;
+            if (attempts < MAX_ATTEMPTS) {
+              await activeStore.setAttempts(entry.seq, attempts);
+              stopped = true;
+              break;
+            }
+            dropped += 1;
+          }
         }
-        if (error && DROPPED_STATUSES.includes(error.status)) dropped += 1;
-        else break;
+        await activeStore.remove(entry.seq);
+        if (onProgress) onProgress({ sent, dropped, remaining: await activeStore.count() });
       }
-      await activeStore.remove(entry.seq);
-      remaining -= 1;
-      if (onProgress) onProgress({ sent, dropped, remaining });
     }
-    return { sent, dropped, remaining, needsLogin };
+    return { sent, dropped, remaining: await activeStore.count(), needsLogin };
   })().finally(() => { runningFlush = null; });
   return runningFlush;
 }

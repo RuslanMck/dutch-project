@@ -35,6 +35,7 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
       answeredAt: gradeInput.answered_at,
       clientAnswerId: gradeInput.client_answer_id,
       setWordIds: gradeInput.set_word_ids,
+      setOpenedAt: gradeInput.set_opened_at,
     }));
   });
 

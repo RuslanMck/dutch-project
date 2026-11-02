@@ -1133,6 +1133,25 @@ export function buildSetWordIds(words) {
   return words.slice(0, MAX_SET_WORD_IDS).map(word => word.id);
 }
 
+// The body of a grade post. answered_at (the phone's clock) goes only with an answer that is queued: an answer posted
+// directly gets the server's own time. set_word_ids and set_opened_at go only when the set on screen was built on the phone
+// (offlineSet), never for an ordinary online set. client_answer_id is always there.
+export function buildGradePostBody({
+  wordId, grade, answer, sessionId, direction, clientAnswerId, answeredAt, setWordIds, setOpenedAt, isQueued, offlineSet,
+}) {
+  return {
+    word_id: wordId,
+    grade,
+    answer,
+    session_id: sessionId,
+    direction,
+    client_answer_id: clientAnswerId,
+    ...(isQueued ? { answered_at: answeredAt } : {}),
+    ...(offlineSet && setWordIds?.length ? { set_word_ids: setWordIds } : {}),
+    ...(offlineSet && setWordIds?.length && setOpenedAt ? { set_opened_at: setOpenedAt } : {}),
+  };
+}
+
 // The set kept on the phone, ready to continue, or null when it is not usable (none stored, or from another day).
 // Words answered in every direction they had left are left out. reviews / newWords split the words by their state, as
 // the server's batch does; allWords keeps the whole set (the words answered already still count as learning).
@@ -1154,6 +1173,7 @@ export function restorePracticeSnapshot({ snapshot, calendarDate }) {
     introducedCount: snapshot.introducedCount || 0,
     hardWordIds: new Set(snapshot.hardWordIds || []),
     isOfflineSet: snapshot.offlineSet === true,
+    setOpenedAt: Number.isFinite(snapshot.setOpenedAt) ? snapshot.setOpenedAt : null,
   };
 }
 
