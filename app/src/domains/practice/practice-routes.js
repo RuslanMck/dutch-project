@@ -9,6 +9,7 @@ import {
   gradeWordInputSchema,
   practiceBatchQuerySchema,
   previewPrioritiesQuerySchema,
+  spareWordsQuerySchema,
 } from '../../contracts/practice-contracts.js';
 import { readRequestBody, removeBlankQueryValues } from '../../http/request-input.js';
 
@@ -31,6 +32,9 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
       answer: gradeInput.answer,
       sessionId: gradeInput.session_id,
       direction: gradeInput.direction,
+      answeredAt: gradeInput.answered_at,
+      clientAnswerId: gradeInput.client_answer_id,
+      setWordIds: gradeInput.set_word_ids,
     }));
   });
 
@@ -72,6 +76,12 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
     response.json(practiceService.getDrillWords({ wordIds: drillInput.ids }));
   });
 
+  // Read only: the words the next set will most likely draw from, for the phone to keep offline.
+  practiceRouter.get('/practice/spare-words', (request, response) => {
+    const spareInput = spareWordsQuerySchema.parse(removeBlankQueryValues(request.query));
+    response.json(practiceService.getSpareWords({ sessionId: spareInput.session_id }));
+  });
+
   // A checked answer of a custom drill: logged for the statistics, the schedule does not move.
   practiceRouter.post('/practice/drill-answers', (request, response) => {
     const drillInput = drillAnswerInputSchema.parse(readRequestBody(request));
@@ -81,6 +91,8 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
       isCorrect: drillInput.is_correct,
       answer: drillInput.answer ?? '',
       source: drillInput.source,
+      answeredAt: drillInput.answered_at,
+      clientAnswerId: drillInput.client_answer_id,
     }));
   });
 

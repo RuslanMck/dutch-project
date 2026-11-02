@@ -31,9 +31,15 @@ const LONG_GOOD_SHARE_DAY_COUNT = 30;
 const GOOD_SHARE_DECIMAL_PLACES = 3;
 const DECK_LEARNING_STATUS = 'learning';
 const MILLISECONDS_PER_DAY = 24 * 3600_000;
+const CLIENT_ANSWER_KIND_GRADE = 'grade';
+const CLIENT_ANSWER_KIND_DRILL = 'drill';
+const CLIENT_ANSWER_RECEIPT_RETENTION_MS = 30 * MILLISECONDS_PER_DAY;
+const ANSWERED_AT_MAXIMUM_AGE_MS = 7 * MILLISECONDS_PER_DAY;
+const LATER_ANSWER_EXISTS_MESSAGE = 'пізніша відповідь уже є';
 
 export function createPracticeService({
   practiceRepository,
+  clientAnswerReceiptRepository,
   wordSetPlanner,
   practiceSettings,
   priorityService,
@@ -86,23 +92,34 @@ export function createPracticeService({
   // sets the log's second grade and grades FSRS again when it is worse; a later answer moves only the deck. Every
   // answer moves the word's deck in its direction and is kept in deck_answers. Returns the word's new state with its
   // deck (describeDeckPositions, has_learned, has_learned_direction) and is_repeat.
-  function gradeWord({ wordId, grade, answer, sessionId, direction = UK_TO_NL_DIRECTION }) {
+  // The offline fields (REST): answeredAt is the time of the answer (default now), clientAnswerId makes a repeated
+  // answer return the first response, setWordIds is the set practised offline (see gradeFirstInSessionInTransaction).
+  function gradeWord({
+    wordId, grade, answer, sessionId, direction = UK_TO_NL_DIRECTION, answeredAt, clientAnswerId, setWordIds,
+  }) {
     assertDirection(direction);
+    answeredAt = resolveAnsweredAt(answeredAt, clock.now());
     const settings = practiceSettings.readActiveSettings();
-    const gradeResult = runInTransaction(() => gradeWordInTransaction({
-      settings, wordId, grade, answer, sessionId, direction,
+    const { response, isReplay } = runInTransaction(() => runClientAnswerOnce({
+      clientAnswerId,
+      kind: CLIENT_ANSWER_KIND_GRADE,
+      operation: () => gradeWordInTransaction({
+        settings, wordId, grade, answer, sessionId, direction, answeredAt, setWordIds,
+      }),
     }));
-    changeEventBus.publishChange('words');
-    return gradeResult;
+    if (!isReplay) changeEventBus.publishChange('words');
+    return response;
   }
 
   // Picks the case of the answer from the word's review log of today, whatever the session: no log (first grade), a log
-  // whose other direction is not answered yet (the first answer in the other direction), or a repeat.
-  function gradeWordInTransaction({ settings, wordId, grade, answer, sessionId, direction }) {
+  // whose other direction is not answered yet (the first answer in the other direction), or a repeat. With answeredAt
+  // the answer is dated then, and refused when the word has an answer later than that.
+  function gradeWordInTransaction({ settings, wordId, grade, answer, sessionId, direction, answeredAt, setWordIds }) {
     const word = getPracticeWordRowOrThrow(wordId);
-    const timestamp = clock.now();
+    if (answeredAt !== undefined) assertNoLaterAnswer(wordId, answeredAt);
+    const timestamp = answeredAt ?? clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
-    const gradeContext = { settings, word, grade, answer, sessionId, direction, timestamp, today };
+    const gradeContext = { settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds };
     const reviewLog = practiceRepository.findLatestReviewLogSince({
       wordId,
       sinceTimestamp: findStartOfDay(today, settings.timeZone),
@@ -118,9 +135,14 @@ export function createPracticeService({
   // word is New). A New word outside an open set is refused. The word comes back tomorrow whatever the card says: its other
   // direction is still to be answered, and a review word may not be asked the other way later. The card keeps its own
   // due day for the second direction.
-  function gradeFirstInSessionInTransaction({ settings, word, grade, answer, sessionId, direction, timestamp, today }) {
+  // setWordIds (offline, REST): when no set is open today, the set is pinned to these words instead of the planned one.
+  function gradeFirstInSessionInTransaction({
+    settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds,
+  }) {
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
-    const plan = pinWordSet({ settings, today, gradedWordIds, timestamp });
+    const plan = pinWordSet({
+      settings, today, gradedWordIds, timestamp, preferredWordIds: setWordIds, gradedWordId: word.id,
+    });
     // A set is 10 words at most: a New word outside the open set waits for a later set.
     if (plan.isOpen && word.fsrs_card === null && !plan.wordIds.includes(word.id)) {
       throw new ConflictError(`word ${word.id} is not in the current set: finish the set first`);
@@ -415,12 +437,43 @@ export function createPracticeService({
 
   // Logs one checked answer of a custom drill for the statistics. Nothing else changes: no card, deck, review log or
   // error count, and no change event (the statistics are read when shown). NotFoundError when the word is gone.
-  function recordDrillAnswer({ wordId, direction, isCorrect, answer = '', source }) {
-    if (!practiceRepository.findPracticeWordById(wordId)) throw new NotFoundError(`word ${wordId} not found`);
-    const id = practiceRepository.createDrillAnswer({
-      wordId, direction, isCorrect, answer, source, answeredAt: clock.now(),
+  // answeredAt (default now) and clientAnswerId as for gradeWord.
+  function recordDrillAnswer({
+    wordId, direction, isCorrect, answer = '', source, answeredAt, clientAnswerId,
+  }) {
+    answeredAt = resolveAnsweredAt(answeredAt, clock.now());
+    const { response } = runInTransaction(() => runClientAnswerOnce({
+      clientAnswerId,
+      kind: CLIENT_ANSWER_KIND_DRILL,
+      operation: () => {
+        if (!practiceRepository.findPracticeWordById(wordId)) throw new NotFoundError(`word ${wordId} not found`);
+        const id = practiceRepository.createDrillAnswer({
+          wordId, direction, isCorrect, answer, source, answeredAt: answeredAt ?? clock.now(),
+        });
+        return { id };
+      },
+    }));
+    return response;
+  }
+
+  // The spare words of the next set, for the phone to keep offline (planSpareWords). The current set (when one is
+  // open today) and the words graded in this session are left out. Read only: nothing is pinned or written.
+  function getSpareWords({ sessionId }) {
+    const settings = practiceSettings.readActiveSettings();
+    const timestamp = clock.now();
+    const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
+    const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
+    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds });
+    const currentSetWordIds = plan.isOpen ? plan.practiceSet.itemIds : [];
+    const spareWordIds = wordSetPlanner.planSpareWords({
+      settings,
+      today,
+      excludeIds: [...currentSetWordIds, ...gradedWordIds],
+      count: settings.newPerDay,
     });
-    return { id };
+    const words = spareWordIds.map(getPracticeWordRowOrThrow)
+      .map(wordRow => mapToPracticeWordWithDirections(wordRow, new Map()));
+    return { words };
   }
 
   // The current round: the words of the pinned set, each with its answers since the set opened and its mistakes, and
@@ -475,15 +528,72 @@ export function createPracticeService({
     };
   }
 
-  // The open set, or the next set planned and pinned now (when it has words). isOpen says it was open already. Runs
-  // inside a transaction.
-  function pinWordSet({ settings, today, gradedWordIds, timestamp }) {
+  // The open set, or the next set pinned now (when it has words). isOpen says it was open already. preferredWordIds
+  // (the set practised offline) is pinned instead of the planned set: its words that exist, in order, without repeats,
+  // up to the set size; when none is left the planned set is pinned. A set pinned from preferredWordIds counts as
+  // open. Runs inside a transaction.
+  // preferredWordIds (offline): the set the phone practised. It is pinned when no set is open, and also when one is
+  // open but the graded word belongs to the phone's set and not to the open one: offline the phone cannot see the
+  // learning deck, so it may finish a set the server still holds open. The words left in that set stay in the learning
+  // deck, and the deck comes first in a later set.
+  function pinWordSet({ settings, today, gradedWordIds, timestamp, preferredWordIds = [], gradedWordId = null }) {
     const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds });
-    if (!plan.isOpen && plan.wordIds.length) {
+    const preferredExistingWordIds = keepExistingWordIds(preferredWordIds, settings.newPerDay);
+    const hasPhoneMovedOn = plan.isOpen && preferredExistingWordIds.includes(gradedWordId)
+      && !plan.wordIds.includes(gradedWordId) && !plan.practiceSet.itemIds.includes(gradedWordId);
+    if (plan.isOpen && !hasPhoneMovedOn) return plan;
+    if (preferredExistingWordIds.length) {
+      const practiceSet = openPracticeSet({ today, openedAt: timestamp, itemIds: preferredExistingWordIds });
+      practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
+      return Object.freeze({ ...plan, isOpen: true, practiceSet, wordIds: practiceSet.itemIds });
+    }
+    if (plan.wordIds.length) {
       const practiceSet = openPracticeSet({ today, openedAt: timestamp, itemIds: plan.wordIds });
       practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
     }
     return plan;
+  }
+
+  // The ids (without repeats, in the given order) of the words that exist, at most limit.
+  function keepExistingWordIds(wordIds, limit) {
+    const uniqueWordIds = [...new Set(wordIds)];
+    const existingWordIds = new Set(practiceRepository.findPracticeWordsByIds(uniqueWordIds).map(row => row.id));
+    return uniqueWordIds.filter(wordId => existingWordIds.has(wordId)).slice(0, limit);
+  }
+
+  // Runs the write of one client answer once, inside the caller's transaction. Without a clientAnswerId it just runs.
+  // With one: a receipt of the same id gives its stored response back (isReplay true) and nothing is written; otherwise
+  // the write runs and its response is stored as the receipt, and receipts older than 30 days are deleted. Returns
+  // { response, isReplay }.
+  function runClientAnswerOnce({ clientAnswerId, kind, operation }) {
+    if (clientAnswerId === undefined) return { response: operation(), isReplay: false };
+    const receipt = clientAnswerReceiptRepository.findReceipt(clientAnswerId);
+    if (receipt) {
+      if (receipt.kind !== kind) throw new ConflictError(`client_answer_id ${clientAnswerId} is already used`);
+      return { response: JSON.parse(receipt.response), isReplay: true };
+    }
+    const response = operation();
+    const now = clock.now();
+    clientAnswerReceiptRepository.createReceipt({ clientAnswerId, kind, response, createdAt: now });
+    clientAnswerReceiptRepository.deleteReceiptsCreatedBefore(now - CLIENT_ANSWER_RECEIPT_RETENTION_MS);
+    return { response, isReplay: false };
+  }
+
+  // The time to grade with: answeredAt, or now when it is later than now (a phone clock running fast would otherwise
+  // lose the answer). Refuses an answer more than 7 days back. undefined stays undefined (now).
+  function resolveAnsweredAt(answeredAt, now) {
+    if (answeredAt === undefined) return undefined;
+    if (answeredAt < now - ANSWERED_AT_MAXIMUM_AGE_MS) throw new ValidationError('answered_at is more than 7 days old');
+    return Math.min(answeredAt, now);
+  }
+
+  // Refuses a dated answer when the word has a counting review log or deck answer later than it: the schedule never
+  // moves backwards.
+  function assertNoLaterAnswer(wordId, answeredAt) {
+    const latestAnswerTime = practiceRepository.findLatestAnswerTimeOfWord(wordId);
+    if (latestAnswerTime !== null && latestAnswerTime > answeredAt) {
+      throw new ConflictError(LATER_ANSWER_EXISTS_MESSAGE);
+    }
   }
 
   function countIntroducedToday(today) {
@@ -527,6 +637,7 @@ export function createPracticeService({
     listStrugglingWords,
     getDrillWords,
     recordDrillAnswer,
+    getSpareWords,
     getRoundSummary,
     calculatePracticeStatistics,
   });

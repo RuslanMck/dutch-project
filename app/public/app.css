@@ -1929,3 +1929,36 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 /* Above the bottom bar: the error notice and the Колоди selection bar. */
 .notice { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 21; }
 .deck-bar { bottom: calc(88px + env(safe-area-inset-bottom)); }
+
+/* ---------- Offline banner (docs/OFFLINE_ARCHITECTURE.md §3.5) ---------- */
+.offline-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  padding: 6px 12px;
+  min-height: 44px;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-blush);
+  border: 1px solid var(--garden-peach);
+  color: var(--garden-ink);
+  font-size: 14px;
+}
+.offline-banner[hidden] { display: none; }
+.offline-banner__text { flex: 1 1 160px; overflow-wrap: anywhere; }
+.offline-banner__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-primary);
+  border: 1px solid var(--garden-primary);
+  color: var(--garden-on-primary);
+  font-weight: var(--garden-weight-strong);
+  text-decoration: none;
+}
+.offline-banner__action[hidden] { display: none; }

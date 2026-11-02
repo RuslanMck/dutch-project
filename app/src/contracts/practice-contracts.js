@@ -16,6 +16,7 @@ export const PRACTICE_GRADE_VALUES = Object.freeze(['again', 'hard', 'good']);
 
 const MAXIMUM_REVIEWS_PER_BATCH = 200;
 const MAXIMUM_CHAPTER_NUMBER = 99;
+const MAXIMUM_SET_WORD_IDS = 20;
 const MAXIMUM_FREQUENCY_ENTRIES_PER_CALL = 20000;
 const REVIEW_LIMIT_DESCRIPTION = 'most overdue reviews to return; default all due reviews';
 const PREVIEW_CHAPTER_DESCRIPTION = 'chapter to preview; default the current chapter';
@@ -63,8 +64,20 @@ export const gradeWordToolInputSchema = gradeWordFieldsSchema.extend({
   id: identifierSchema.describe('word id, from get_practice_batch'),
 }).strict();
 
+// The offline fields (REST only; the MCP tool takes none of them). client_answer_id makes a repeated post harmless;
+// answered_at is the time the learner answered (ms since epoch; missing = now); set_word_ids is the set the phone
+// practised offline, pinned when no set is open today.
+export const clientAnswerIdSchema = z.string().min(8, 'at least 8 characters').max(100)
+  .describe('id the phone gives each answer, so a repeated post is stored once');
+export const answeredAtSchema = z.number().int().nonnegative()
+  .describe('when the learner answered, ms since epoch; missing = now');
+
 export const gradeWordInputSchema = gradeWordFieldsSchema.extend({
   word_id: identifierSchema.describe('word id, from the practice batch'),
+  client_answer_id: clientAnswerIdSchema.optional(),
+  answered_at: answeredAtSchema.optional(),
+  set_word_ids: z.array(identifierSchema).min(1).max(MAXIMUM_SET_WORD_IDS).optional()
+    .describe('the set practised offline, in order: pinned when no set is open today'),
 }).strict();
 
 // A phrase has no article or answer text, so its grade takes no answer field; it is still graded per direction.
@@ -98,6 +111,13 @@ export const drillAnswerInputSchema = z.object({
   is_correct: z.boolean(),
   answer: z.string().max(500).optional(),
   source: z.enum(DRILL_SOURCES),
+  client_answer_id: clientAnswerIdSchema.optional(),
+  answered_at: answeredAtSchema.optional(),
+}).strict();
+
+// The spare words for the phone's offline sets: the practice session the words are for.
+export const spareWordsQuerySchema = z.object({
+  session_id: practiceSessionIdSchema,
 }).strict();
 
 export const setCurrentChapterInputSchema = z.object({

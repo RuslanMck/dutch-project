@@ -12,6 +12,7 @@ import { createMistakeRepository } from '../domains/mistakes/mistake-repository.
 import { createMistakeService } from '../domains/mistakes/mistake-service.js';
 import { createPhraseRepository } from '../domains/phrases/phrase-repository.js';
 import { createPhraseService } from '../domains/phrases/phrase-service.js';
+import { createClientAnswerReceiptRepository } from '../domains/practice/client-answer-receipts.js';
 import { createFrequencyRepository } from '../domains/practice/frequency-repository.js';
 import { createFsrsScheduler } from '../domains/practice/fsrs-scheduling.js';
 import { createWordSetPlanner } from '../domains/practice/word-set-planning.js';
@@ -80,6 +81,7 @@ export function createDomainServices({
   const wordSetPlanner = createWordSetPlanner({ practiceRepository });
   const practiceService = createPracticeService({
     practiceRepository,
+    clientAnswerReceiptRepository: createClientAnswerReceiptRepository({ database }),
     wordSetPlanner,
     practiceSettings,
     priorityService,

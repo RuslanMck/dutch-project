@@ -1,6 +1,7 @@
 // Dutch матеріали: UI controller. Static tab shells live in index.html; this file fills them
 // and keeps user input (form text, card index, practice question, open rules) across re-renders.
 import * as api from './api.js';
+import { offlineStore, flushOutbox, getStore as getOfflineStore } from './offline-store.js';
 import {
   buildHomeSummary,
   computeQueueProgressPercent,
@@ -76,6 +77,13 @@ import {
   selectVisible,
   sortCatalog,
   toggleSelected,
+  buildOfflineSet,
+  buildSetWordIds,
+  restorePracticeSnapshot,
+  formatOfflineBanner,
+  formatDroppedNotice,
+  formatUnsentLogoutText,
+  buildLocalRoundSummary,
 } from './logic.js';
 
 const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
@@ -102,8 +110,12 @@ const GRADE_LABEL = { again: 'Знову', hard: 'Важко', good: 'Добре
 
 // Practice session ({ sessionId, calendarDate }): kept in sessionStorage so a reload resumes the same day's session.
 const PRACTICE_SESSION_KEY = 'practice-session-id';
+// The set size when the server did not say.
+const DEFAULT_SET_SIZE = 10;
+const OFFLINE_WRITE_NOTICE = "Немає зв'язку — зміни не збережено";
+const OFFLINE_PRACTICE_MESSAGE = "Немає зв'язку. Практика продовжиться, щойно з'явиться інтернет";
 // Statuses of the FSRS practice in which a visit to the practice tab fetches a new batch.
-const FSRS_LOAD_STATUSES = ['idle', 'failed', 'unconfigured'];
+const FSRS_LOAD_STATUSES = ['idle', 'failed', 'unconfigured', 'offline'];
 // Shown when the queue ran out and the batch, asked again, brought the next set.
 const QUEUE_REFILLED_MESSAGE = 'Набір завершено — далі наступний набір.';
 
@@ -165,6 +177,15 @@ const ui = {
     pendingGradePosts: new Set(),
     tally: { again: 0, hard: 0, good: 0 },
     introducedCount: 0,
+    // Offline: calendarDate: the day the set was loaded for; setWords: the words of the set on screen (batch order);
+    // setWordIds: their ids (sent as set_word_ids); hardWordIds: words answered again or hard in this session;
+    // isOfflineSet: the set was built on the phone; setSize: the size of a full set.
+    calendarDate: '',
+    setWords: [],
+    setWordIds: [],
+    hardWordIds: new Set(),
+    isOfflineSet: false,
+    setSize: DEFAULT_SET_SIZE,
     current: null,                   // { word, direction, checked, grade, repeat, schedule, canOverride, post }
     feedback: null,
     dueTomorrow: null,
@@ -224,6 +245,7 @@ async function refresh(keys) {
     state.loaded = true;
     render();
   }
+  renderOfflineBanner();
 }
 
 // Run a write, then refetch the affected collections. Errors go to the notice line.
@@ -233,7 +255,7 @@ async function act(fn, keys = []) {
     if (keys.length) await refresh(keys);
     return result;
   } catch (error) {
-    notice(error.message || 'Помилка');
+    notice(error.offline ? OFFLINE_WRITE_NOTICE : error.message || 'Помилка');
   }
 }
 
@@ -631,7 +653,7 @@ async function loadCardWords(sessionId) {
   ui.cards.flipped = false;
   renderCards();
   try {
-    const batch = await api.getPracticeBatch(sessionId);
+    const batch = await api.getPracticeBatch(sessionId, { allowOfflineCache: true });
     words.deck = [...orderWords(batch.reviews), ...orderWords(batch.new_words)];
     words.status = 'ready';
   } catch (error) {
@@ -1016,6 +1038,12 @@ async function loadFsrsBatch(sessionId) {
     tally: { again: 0, hard: 0, good: 0 },
     pendingGradePosts: new Set(),
     introducedCount: 0,
+    calendarDate: formatTodayInAmsterdam(),
+    setWords: [],
+    setWordIds: [],
+    hardWordIds: new Set(),
+    isOfflineSet: false,
+    setSize: DEFAULT_SET_SIZE,
     current: null,
     feedback: null,
     dueTomorrow: null,
@@ -1024,17 +1052,17 @@ async function loadFsrsBatch(sessionId) {
   });
   renderPractice();
   try {
-    const batch = await api.getPracticeBatch(sessionId);
-    session.waiting = splitIntoRounds({
-      reviews: batch.reviews,
-      newCards: batch.new_words,
-      answered: session.answered,
-      order: orderWords,
-    });
+    const batch = await fetchLiveBatch(sessionId);
+    startFsrsSet({ words: [...batch.reviews, ...batch.new_words], setSize: batch.counts?.set_size });
     session.status = 'ready';
     showNextFsrsWord();
+    saveFsrsSnapshot();
+    loadSpareWords(sessionId);
   } catch (error) {
-    if (error.status === 409) {
+    if (error.offline) {
+      // The set kept on the phone continues; without one the practice waits for the connection.
+      if (!(await restoreFsrsFromSnapshot())) session.status = 'offline';
+    } else if (error.status === 409) {
       session.status = 'unconfigured';
     } else {
       session.status = 'failed';
@@ -1089,10 +1117,19 @@ async function showRoundSummaryOrRefill() {
   await Promise.allSettled([...session.pendingGradePosts]);
   if (ui.fsrs.sessionId !== sessionId) return;
   let round = null;
+  let isOffline = false;
   try {
+    if (!(await isReadyForLiveRead())) throw api.createOfflineError();
     round = (await api.getRoundSummary()).round;
-  } catch { /* no summary: the session goes on */ }
+  } catch (error) {
+    isOffline = !!error.offline;     // other errors: no summary, the session goes on
+  }
   if (ui.fsrs.sessionId !== sessionId) return;
+  // Offline the summary comes from the answers on the phone.
+  if (isOffline && session.answered.size > 0) {
+    showLocalRoundSummary();
+    return;
+  }
   if (round?.is_complete && round.finished_in_session_id === sessionId) {
     session.round = round;
     session.status = 'round-done';
@@ -1116,6 +1153,18 @@ function handleRoundFinishClick() {
 }
 
 function renderRoundSummary() {
+  const isLocal = ui.fsrs.round.isLocal === true;
+  $('practice-round-hardest').hidden = isLocal;
+  $('practice-round-words-box').hidden = isLocal;
+  if (isLocal) {
+    // Finished offline: only the local tally is known.
+    const localRound = ui.fsrs.round;
+    $('practice-round-title').textContent = localRound.title;
+    $('practice-round-stats').innerHTML = localRound.stats.map(([label, value]) =>
+      `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
+    renderRoundDrillButtons(localRound);
+    return;
+  }
   const view = buildRoundSummaryView(ui.fsrs.round);
   $('practice-round-title').textContent = view.title;
   $('practice-round-stats').innerHTML = view.stats.map(([label, value]) =>
@@ -1152,9 +1201,10 @@ async function refillFsrsQueue(continueMessage = '') {
   if (ui.fsrs.sessionId !== sessionId) return false;
   let batch;
   try {
-    batch = await api.getPracticeBatch(sessionId);
+    batch = await fetchLiveBatch(sessionId);
   } catch (error) {
     if (ui.fsrs.sessionId !== sessionId) return false;
+    if (error.offline) return startOfflineNextSet(continueMessage);
     if (error.status === 409) {
       session.status = 'unconfigured';
     } else {
@@ -1166,12 +1216,7 @@ async function refillFsrsQueue(continueMessage = '') {
   }
   if (ui.fsrs.sessionId !== sessionId) return false;
   // A card answered in this session in a direction never comes back in that direction, even if the batch still lists it.
-  session.waiting = splitIntoRounds({
-    reviews: batch.reviews,
-    newCards: batch.new_words,
-    answered: session.answered,
-    order: orderWords,
-  });
+  startFsrsSet({ words: [...batch.reviews, ...batch.new_words], setSize: batch.counts?.set_size });
   if (!ROUND_DIRECTIONS.some(direction => session.waiting[direction].length)) {
     finishFsrsSession();
     return false;
@@ -1180,6 +1225,8 @@ async function refillFsrsQueue(continueMessage = '') {
   // The session continues, so its id stays the stored one (finishing replaced it).
   saveSession(sessionId);
   showNextFsrsWord();
+  saveFsrsSnapshot();
+  loadSpareWords(sessionId);
   // The message says a set was finished, so it shows only when the batch is a new set, not the rest of an open one.
   const isNewSet = batch.counts?.is_set_open !== true;
   if (continueMessage && isNewSet) session.feedback = { text: continueMessage, ok: true };
@@ -1193,6 +1240,7 @@ function finishFsrsSession() {
   const session = ui.fsrs;
   session.current = null;
   session.status = 'done';
+  offlineStore.deleteSnapshot('practice').catch(() => {});
   saveSession(createSessionId());
   loadDueTomorrow();
   loadStrugglingCount();
@@ -1303,11 +1351,17 @@ function recordFsrsAnswer(current) {
   const key = answerKey(direction, word.id);
   current.canOverride = false;
   current.repeat = session.answered.has(key);
+  // The id and the time belong to the moment of the answer, so a retried post is never counted twice.
+  current.clientAnswerId = createSessionId();
+  current.answeredAt = Date.now();
+  current.setWordIds = session.setWordIds;
+  if (grade !== 'good') session.hardWordIds.add(word.id);
   if (!current.repeat) {
     session.answered.add(key);
     session.tally[grade] += 1;
     if (word.state === 'new' && direction === 'uk_nl') session.introducedCount += 1;
   }
+  saveFsrsSnapshot();
   current.post = postFsrsGrade(current, current.answer);
   trackPendingPost(session.pendingGradePosts, current.post);
 }
@@ -1324,15 +1378,38 @@ function handleOverrideClick() {
   $('practice-btn').focus();
 }
 
-// The response carries the deck position, which the line under the message shows. A failed first answer undoes its
-// local count, so the next first answer to the word in this direction posts again; a failed repeat only shows the notice.
+// The response carries the deck position, which the line under the message shows. Offline (or while older answers wait in
+// the outbox) the answer goes to the outbox instead and the word follows the no-schedule path. A failed first answer
+// undoes its local count, so the next first answer to the word in this direction posts again; a failed repeat only shows
+// the notice.
 async function postFsrsGrade(current, answer) {
   const session = ui.fsrs;
   const { sessionId, answered } = session;
   const { word, grade, direction } = current;
   const key = answerKey(direction, word.id);
+  const body = {
+    word_id: word.id,
+    grade,
+    answer,
+    session_id: sessionId,
+    direction,
+    client_answer_id: current.clientAnswerId,
+    answered_at: current.answeredAt,
+    ...(current.setWordIds?.length ? { set_word_ids: current.setWordIds } : {}),
+  };
   try {
-    const schedule = await api.gradePracticeWord({ word_id: word.id, grade, answer, session_id: sessionId, direction });
+    if (shouldQueueAnswers()) {
+      await queueOfflineAnswer('grade', GRADES_URL, body);
+      return;
+    }
+    let schedule;
+    try {
+      schedule = await api.gradePracticeWord(body);
+    } catch (error) {
+      if (!error.offline) throw error;
+      await queueOfflineAnswer('grade', GRADES_URL, body);
+      return;
+    }
     current.schedule = schedule;
     word.deck = schedule.deck;
     if (session.current === current) renderPractice();
@@ -1342,6 +1419,7 @@ async function postFsrsGrade(current, answer) {
       answered.delete(key);
       session.tally[grade] -= 1;
       if (word.state === 'new' && direction === 'uk_nl') session.introducedCount -= 1;
+      saveFsrsSnapshot();
       renderPractice();
     }
     notice(error.message || 'Помилка');
@@ -1482,6 +1560,7 @@ function renderFsrsPractice() {
     'round-done': '',
     unconfigured: 'Практика FSRS ще не налаштована',
     failed: 'Не вдалося завантажити слова',
+    offline: OFFLINE_PRACTICE_MESSAGE,
   };
   $('practice-q').textContent = questionByStatus[session.status];
   $('practice-form').hidden = !isReady;
@@ -1544,6 +1623,132 @@ async function loadStrugglingCount() {
     const listing = await api.getStrugglingWords();
     if (ui.fsrs.sessionId === sessionId) ui.fsrs.strugglingCount = listing.count;
   } catch { /* the button stays hidden */ }
+  renderPractice();
+}
+
+// ----- offline practice (docs/OFFLINE_ARCHITECTURE.md §3.4) -----
+
+// Starts a set from its words: remembers them (and their ids for set_word_ids) and splits them into the two rounds. A card
+// answered in this session in a direction never comes back in that direction, even if the set lists it.
+function startFsrsSet({ words, isOfflineSet = false, setSize }) {
+  const session = ui.fsrs;
+  session.setWords = words;
+  session.setWordIds = buildSetWordIds(words);
+  session.isOfflineSet = isOfflineSet;
+  if (setSize) session.setSize = setSize;
+  session.waiting = splitIntoRounds({
+    reviews: words.filter(word => word.state !== 'new'),
+    newCards: words.filter(word => word.state === 'new'),
+    answered: session.answered,
+    order: orderWords,
+  });
+}
+
+// The batch from the server, only when the answers on the phone have reached it first (the set is planned from the
+// stored answers). Throws an offline error when the phone is offline or some answers could not be sent.
+async function fetchLiveBatch(sessionId) {
+  if (!(await isReadyForLiveRead())) throw api.createOfflineError();
+  return api.getPracticeBatch(sessionId);
+}
+
+// Keeps the set on screen on the phone, so a reload offline can continue it.
+function saveFsrsSnapshot() {
+  const session = ui.fsrs;
+  if (!session.sessionId || !session.setWords.length) return;
+  offlineStore.saveSnapshot('practice', {
+    sessionId: session.sessionId,
+    calendarDate: session.calendarDate,
+    words: session.setWords,
+    answeredKeys: [...session.answered],
+    tally: { ...session.tally },
+    introducedCount: session.introducedCount,
+    hardWordIds: [...session.hardWordIds],
+    offlineSet: session.isOfflineSet,
+    setSize: session.setSize,
+  }).catch(() => {});
+}
+
+// After a batch loaded online: the words the next set will probably draw from are kept for an offline next set.
+async function loadSpareWords(sessionId) {
+  if (isDeviceOffline()) return;
+  try {
+    const { words } = await api.getSpareWords(sessionId);
+    await offlineStore.saveSnapshot('spare', { words, calendarDate: formatTodayInAmsterdam(), sessionId });
+  } catch { /* the spare words stay as they were */ }
+}
+
+// The batch could not be loaded offline: continues the set kept on the phone for today. Resolves to false when there is none.
+async function restoreFsrsFromSnapshot() {
+  const session = ui.fsrs;
+  let snapshot = null;
+  try { snapshot = await offlineStore.loadSnapshot('practice'); } catch { /* none */ }
+  const calendarDate = formatTodayInAmsterdam();
+  const restored = restorePracticeSnapshot({ snapshot, calendarDate });
+  if (!restored) return false;
+  // The stored session id may be gone (the phone closed the page); the set's own session continues.
+  saveSession(restored.sessionId);
+  Object.assign(session, {
+    sessionId: restored.sessionId,
+    calendarDate,
+    answered: restored.answered,
+    tally: restored.tally,
+    introducedCount: restored.introducedCount,
+    hardWordIds: restored.hardWordIds,
+  });
+  startFsrsSet({ words: restored.allWords, isOfflineSet: restored.isOfflineSet, setSize: restored.setSize });
+  session.status = 'ready';
+  showNextFsrsWord();
+  return true;
+}
+
+// «Наступний набір» without the server: the words of the finished set that are still learning, then the spare words kept
+// on the phone. It is practised like a normal set; its grades carry the set's ids. Resolves to true when a set started.
+async function startOfflineNextSet(continueMessage = '') {
+  const session = ui.fsrs;
+  const sessionId = session.sessionId;
+  let spareSnapshot = null;
+  try { spareSnapshot = await offlineStore.loadSnapshot('spare'); } catch { /* none */ }
+  if (ui.fsrs.sessionId !== sessionId) return false;
+  const spare = spareSnapshot?.calendarDate === formatTodayInAmsterdam() ? spareSnapshot.words : [];
+  const words = buildOfflineSet({
+    stillLearning: session.setWords.filter(word => session.hardWordIds.has(word.id)),
+    spare,
+    setSize: session.setSize,
+  });
+  if (!words.length) {
+    session.status = 'offline';
+    renderPractice();
+    return false;
+  }
+  // The words are asked again in both directions; the spare words used here are not offered a second time.
+  for (const word of words) {
+    session.hardWordIds.delete(word.id);
+    for (const direction of ROUND_DIRECTIONS) session.answered.delete(answerKey(direction, word.id));
+  }
+  const usedIds = new Set(words.map(word => word.id));
+  if (spareSnapshot) {
+    offlineStore.saveSnapshot('spare', { ...spareSnapshot, words: spare.filter(word => !usedIds.has(word.id)) })
+      .catch(() => {});
+  }
+  startFsrsSet({ words, isOfflineSet: true });
+  session.status = 'ready';
+  showNextFsrsWord();
+  if (continueMessage) session.feedback = { text: continueMessage, ok: true };
+  saveFsrsSnapshot();
+  renderPractice();
+  return true;
+}
+
+// The set is finished and the server cannot say how it went: the summary shows the local tally.
+function showLocalRoundSummary() {
+  const session = ui.fsrs;
+  session.round = buildLocalRoundSummary({
+    tally: session.tally,
+    introducedCount: session.introducedCount,
+    hardWords: session.setWords.filter(word => session.hardWordIds.has(word.id)),
+  });
+  session.status = 'round-done';
+  session.peakQueueLength = 0;
   renderPractice();
 }
 
@@ -1733,16 +1938,26 @@ function advanceCustomWord() {
   $('practice-input').focus();
 }
 
-// Posts one checked answer to the drill log, for the statistics. A failed post (offline, a word deleted meanwhile) is
-// not retried and never stops the drill: the statistics only miss that answer.
+// Posts one checked answer to the drill log, for the statistics. Offline (or behind older queued answers) it goes to the
+// outbox, with the time of the answer. Any other failure (a word deleted meanwhile) is not retried and never stops the
+// drill: the statistics only miss that answer.
 function logDrillAnswer(drill, current, answerText) {
-  api.postDrillAnswer({
+  const body = {
     word_id: current.word.id,
     direction: current.direction,
     is_correct: current.grade === 'good',
     answer: answerText.trim().slice(0, 500),
     source: drill.source,
-  }).catch(() => {});
+    client_answer_id: createSessionId(),
+    answered_at: Date.now(),
+  };
+  if (shouldQueueAnswers()) {
+    queueOfflineAnswer('drill', DRILL_ANSWERS_URL, body).catch(() => {});
+    return;
+  }
+  api.postDrillAnswer(body).catch(error => {
+    if (error.offline) queueOfflineAnswer('drill', DRILL_ANSWERS_URL, body).catch(() => {});
+  });
 }
 
 // The question on screen: the Ukrainian in round 1, the Dutch with its article in round 2.
@@ -1849,7 +2064,9 @@ function renderRoundDrillButtons(round) {
     element.hidden = button.hidden;
     element.disabled = roundDrillBusy;
   }
-  $('practice-round-drills').hidden = buttons.every(button => button.hidden);
+  // A set finished offline knows only its hard words: the second button would repeat the first.
+  if (round.isLocal) $(ROUND_DRILL_BUTTON_IDS['hard-medium']).hidden = true;
+  $('practice-round-drills').hidden = buttons.every(button => button.hidden || (round.isLocal && button.kind !== 'hard'));
 }
 
 // True while a round-summary drill's words are being fetched: both buttons wait (a second tap does nothing).
@@ -1870,7 +2087,9 @@ async function handleRoundDrillClick(kind) {
   let words;
   setRoundDrillsBusy(true);
   try {
-    words = (await api.getDrillWords(button.wordIds)).words;
+    words = round.isLocal
+      ? round.words.filter(word => button.wordIds.includes(word.id))
+      : (await api.getDrillWords(button.wordIds)).words;
   } catch (error) {
     notice(error.message || 'Помилка');
     return;
@@ -2742,6 +2961,171 @@ function bindEvents() {
   $('word-order-list').addEventListener('click', handleWordOrderListClick);
 }
 
+// ---------- 8 · Offline: outbox, banner, warm-up (docs/OFFLINE_ARCHITECTURE.md §3.1, §3.3, §3.5, §3.6) ----------
+
+const GRADES_URL = '/api/practice/grades';
+const DRILL_ANSWERS_URL = '/api/practice/drill-answers';
+const OUTBOX_RETRY_MS = 30 * 1000;
+const WARM_UP_MIN_GAP_MS = 10 * 60 * 1000;
+const MAX_FLUSH_PASSES = 3;
+
+// pendingCount: answers in the outbox; needsLogin: the last flush met a 401.
+const outbox = { pendingCount: 0, needsLogin: false };
+// Resolves once the stored outbox size is known (the first reads wait for it).
+const outboxReady = offlineStore.count().then(count => { outbox.pendingCount = count; }).catch(() => {});
+let lastWarmUpAt = 0;
+
+function isDeviceOffline() {
+  return navigator.onLine === false;
+}
+
+// True when the phone is online and the last request reached the server.
+function isConnected() {
+  return !isDeviceOffline() && !api.isNetworkDown();
+}
+
+// New answers go to the outbox while offline, and while older ones wait there (so they are replayed in order).
+function shouldQueueAnswers() {
+  return isDeviceOffline() || outbox.pendingCount > 0;
+}
+
+// Puts an answer in the outbox and, when the phone is online, tries to send the outbox at once.
+async function queueOfflineAnswer(kind, url, body) {
+  await offlineStore.enqueue({ kind, url, body, created_at: Date.now() });
+  outbox.pendingCount += 1;
+  renderOfflineBanner();
+  if (!isDeviceOffline()) flushOutboxNow();
+}
+
+// Sends the outbox in order (offline-store.js). Entries added while it runs get another pass. Afterwards the banner and,
+// when anything was sent, the words and statistics are refreshed. Returns { sent, dropped, remaining, needsLogin }.
+async function flushOutboxNow() {
+  await outboxReady;
+  const total = { sent: 0, dropped: 0, remaining: 0, needsLogin: false };
+  for (let pass = 0; pass < MAX_FLUSH_PASSES; pass += 1) {
+    if (await offlineStore.count() === 0) break;
+    const result = await flushOutbox({
+      store: await getOfflineStore(),
+      post: api.postWithoutRedirect,
+      onProgress: ({ remaining }) => { outbox.pendingCount = remaining; renderOfflineBanner(); },
+    });
+    total.sent += result.sent;
+    total.dropped += result.dropped;
+    total.remaining = result.remaining;
+    total.needsLogin = result.needsLogin;
+    if (result.remaining > 0) break;
+  }
+  outbox.pendingCount = await offlineStore.count().catch(() => total.remaining);
+  total.remaining = outbox.pendingCount;
+  outbox.needsLogin = total.needsLogin && outbox.pendingCount > 0;
+  renderOfflineBanner();
+  if (total.dropped) notice(formatDroppedNotice(total.dropped));
+  if (total.sent) refreshAfterSync();
+  return total;
+}
+
+// The answers reached the server: the schedule changed, so the words and the pages built from them are read again.
+function refreshAfterSync() {
+  refresh(['words', 'topics']).catch(() => {});
+  if (ui.tab === 'stats') loadStats();
+  if (ui.tab === 'home') loadHomeStrugglingCount();
+}
+
+// True when the server may be read for the practice: the phone is online and the outbox is empty (or was just sent).
+async function isReadyForLiveRead() {
+  if (isDeviceOffline()) return false;
+  await outboxReady;
+  if (outbox.pendingCount === 0) return true;
+  return (await flushOutboxNow()).remaining === 0;
+}
+
+// The thin line under the header: offline, answers waiting, or login needed (formatOfflineBanner).
+function renderOfflineBanner() {
+  const view = formatOfflineBanner({
+    isOnline: isConnected(),
+    pendingCount: outbox.pendingCount,
+    cacheTime: api.getLastOfflineCacheTime(),
+    needsLogin: outbox.needsLogin,
+  });
+  $('offline-banner').hidden = !view;
+  if (!view) return;
+  $('offline-banner-text').textContent = view.text;
+  $('offline-banner-send').hidden = !view.showSendButton;
+  $('offline-banner-login').hidden = !view.showLoginLink;
+}
+
+// In the background, reads the lists the tabs use so the service worker keeps them for reading offline. At most once
+// every 10 minutes; errors are ignored.
+async function warmUpOfflineData() {
+  if (isDeviceOffline() || Date.now() - lastWarmUpAt < WARM_UP_MIN_GAP_MS) return;
+  lastWarmUpAt = Date.now();
+  const quietly = request => request.catch(() => null);
+  await Promise.all([
+    api.listWords(), api.listTopics(), api.listRules(), api.listPatterns(), api.listPhrases(), api.listTexts(),
+    api.getDeckWordCatalog(), api.getPracticeStats(), api.getStats(), api.getActivity(ui.stats.period),
+  ].map(quietly));
+  const deckList = await quietly(api.listDecks());
+  for (const deck of deckList || []) {
+    const detail = await quietly(api.getDeck(deck.id));
+    const ids = (detail?.words || []).map(word => word.id);
+    if (ids.length) await quietly(api.getDrillWords(ids));
+  }
+}
+
+// Registers the service worker after the page loaded; a failure is ignored (the app works without it).
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const register = () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); };
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
+}
+
+// Logout: the worker's stored answers and the phone's outbox and snapshots are deleted first. Unsent answers are asked about.
+function bindLogout() {
+  const form = document.querySelector('.profile-logout');
+  if (!form) return;
+  const finishLogout = async () => {
+    try { navigator.serviceWorker?.controller?.postMessage({ type: 'clear-data' }); } catch { /* no worker */ }
+    try {
+      await offlineStore.clear();
+      await offlineStore.clearSnapshots();
+    } catch { /* storage unavailable */ }
+    form.submit();
+  };
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    let unsentCount = 0;
+    try { unsentCount = await offlineStore.count(); } catch { /* storage unavailable */ }
+    if (unsentCount > 0) {
+      askConfirm({ title: 'Вийти?', text: formatUnsentLogoutText(unsentCount), onConfirm: finishLogout });
+      return;
+    }
+    await finishLogout();
+  });
+}
+
+// Everything the offline support needs at start: the worker, the banner, the outbox flush triggers, the logout.
+function bindOfflineSupport() {
+  registerServiceWorker();
+  bindLogout();
+  $('offline-banner-send').addEventListener('click', () => { flushOutboxNow(); });
+  window.addEventListener('offline', renderOfflineBanner);
+  window.addEventListener('online', () => {
+    renderOfflineBanner();
+    flushOutboxNow();
+    warmUpOfflineData();
+    if (ui.fsrs.status === 'offline' && ui.tab === 'practice') ensureFsrsSession();
+  });
+  // Answers still waiting are tried again every 30 s while the phone is online.
+  setInterval(() => {
+    if (outbox.pendingCount > 0 && !isDeviceOffline()) flushOutboxNow();
+  }, OUTBOX_RETRY_MS);
+  outboxReady.then(() => {
+    renderOfflineBanner();
+    if (outbox.pendingCount > 0 && !isDeviceOffline()) flushOutboxNow();
+  });
+}
+
 // ---------- 7 · Колоди ----------
 
 // The decks tab. view: list | picker | form. list: the decks of GET /api/decks (status idle | loading | ready | failed).
@@ -3277,16 +3661,19 @@ function init() {
   bindEvents();
   bindDeckEvents();
   renderShuffleButton();
+  bindOfflineSupport();
   let saved = 'home';
   try { saved = localStorage.getItem('tab') || 'home'; } catch { /* storage unavailable */ }
   showTab(saved);
-  refresh(ALL_KEYS).catch(error => notice(error.message || 'Не вдалося завантажити дані'));
+  refresh(ALL_KEYS)
+    .then(() => warmUpOfflineData())
+    .catch(error => { if (!error.offline) notice(error.message || 'Не вдалося завантажити дані'); });
   api.subscribe(collection => {
     if (collection === 'word-order' || collection === 'all') refreshWordOrderIfNeeded();
     if (collection === 'word-order') return;
     refreshDecksLive(collection);
     if (collection === 'decks') return;
-    refresh(KEYS_FOR[collection] || ALL_KEYS).catch(error => notice(error.message || 'Помилка оновлення'));
+    refresh(KEYS_FOR[collection] || ALL_KEYS).catch(error => { if (!error.offline) notice(error.message || 'Помилка оновлення'); });
   });
 }
 

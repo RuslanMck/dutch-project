@@ -209,6 +209,18 @@ export function createPracticeRepository({ database }) {
     ORDER BY review_logs.reviewed_at DESC, review_logs.id DESC
     LIMIT 1
   `);
+  // The latest time a counting review log or deck answer of the word was given (ms), or NULL when there is none.
+  const selectLatestAnswerTimeOfWordStatement = database.prepare(`
+    SELECT MAX(answered_at) FROM (
+      SELECT review_logs.reviewed_at AS answered_at
+      FROM review_logs
+      WHERE review_logs.word_id = @wordId AND review_logs.superseded_at IS NULL
+      UNION ALL
+      SELECT deck_answers.answered_at
+      FROM deck_answers
+      WHERE deck_answers.word_id = @wordId AND deck_answers.superseded_at IS NULL
+    )
+  `).pluck();
   const selectReviewedWordIdsStatement = database.prepare(`
     SELECT review_logs.word_id
     FROM review_logs
@@ -410,6 +422,11 @@ export function createPracticeRepository({ database }) {
     return selectLatestReviewLogSinceStatement.get({ wordId, sinceTimestamp }) ?? null;
   }
 
+  // The latest time (ms) of a review log or deck answer of the word that still counts, or null when there is none.
+  function findLatestAnswerTimeOfWord(wordId) {
+    return selectLatestAnswerTimeOfWordStatement.get({ wordId }) ?? null;
+  }
+
   // Word ids graded in the session by logs that still count.
   function listWordIdsReviewedInSession({ sessionId }) {
     return selectReviewedWordIdsStatement.all({ sessionId });
@@ -456,6 +473,7 @@ export function createPracticeRepository({ database }) {
     countIntroducedOnByPriority,
     createReviewLog,
     findLatestReviewLogSince,
+    findLatestAnswerTimeOfWord,
     updateReviewLogSecondGrade,
     listWordIdsReviewedInSession,
     markReviewLogsSuperseded,

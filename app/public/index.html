@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preload" href="/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="app.css">
 </head>
@@ -20,6 +21,12 @@
     <h1 id="page-title" class="top__title" tabindex="-1">Dutch матеріали</h1>
     <p id="page-subtitle" class="top__subtitle"></p>
   </header>
+
+  <div id="offline-banner" class="offline-banner" role="status" hidden>
+    <span id="offline-banner-text" class="offline-banner__text"></span>
+    <button id="offline-banner-send" class="offline-banner__action" type="button" hidden>Надіслати</button>
+    <a id="offline-banner-login" class="offline-banner__action" href="/login" hidden>Увійти</a>
+  </div>
 
   <div id="notice" class="notice" role="alert" hidden></div>
 

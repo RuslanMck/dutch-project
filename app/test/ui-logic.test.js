@@ -5,6 +5,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  buildOfflineSet,
+  buildSetWordIds,
+  restorePracticeSnapshot,
+  formatOfflineBanner,
+  formatDroppedNotice,
+  formatUnsentLogoutText,
+  buildLocalRoundSummary,
   esc,
   normalise,
   normalizeAnswerText,
@@ -1142,6 +1149,11 @@ test('the custom drill section of app.js calls no grading API (the two reads and
   const calls = [...section.matchAll(/\bapi\.(\w+)/g)].map(match => match[1]);
   assert.deepEqual([...new Set(calls)].sort(), ['getDrillWords', 'getStrugglingWords', 'postDrillAnswer']);
   assert.doesNotMatch(section, /recordResult|gradePracticeWord|gradePracticePhrase|recordFsrsAnswer|postFsrsGrade|postPhraseGrade|gradeCardPhrase|answerFsrsWord|trackPendingPost/);
+  // Offline the drill may queue its answers in the outbox, as drill answers only: never a grade.
+  const queued = [...section.matchAll(/queueOfflineAnswer\('(\w+)'/g)].map(match => match[1]);
+  assert.ok(queued.length > 0, 'the drill queues its answers offline');
+  assert.deepEqual([...new Set(queued)], ['drill']);
+  assert.doesNotMatch(section, /GRADES_URL/);
 });
 
 // ---------- Колоди (decks) ----------
@@ -1455,4 +1467,121 @@ test('buildWordEditPatch sends only the changed fields, trimmed, and refuses an 
     { patch: { article: 'het', section: '7' } });
   assert.deepEqual(buildWordEditPatch(word, { ...same, nl: '  ' }), { error: 'nl' });
   assert.deepEqual(buildWordEditPatch(word, { ...same, uk: '' }), { error: 'uk' });
+});
+
+// ---------- offline practice ----------
+
+const offlineWord = (id, extra = {}) => ({ id, uk: `uk${id}`, nl: `nl${id}`, state: 'learning', directions_left: ['uk_nl'], ...extra });
+
+test('buildOfflineSet: still-learning words first, then spare words, no repeats, at most setSize', () => {
+  const set = buildOfflineSet({
+    stillLearning: [offlineWord(1), offlineWord(2)],
+    spare: [offlineWord(2), offlineWord(3), offlineWord(4), offlineWord(5)],
+    setSize: 4,
+  });
+  assert.deepEqual(set.map(word => word.id), [1, 2, 3, 4]);
+  assert.ok(set.every(word => word.directions_left.join() === 'uk_nl,nl_uk'), 'both directions are asked again');
+});
+
+test('buildOfflineSet: too many still-learning words are cut to the size; nothing to take gives an empty set', () => {
+  const learning = [1, 2, 3].map(id => offlineWord(id));
+  assert.deepEqual(buildOfflineSet({ stillLearning: learning, spare: [offlineWord(9)], setSize: 2 }).map(word => word.id), [1, 2]);
+  assert.deepEqual(buildOfflineSet({ stillLearning: [], spare: [], setSize: 10 }), []);
+  assert.deepEqual(buildOfflineSet({ stillLearning: [], spare: [offlineWord(7)] }).map(word => word.id), [7]);
+});
+
+test('buildOfflineSet does not change its inputs', () => {
+  const spareWord = offlineWord(3);
+  buildOfflineSet({ stillLearning: [], spare: [spareWord], setSize: 5 });
+  assert.deepEqual(spareWord.directions_left, ['uk_nl']);
+});
+
+test('buildSetWordIds keeps the order and at most 20 ids', () => {
+  const words = Array.from({ length: 25 }, (_, index) => offlineWord(index + 1));
+  const ids = buildSetWordIds(words);
+  assert.equal(ids.length, 20);
+  assert.deepEqual(ids.slice(0, 3), [1, 2, 3]);
+});
+
+const baseSnapshot = {
+  sessionId: 's1',
+  calendarDate: '2026-11-02',
+  words: [
+    offlineWord(1, { directions_left: ['uk_nl', 'nl_uk'] }),
+    offlineWord(2, { state: 'new', directions_left: ['uk_nl', 'nl_uk'] }),
+    offlineWord(3, { directions_left: ['uk_nl'] }),
+  ],
+  answeredKeys: ['uk_nl:1', 'uk_nl:3'],
+  tally: { again: 1, hard: 0, good: 1 },
+  introducedCount: 0,
+  hardWordIds: [1],
+  offlineSet: true,
+};
+
+test('restorePracticeSnapshot: the same day restores; words answered in every direction are left out', () => {
+  const restored = restorePracticeSnapshot({ snapshot: baseSnapshot, calendarDate: '2026-11-02' });
+  assert.equal(restored.sessionId, 's1');
+  assert.deepEqual(restored.words.map(word => word.id), [1, 2]);
+  assert.deepEqual(restored.reviews.map(word => word.id), [1]);
+  assert.deepEqual(restored.newWords.map(word => word.id), [2]);
+  assert.deepEqual(restored.allWords.map(word => word.id), [1, 2, 3]);
+  assert.ok(restored.answered.has('uk_nl:1'));
+  assert.deepEqual(restored.tally, { again: 1, hard: 0, good: 1 });
+  assert.ok(restored.hardWordIds.has(1));
+  assert.equal(restored.isOfflineSet, true);
+  assert.equal(restored.setSize, 10);
+});
+
+test('restorePracticeSnapshot: another day, no snapshot or a broken one gives null', () => {
+  assert.equal(restorePracticeSnapshot({ snapshot: baseSnapshot, calendarDate: '2026-11-03' }), null);
+  assert.equal(restorePracticeSnapshot({ snapshot: null, calendarDate: '2026-11-02' }), null);
+  assert.equal(restorePracticeSnapshot({ snapshot: { calendarDate: '2026-11-02' }, calendarDate: '2026-11-02' }), null);
+});
+
+test('formatOfflineBanner: nothing to say online with an empty outbox', () => {
+  assert.equal(formatOfflineBanner({ isOnline: true, pendingCount: 0 }), null);
+});
+
+test('formatOfflineBanner: offline shows the saved-data line, with the age of the data when known', () => {
+  assert.equal(formatOfflineBanner({ isOnline: false, pendingCount: 0 }).text, 'Офлайн · показано збережене');
+  const time = new Date(2026, 10, 2, 9, 5).getTime();
+  assert.equal(formatOfflineBanner({ isOnline: false, pendingCount: 0, cacheTime: time }).text,
+    'Офлайн · показано збережене · оновлено 09:05');
+  const withAnswers = formatOfflineBanner({ isOnline: false, pendingCount: 2 });
+  assert.match(withAnswers.text, /не надіслано: 2$/);
+  assert.equal(withAnswers.showSendButton, false);
+});
+
+test('formatOfflineBanner: waiting answers online offer «Надіслати»; a needed login offers the link', () => {
+  const waiting = formatOfflineBanner({ isOnline: true, pendingCount: 3 });
+  assert.deepEqual(waiting, { text: 'Не надіслано відповідей: 3', showSendButton: true, showLoginLink: false });
+  const login = formatOfflineBanner({ isOnline: true, pendingCount: 3, needsLogin: true });
+  assert.deepEqual(login, { text: 'Увійди, щоб надіслати відповіді (3)', showSendButton: false, showLoginLink: true });
+});
+
+test('dropped and logout texts use the Ukrainian plural of «відповідь»', () => {
+  assert.equal(formatDroppedNotice(1), '1 відповідь не зараховано: пізніші вже були');
+  assert.equal(formatDroppedNotice(3), '3 відповіді не зараховано: пізніші вже були');
+  assert.equal(formatDroppedNotice(5), '5 відповідей не зараховано: пізніші вже були');
+  assert.equal(formatUnsentLogoutText(2), '2 відповіді ще не надіслано. Вийти й видалити їх?');
+});
+
+test('buildLocalRoundSummary counts the local answers and marks the hard words for the drill button', () => {
+  const summary = buildLocalRoundSummary({
+    tally: { again: 1, hard: 2, good: 4 }, introducedCount: 3, hardWords: [offlineWord(5)],
+  });
+  assert.equal(summary.isLocal, true);
+  assert.deepEqual(summary.stats[0], ['Відповідей', '7']);
+  assert.deepEqual(summary.words.map(word => word.difficulty), ['hard']);
+  assert.equal(buildRoundDrillButtons(summary.words)[0].count, 1);
+});
+
+test('the page wires the offline support: banner, service worker, outbox for grades, logout cleanup', () => {
+  const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
+  assert.match(html, /<div id="offline-banner"[^>]*role="status"[^>]*hidden>/);
+  assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png">/);
+  assert.match(appSource, /serviceWorker\.register\('\/sw\.js'\)/);
+  assert.match(functionBody(appSource, 'async function postFsrsGrade(current, answer) {'), /queueOfflineAnswer\('grade', GRADES_URL, body\)/);
+  assert.match(functionBody(appSource, 'function bindLogout() {'), /type: 'clear-data'/);
+  assert.match(functionBody(appSource, 'function bindLogout() {'), /askConfirm/);
 });

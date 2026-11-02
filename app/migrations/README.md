@@ -20,6 +20,7 @@ Numbered SQL files that build the SQLite schema. The runner applies them in name
 | `012-add-custom-decks.sql` | Custom decks: `custom_decks` (unique name ignoring case) and `custom_deck_words`, the words of each deck in the order added (cascade on delete of a deck or a word). |
 | `013-add-wrong-forms.sql` | `order_sentences.wrong_forms`: wrong forms of the sentence's words (single words, JSON array of strings) used as its extra tiles (`'[]'` = random extra words). |
 | `014-add-drill-answers.sql` | `drill_answers`: one row per checked answer of a custom drill (round-summary drills, decks, Важкі слова), for the statistics only; the schedule never reads it. |
+| `015-add-client-answer-receipts.sql` | `client_answer_receipts`: the response of each grade or drill answer sent with a `client_answer_id` (offline outbox), kept 30 days, so a repeated post writes nothing. |
 
 ## Conventions
 

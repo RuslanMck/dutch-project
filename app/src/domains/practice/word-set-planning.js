@@ -1,8 +1,8 @@
 // Plans the word set of the session (practice-set.js): the open set's words still to finish, or the next set: the
 // learning deck's words, then the reviews due today (most overdue first), up to the set size, and New words by
 // priority quota in the room that is left. A word is finished in an open set once it is in neither deck and has been
-// answered in both directions since the set opened (19.3). Reads the words through the practice repository and writes
-// nothing.
+// answered in both directions since the set opened (19.3). Also the spare words the phone keeps offline. Reads the
+// words through the practice repository and writes nothing.
 import { PRACTICE_DIRECTIONS } from './practice-direction.js';
 import { findOpenSet, planSetRoom } from './practice-set.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
@@ -69,7 +69,25 @@ export function createWordSetPlanner({ practiceRepository }) {
     return mapAnsweredDirections(answerRows);
   }
 
-  return Object.freeze({ planWordSet, countNewWordsOutside });
+  // The words the next set will most likely draw from, for the phone to keep: the deck's words and the reviews due
+  // before tomorrow's start (most overdue first), then New words in queue order by the priority quota, up to count
+  // words in all. excludeIds (the current set and the words graded in this session) are left out. Read only.
+  function planSpareWords({ settings, today, excludeIds, count }) {
+    const excludedIdSet = new Set(excludeIds);
+    const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
+    const oldCandidateIds = [
+      ...practiceRepository.listDeckWordIds(),
+      ...practiceRepository.listDueWordIds(tomorrowStart),
+    ].filter(wordId => !excludedIdSet.has(wordId));
+    const { oldIds, room } = planSetRoom({ oldIds: oldCandidateIds, setSize: count });
+    const newRows = listNewWordRows().filter(wordRow => !excludedIdSet.has(wordRow.id));
+    const newCandidates = room > 0
+      ? allocateSetCandidates({ settings, candidatesByPriority: groupCandidatesByPriority(newRows), room })
+      : [];
+    return Object.freeze([...oldIds, ...newCandidates.map(candidate => candidate.id)]);
+  }
+
+  return Object.freeze({ planWordSet, countNewWordsOutside, planSpareWords });
 }
 
 // A word of the set is not finished while it is New, in a deck direction, or not yet answered in both directions. A

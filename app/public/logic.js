@@ -1107,3 +1107,103 @@ export function computeQueueProgressPercent(queueLength, peakQueueLength) {
   if (!peakQueueLength) return 0;
   return Math.round(((peakQueueLength - queueLength) / peakQueueLength) * 100);
 }
+
+// ---------- offline practice ----------
+
+const BOTH_DIRECTIONS = Object.freeze(['uk_nl', 'nl_uk']);
+const MAX_SET_WORD_IDS = 20;
+
+// The set practised offline: the words of the finished set that are still learning (graded again or hard in it) come
+// first, then spare words that are not already in it, up to setSize. Each word is asked in both directions again.
+// A word appears once. Inputs are not changed.
+export function buildOfflineSet({ stillLearning = [], spare = [], setSize = 10 }) {
+  const chosen = [];
+  const seenIds = new Set();
+  for (const word of [...stillLearning, ...spare]) {
+    if (chosen.length >= setSize) break;
+    if (seenIds.has(word.id)) continue;
+    seenIds.add(word.id);
+    chosen.push({ ...word, directions_left: [...BOTH_DIRECTIONS] });
+  }
+  return chosen;
+}
+
+// The ids sent as set_word_ids with a grade: the set's words in order, at most 20.
+export function buildSetWordIds(words) {
+  return words.slice(0, MAX_SET_WORD_IDS).map(word => word.id);
+}
+
+// The set kept on the phone, ready to continue, or null when it is not usable (none stored, or from another day).
+// Words answered in every direction they had left are left out. reviews / newWords split the words by their state, as
+// the server's batch does; allWords keeps the whole set (the words answered already still count as learning).
+export function restorePracticeSnapshot({ snapshot, calendarDate }) {
+  if (!snapshot || !Array.isArray(snapshot.words) || typeof snapshot.sessionId !== 'string') return null;
+  if (snapshot.calendarDate !== calendarDate) return null;
+  const answered = new Set(snapshot.answeredKeys || []);
+  const isFinished = word => (word.directions_left || []).every(direction => answered.has(answerKey(direction, word.id)));
+  const words = snapshot.words.filter(word => !isFinished(word));
+  return {
+    sessionId: snapshot.sessionId,
+    words,
+    allWords: snapshot.words,
+    setSize: snapshot.setSize || 10,
+    reviews: words.filter(word => word.state !== 'new'),
+    newWords: words.filter(word => word.state === 'new'),
+    answered,
+    tally: { again: 0, hard: 0, good: 0, ...(snapshot.tally || {}) },
+    introducedCount: snapshot.introducedCount || 0,
+    hardWordIds: new Set(snapshot.hardWordIds || []),
+    isOfflineSet: snapshot.offlineSet === true,
+  };
+}
+
+// «14:32» from a time in ms (the phone's own time zone).
+function formatClockTime(timeMs) {
+  const date = new Date(timeMs);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+// The line under the header and what goes with it, or null when nothing is to be said (online, nothing unsent).
+// Returns { text, showSendButton, showLoginLink }.
+export function formatOfflineBanner({ isOnline, pendingCount = 0, cacheTime = null, needsLogin = false }) {
+  if (needsLogin && pendingCount > 0 && isOnline) {
+    return { text: `Увійди, щоб надіслати відповіді (${pendingCount})`, showSendButton: false, showLoginLink: true };
+  }
+  if (!isOnline) {
+    const updated = cacheTime ? ` · оновлено ${formatClockTime(cacheTime)}` : '';
+    const waiting = pendingCount > 0 ? ` · не надіслано: ${pendingCount}` : '';
+    return { text: `Офлайн · показано збережене${updated}${waiting}`, showSendButton: false, showLoginLink: false };
+  }
+  if (pendingCount > 0) {
+    return { text: `Не надіслано відповідей: ${pendingCount}`, showSendButton: true, showLoginLink: false };
+  }
+  return null;
+}
+
+// After a flush: «2 відповіді не зараховано: пізніші вже були».
+export function formatDroppedNotice(count) {
+  return `${count} ${pluralize(count, ANSWER_WORDS)} не зараховано: пізніші вже були`;
+}
+
+// The question before logging out with answers still on the phone.
+export function formatUnsentLogoutText(count) {
+  return `${count} ${pluralize(count, ANSWER_WORDS)} ще не надіслано. Вийти й видалити їх?`;
+}
+
+// The summary of a set finished offline, from the local tally only: { title, stats, words } where words are the set's
+// words answered again or hard (marked difficulty 'hard', so the round's drill button counts them).
+export function buildLocalRoundSummary({ tally, introducedCount, hardWords }) {
+  const answerCount = tally.again + tally.hard + tally.good;
+  return {
+    isLocal: true,
+    title: 'Набір завершено 🎉',
+    stats: [
+      ['Відповідей', String(answerCount)],
+      ['Знову', String(tally.again)],
+      ['Важко', String(tally.hard)],
+      ['Добре', String(tally.good)],
+      ['Нових слів', String(introducedCount)],
+    ],
+    words: hardWords.map(word => ({ ...word, difficulty: 'hard' })),
+  };
+}
