@@ -22,13 +22,22 @@ function summarize(period, answers, extra = {}) {
   });
 }
 
-test('resolvePeriodRange: day, the last 7 and 30 days, the last 12 months, and all time from the first answer', () => {
+test('resolvePeriodRange: day, the calendar week, the last 30 days, the last 12 months, and all time from the first answer', () => {
   const today = '2026-10-27';
   const day = resolvePeriodRange({ period: 'day', today, timeZone: TIME_ZONE, firstAnswerAt: NOW });
   assert.equal(day.start, at('2026-10-27T00:00:00+01:00'));
   assert.equal(day.previous.start, at('2026-10-26T00:00:00+01:00'));
   const week = resolvePeriodRange({ period: 'week', today, timeZone: TIME_ZONE, firstAnswerAt: NOW });
-  assert.deepEqual([week.fromDate, week.toDate, week.unit], ['2026-10-21', '2026-10-27', 'day']);
+  // 27.10.2026 is a Tuesday: the calendar week runs Monday 26.10 to Sunday 01.11, the week before is 19.10 to 25.10.
+  assert.deepEqual([week.fromDate, week.toDate, week.unit], ['2026-10-26', '2026-11-01', 'day']);
+  assert.equal(week.start, at('2026-10-26T00:00:00+01:00'));
+  assert.equal(week.end, at('2026-11-02T00:00:00+01:00'));
+  assert.equal(week.previous.start, at('2026-10-19T00:00:00+02:00'));
+  assert.equal(week.previous.end, week.start);
+  const sunday = resolvePeriodRange({ period: 'week', today: '2026-11-01', timeZone: TIME_ZONE, firstAnswerAt: NOW });
+  assert.equal(sunday.fromDate, '2026-10-26');
+  const monday = resolvePeriodRange({ period: 'week', today: '2026-11-02', timeZone: TIME_ZONE, firstAnswerAt: NOW });
+  assert.deepEqual([monday.fromDate, monday.toDate], ['2026-11-02', '2026-11-08']);
   const month = resolvePeriodRange({ period: 'month', today, timeZone: TIME_ZONE, firstAnswerAt: NOW });
   assert.equal(month.fromDate, '2026-09-28');
   const year = resolvePeriodRange({ period: 'year', today, timeZone: TIME_ZONE, firstAnswerAt: NOW });
@@ -61,7 +70,10 @@ test('totals: answers, accuracy, time without pauses, days, and the previous per
   const week = summarize('week', answers);
   assert.equal(week.chart.buckets.length, 7);
   assert.equal(week.totals.days_practised, 2);
-  assert.equal(week.chart.buckets.at(-1).key, '2026-10-27');
+  // Monday to Sunday: Tuesday 27.10 is the second bar, the days still to come are empty.
+  assert.equal(week.chart.buckets[1].key, '2026-10-27');
+  assert.equal(week.chart.buckets.at(-1).key, '2026-11-01');
+  assert.equal(week.chart.buckets.at(-1).answers, 0);
   assert.equal(summarize('all', answers).previous_totals, null);
 });
 

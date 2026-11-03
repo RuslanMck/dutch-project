@@ -5,5 +5,5 @@ export const ACTIVITY_PERIODS = Object.freeze(['day', 'week', 'month', 'year', '
 
 export const activityQuerySchema = z.object({
   period: z.enum(ACTIVITY_PERIODS).default('week')
-    .describe('day: today; week: the last 7 days; month: the last 30 days; year: the last 12 months; all: all time'),
+    .describe('day: today; week: this calendar week, Monday to Sunday; month: the last 30 days; year: the last 12 months; all: all time'),
 }).strict();

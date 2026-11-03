@@ -493,7 +493,7 @@ finished, and reviews join the session.
   shows the current section's name.
 - **Statistics.** `GET /api/stats/activity?period=day|week|month|year|all` (`src/domains/statistics/learning-activity.js`,
   pure): answers (words and phrases), accuracy, mistakes, time spent (gaps over 5 minutes are pauses), days practised,
-  words started and first learned, a chart per hour (day), per day (week = 7 days, month = 30 days) or per month
+  words started and first learned, a chart per hour (day), per day (week = the calendar week, Monday to Sunday, compared with the whole week before; month = 30 days) or per month
   (year = the last 12 months, all time), the 5 words with the most mistakes, and the streak of days in a row. Each
   period but all time also returns the period before it for comparison; the year is compared with the same span a
   year earlier. Answers count every row, resets included (they are history); words started and learned count only

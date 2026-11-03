@@ -592,10 +592,10 @@ test('buildActivityTiles: values and the comparison with the period before; none
     period: 'week', totals, previous_totals: { ...totals, answers: 30, accuracy: 0.85, active_seconds: 900 },
   };
   const tiles = buildActivityTiles(activity);
-  assert.deepEqual(tiles[0], { label: 'Відповідей', value: '40', delta: '+10 · попередні 7 днів: 30' });
+  assert.deepEqual(tiles[0], { label: 'Відповідей', value: '40', delta: '+10 · минулий тиждень: 30' });
   assert.equal(tiles[1].value, '80%');
-  assert.equal(tiles[1].delta, '−5 п.п. · попередні 7 днів: 85%');
-  assert.equal(tiles[2].delta, '= · попередні 7 днів: 15 хв');
+  assert.equal(tiles[1].delta, '−5 п.п. · минулий тиждень: 85%');
+  assert.equal(tiles[2].delta, '= · минулий тиждень: 15 хв');
   assert.equal(buildActivityTiles({ ...activity, period: 'all', previous_totals: null })[0].delta, null);
   assert.equal(tiles[3].label, 'Днів з практикою');
   assert.ok(!buildActivityTiles({ ...activity, period: 'day' }).some(tile => tile.label === 'Днів з практикою'));
@@ -645,7 +645,7 @@ test('formatActivityRange and buildStreakTiles', () => {
   assert.equal(formatActivityRange({ period: 'day', from_date: '2026-10-27', to_date: '2026-10-27' }),
     'Сьогодні: 27.10.2026');
   assert.equal(formatActivityRange({ period: 'week', from_date: '2026-10-21', to_date: '2026-10-27' }),
-    'Останні 7 днів: 21.10.2026 – 27.10.2026');
+    'Цей тиждень: 21.10.2026 – 27.10.2026');
   assert.deepEqual(buildStreakTiles({ current: 3, longest: 5, is_today_practised: false }).map(tile => tile.value),
     ['3 дні', '5 днів']);
 });

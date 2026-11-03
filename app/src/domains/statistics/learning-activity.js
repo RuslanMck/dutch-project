@@ -71,8 +71,16 @@ export function resolvePeriodRange({ period, today, timeZone, firstAnswerAt }) {
       previous: dayRange(addDaysToCalendarDate(today, -1), 1),
     };
   }
-  if (period === 'week' || period === 'month') {
-    const dayCount = period === 'week' ? WEEK_DAY_COUNT : MONTH_DAY_COUNT;
+  if (period === 'week') {
+    // The calendar week, Monday to Sunday: the days still to come are empty bars. Compared with the whole week before.
+    const fromDate = addDaysToCalendarDate(today, -findDaysSinceMonday(today));
+    return {
+      ...dayRange(fromDate, WEEK_DAY_COUNT), fromDate, toDate: addDaysToCalendarDate(fromDate, WEEK_DAY_COUNT - 1),
+      unit: 'day', previous: dayRange(addDaysToCalendarDate(fromDate, -WEEK_DAY_COUNT), WEEK_DAY_COUNT),
+    };
+  }
+  if (period === 'month') {
+    const dayCount = MONTH_DAY_COUNT;
     const fromDate = addDaysToCalendarDate(today, 1 - dayCount);
     return {
       ...dayRange(fromDate, dayCount), fromDate, toDate: today, unit: 'day',
@@ -96,6 +104,12 @@ export function resolvePeriodRange({ period, today, timeZone, firstAnswerAt }) {
   const firstDate = formatCalendarDateInTimeZone(Math.min(firstAnswerAt, end - 1), timeZone);
   const fromDate = `${firstDate.slice(0, 7)}-01`;
   return { start: findStartOfDay(fromDate, timeZone), end, fromDate, toDate: today, unit: 'month', previous: null };
+}
+
+// 0 on Monday, 6 on Sunday.
+function findDaysSinceMonday(calendarDate) {
+  const [year, month, day] = calendarDate.split('-').map(Number);
+  return (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % WEEK_DAY_COUNT;
 }
 
 // The same calendar date a year earlier; 29 February becomes 1 March.

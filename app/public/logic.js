@@ -529,14 +529,14 @@ export const TAB_SUBTITLES = Object.freeze({
 
 const PERIOD_RANGE_PREFIX = Object.freeze({
   day: 'Сьогодні',
-  week: 'Останні 7 днів',
+  week: 'Цей тиждень',
   month: 'Останні 30 днів',
   year: 'Останні 12 місяців',
   all: 'Увесь час',
 });
 const PREVIOUS_PERIOD_NAME = Object.freeze({
   day: 'учора',
-  week: 'попередні 7 днів',
+  week: 'минулий тиждень',
   month: 'попередні 30 днів',
   year: 'попередні 12 місяців',
 });
@@ -563,7 +563,7 @@ export function formatActivityRange(activity) {
   return `${prefix}: ${formatCalendarDate(activity.from_date)} – ${formatCalendarDate(activity.to_date)}`;
 }
 
-// "+10 · учора: 30", "−5 п.п. · попередні 7 днів: 85%", "= · учора: 30"; null when there is nothing to compare with.
+// "+10 · учора: 30", "−5 п.п. · минулий тиждень: 85%", "= · учора: 30"; null when there is nothing to compare with.
 // formatDifference formats the difference, formatPrevious the earlier value.
 function formatDelta(current, previous, period, { formatDifference = String, formatPrevious = String } = {}) {
   if (previous === null || previous === undefined || current === null) return null;
