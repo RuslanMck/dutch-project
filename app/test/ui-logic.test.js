@@ -19,6 +19,8 @@ import {
   levenshtein,
   checkAnswer,
   gradeTranslationAnswer,
+  findSameMeaningWord,
+  splitTranslationMeanings,
   buildWordEditPatch,
   renderRuleBody,
   formatDutchWithArticle,
@@ -1616,4 +1618,47 @@ test('buildGradePostBody: an offline set sends its ids and open time on a direct
 test('restorePracticeSnapshot returns the time the set was opened', () => {
   const restored = restorePracticeSnapshot({ snapshot: { ...baseSnapshot, setOpenedAt: 1234 }, calendarDate: '2026-11-02' });
   assert.equal(restored.setOpenedAt, 1234);
+});
+
+// Words that share a Ukrainian translation (lekker / heerlijk, nemen / bestellen).
+const lekker = { id: 18, nl: 'lekker', uk: 'смачний (звичайне слово)', article: null };
+const heerlijk = { id: 11, nl: 'heerlijk', uk: 'чудовий, дуже смачний; смачний', article: null };
+const bestellen = { id: 1, nl: 'bestellen', uk: 'замовляти (офіційно)', article: null };
+const nemen = { id: 26, nl: 'nemen', uk: 'брати; замовляти (розмовно)', article: null };
+const toetje = { id: 554, nl: 'toetje', uk: 'десерт (невеликий)', article: 'het' };
+const nagerecht = { id: 25, nl: 'nagerecht', uk: 'десерт (страва в меню)', article: 'het' };
+const sameMeaningWords = [lekker, heerlijk, bestellen, nemen, toetje, nagerecht, huis];
+
+test('splitTranslationMeanings: splits on , and ; and leaves out the notes in brackets', () => {
+  assert.deepEqual(splitTranslationMeanings('брати; замовляти (розмовно)'), ['брати', 'замовляти']);
+  assert.deepEqual(splitTranslationMeanings('чудовий, дуже смачний'), ['чудовий', 'дуже смачний']);
+  assert.deepEqual(splitTranslationMeanings(''), []);
+});
+
+test('findSameMeaningWord: another word sharing a meaning is found, the word itself and unrelated words are not', () => {
+  assert.equal(findSameMeaningWord(bestellen, 'nemen', sameMeaningWords).word, nemen);
+  assert.equal(findSameMeaningWord(bestellen, 'nemen', sameMeaningWords).meaning, 'замовляти');
+  assert.equal(findSameMeaningWord(nagerecht, 'het toetje', sameMeaningWords).word, toetje);
+  assert.equal(findSameMeaningWord(nagerecht, 'toetje', sameMeaningWords).word, toetje);
+  assert.equal(findSameMeaningWord(bestellen, 'bestellen', sameMeaningWords), null);
+  assert.equal(findSameMeaningWord(bestellen, 'huis', sameMeaningWords), null);
+  assert.equal(findSameMeaningWord(bestellen, '', sameMeaningWords), null);
+});
+
+test('gradeTranslationAnswer: a word with the same meaning is not graded and asks to try again', () => {
+  const result = gradeTranslationAnswer(lekker, 'Heerlijk', { words: sameMeaningWords });
+  assert.equal(result.counted, false);
+  assert.equal(result.grade, null);
+  assert.equal(result.isSameMeaning, true);
+  assert.equal(result.message, '«heerlijk» теж «смачний», але тут інше слово — спробуй ще');
+  assert.equal(gradeTranslationAnswer(lekker, 'lekker', { words: sameMeaningWords }).grade, 'good');
+  // Without the word list the old grading stays.
+  assert.equal(gradeTranslationAnswer(lekker, 'heerlijk').grade, 'again');
+});
+
+test('gradeReverseTranslationAnswer: the notes in brackets may be left out', () => {
+  assert.equal(gradeReverseTranslationAnswer(lekker, 'смачний').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(lekker, 'смачний (звичайне слово)').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(nemen, 'брати; замовляти').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(lekker, 'чудовий').grade, 'again');
 });

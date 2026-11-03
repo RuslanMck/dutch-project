@@ -1313,13 +1313,21 @@ function submitFsrsAnswer() {
   if (!session.current) return;
   const { current } = session;
   const result = current.direction === 'uk_nl'
-    ? gradeTranslationAnswer(current.word, input.value)
+    ? gradeTranslationAnswer(current.word, input.value, { words: state.words })
     : gradeReverseTranslationAnswer(current.word, input.value);
   if (!result.counted) {
+    if (result.isSameMeaning) showSameMeaningHint(session, result);
     input.focus();
     return;
   }
   answerFsrsWord(result, normalise(input.value));
+}
+
+// Another word with the same meaning was typed: the hint is shown, the input is cleared and nothing is graded.
+function showSameMeaningHint(practiceState, result) {
+  practiceState.feedback = { text: result.message, ok: false };
+  $('practice-input').value = '';
+  renderPractice();
 }
 
 // «Не знаю»: the right answer is shown and the word is graded again. The answer is left out of the request.
@@ -1899,9 +1907,10 @@ function submitCustomAnswer() {
   if (!drill.current) return;
   const { word, direction } = drill.current;
   const result = direction === 'uk_nl'
-    ? gradeTranslationAnswer(word, input.value)
+    ? gradeTranslationAnswer(word, input.value, { words: state.words })
     : gradeReverseTranslationAnswer(word, input.value);
   if (!result.counted) {
+    if (result.isSameMeaning) showSameMeaningHint(drill, result);
     input.focus();
     return;
   }

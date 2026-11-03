@@ -100,7 +100,29 @@ export function revealTranslationAnswer(word) {
 // letter off) or 'again' (anything else, including "DNK"). counted=false means nothing is graded.
 // The article never changes the grade: a missing or wrong de/het with the right word is 'good', and the message names
 // the right article. Punctuation, typographic quotes and extra spaces are ignored on both sides (normalizeAnswerText).
-export function gradeTranslationAnswer(word, input) {
+// The meanings of a Ukrainian translation: split on , and ;, with notes in brackets left out. «брати, замовляти (розм.)»
+// -> ['брати', 'замовляти'].
+export function splitTranslationMeanings(uk) {
+  return String(uk ?? '').replace(/\([^)]*\)/g, ' ').split(/[,;]/).map(normalizeAnswerText).filter(Boolean);
+}
+
+// UA -> NL: the learner typed another dictionary word that shares a meaning with the asked one («heerlijk» for lekker,
+// both «смачний»). Returns { word, meaning } for that word, or null. The article is optional, as in the grading.
+export function findSameMeaningWord(word, input, words = []) {
+  const normalizedInput = normalizeAnswerText(input);
+  if (!normalizedInput) return null;
+  const askedMeanings = new Set(splitTranslationMeanings(word.uk));
+  for (const other of words) {
+    if (other.id === word.id) continue;
+    const typedForms = [other.nl, formatDutchWithArticle(other)].map(normalizeAnswerText);
+    if (!typedForms.includes(normalizedInput)) continue;
+    const meaning = splitTranslationMeanings(other.uk).find(otherMeaning => askedMeanings.has(otherMeaning));
+    if (meaning) return { word: other, meaning };
+  }
+  return null;
+}
+
+export function gradeTranslationAnswer(word, input, { words = [] } = {}) {
   const normalizedInput = normalizeAnswerText(input);
   const normalizedTarget = normalizeAnswerText(word.nl);
   const article = word.article || '';
@@ -123,6 +145,17 @@ export function gradeTranslationAnswer(word, input) {
     return { counted: true, grade: 'good', message: `✓ Правильно (артикль: ${article})` };
   }
 
+  // Another word with the same meaning is not a mistake: nothing is graded and the learner tries again.
+  const sameMeaning = findSameMeaningWord(word, input, words);
+  if (sameMeaning) {
+    return {
+      counted: false,
+      grade: null,
+      isSameMeaning: true,
+      message: `«${formatDutchWithArticle(sameMeaning.word)}» теж «${sameMeaning.meaning}», але тут інше слово — спробуй ще`,
+    };
+  }
+
   // Both readings are compared, so an expression that starts with de or het is not cut before the comparison.
   const distance = Math.min(levenshtein(rest, normalizedTarget), levenshtein(normalizedInput, normalizedTarget));
   if (distance <= 1) {
@@ -137,13 +170,15 @@ export function revealReverseTranslationAnswer(word) {
 }
 
 // Reverse round (19.6): the learner types the Ukrainian for a Dutch word. Only the same text after normalizeAnswerText
-// is right; there is no fuzzy match. A wrong answer is 'again' with canOverride: the learner may still say it was right
+// is right, with or without the notes in brackets; there is no fuzzy match. A wrong answer is 'again' with canOverride: the learner may still say it was right
 // («Я мав рацію»), and the client holds the grade until then or until «Далі».
 export function gradeReverseTranslationAnswer(word, input) {
   const normalizedInput = normalizeAnswerText(input);
   if (!normalizedInput) return { counted: false, grade: null, message: 'Напиши відповідь українською' };
   if (normalizedInput === 'dnk') return revealReverseTranslationAnswer(word);
-  if (normalizedInput === normalizeAnswerText(word.uk)) return { counted: true, grade: 'good', message: '✓ Правильно' };
+  // Notes in brackets («смачний (звичайне слово)») only guide the learner; the answer may leave them out.
+  const acceptedAnswers = [word.uk, String(word.uk ?? '').replace(/\([^)]*\)/g, ' ')].map(normalizeAnswerText);
+  if (acceptedAnswers.includes(normalizedInput)) return { counted: true, grade: 'good', message: '✓ Правильно' };
   return { counted: true, grade: 'again', message: `✗ Правильно: ${word.uk}`, canOverride: true };
 }
 
