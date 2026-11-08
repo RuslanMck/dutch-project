@@ -37,6 +37,11 @@ import {
   advanceWindowedQueue,
   answerKey,
   formatRoundProgress,
+  formatRuleQuizProgress,
+  formatRuleQuizResult,
+  formatRuleQuizRuleStats,
+  formatRuleQuizSelection,
+  splitRuleQuizSentence,
   formatRoundStart,
   buildRoundSummaryView,
   planNextRound,
@@ -87,7 +92,8 @@ import {
   buildLocalRoundSummary,
 } from './logic.js';
 
-const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'texts', 'stats'];
+const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
+  'stats'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -125,6 +131,11 @@ const $ = id => document.getElementById(id);
 const state = { words: [], topics: [], rules: [], patterns: [], phrases: [], texts: [], loaded: false };
 
 const ui = {
+  // Вправи з правил. status: setup | loading | question | summary. selectedRuleIds: null = every rule.
+  ruleQuiz: {
+    status: 'setup', overview: null, selectedRuleIds: null, exercises: [], index: 0, current: null, results: [],
+    error: '', isAnswering: false,
+  },
   tab: 'home',
   home: { strugglingCount: null },  // Головна: the Важкі слова tile's count, null while unknown
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
@@ -305,6 +316,7 @@ const RENDER = {
   rules: renderRules,
   phrases: renderPhrases,
   'word-order': renderWordOrderLive,
+  'rule-quiz': renderRuleQuiz,
   texts: renderTexts,
   stats: renderStats,
 };
@@ -339,6 +351,7 @@ function showTab(name) {
   if (ui.tab === 'stats') loadStats();
   if (ui.tab === 'decks') loadDeckList();
   if (ui.tab === 'word-order') refreshWordOrderIfNeeded();
+  if (ui.tab === 'rule-quiz') loadRuleQuizOverview();
   render();
 }
 
@@ -2739,6 +2752,235 @@ function buildWordOrderRuleList() {
   }));
 }
 
+// ---------- Вправи з правил ----------
+
+const RULE_QUIZ_SET_SIZE = 10;
+const RULE_QUIZ_STORAGE_KEY = 'ruleQuizRuleIds';
+
+// The rules with their numbers, read each time the setup shows. The choice of rules is kept on this phone.
+async function loadRuleQuizOverview() {
+  const quiz = ui.ruleQuiz;
+  if (quiz.selectedRuleIds === null) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RULE_QUIZ_STORAGE_KEY) ?? 'null');
+      if (Array.isArray(saved)) quiz.selectedRuleIds = saved;
+    } catch { /* storage unavailable */ }
+  }
+  try {
+    quiz.overview = await api.getRuleQuizRules();
+    quiz.error = '';
+  } catch (error) {
+    quiz.error = error.message || 'Помилка';
+  }
+  if (ui.tab === 'rule-quiz') renderRuleQuiz();
+}
+
+function findSelectedRuleQuizIds() {
+  const allIds = (ui.ruleQuiz.overview?.rules ?? []).map(rule => rule.id);
+  const selected = ui.ruleQuiz.selectedRuleIds;
+  return selected === null ? allIds : allIds.filter(id => selected.includes(id));
+}
+
+function setRuleQuizRules(ruleIds) {
+  ui.ruleQuiz.selectedRuleIds = ruleIds;
+  try {
+    if (ruleIds === null) localStorage.removeItem(RULE_QUIZ_STORAGE_KEY);
+    else localStorage.setItem(RULE_QUIZ_STORAGE_KEY, JSON.stringify(ruleIds));
+  } catch { /* storage unavailable */ }
+  renderRuleQuiz();
+}
+
+function handleRuleQuizRulesChange() {
+  const checkedIds = [...$('rule-quiz-rules-list').querySelectorAll('input:checked')].map(input => Number(input.value));
+  const allCount = ui.ruleQuiz.overview?.rules.length ?? 0;
+  setRuleQuizRules(checkedIds.length === allCount ? null : checkedIds);
+}
+
+async function startRuleQuizSet() {
+  const quiz = ui.ruleQuiz;
+  const ruleIds = findSelectedRuleQuizIds();
+  if (!ruleIds.length) return;
+  quiz.status = 'loading';
+  quiz.error = '';
+  renderRuleQuiz();
+  try {
+    const allCount = quiz.overview?.rules.length ?? 0;
+    const set = await api.startRuleQuizSet(ruleIds.length === allCount ? undefined : ruleIds, RULE_QUIZ_SET_SIZE);
+    Object.assign(quiz, { exercises: set.exercises, index: 0, results: [], status: 'question' });
+    showRuleQuizExercise();
+  } catch (error) {
+    quiz.status = 'setup';
+    quiz.error = error.message || 'Помилка';
+    renderRuleQuiz();
+  }
+}
+
+function showRuleQuizExercise() {
+  const quiz = ui.ruleQuiz;
+  quiz.current = { exercise: quiz.exercises[quiz.index], result: null, chosen: null };
+  $('rule-quiz-input').value = '';
+  renderRuleQuiz();
+  if (quiz.current.exercise.kind === 'gap') $('rule-quiz-input').focus();
+}
+
+async function submitRuleQuizAnswer(answer, skipped) {
+  const quiz = ui.ruleQuiz;
+  const current = quiz.current;
+  if (!current || current.result || quiz.isAnswering) return;
+  if (!skipped && !answer.trim()) {
+    $('rule-quiz-input').focus();
+    return;
+  }
+  quiz.isAnswering = true;
+  try {
+    current.result = await api.answerRuleQuiz(current.exercise.id, answer, skipped);
+    current.chosen = skipped ? null : answer;
+    quiz.results.push({ exercise: current.exercise, given: current.chosen, ...current.result });
+  } catch (error) {
+    $('rule-quiz-msg').textContent = error.message || 'Помилка';
+    $('rule-quiz-msg').className = 'msg bad';
+    return;
+  } finally {
+    quiz.isAnswering = false;
+  }
+  renderRuleQuiz();
+  $('rule-quiz-next').focus();
+}
+
+function showNextRuleQuizExercise() {
+  const quiz = ui.ruleQuiz;
+  quiz.index += 1;
+  if (quiz.index < quiz.exercises.length) {
+    showRuleQuizExercise();
+    return;
+  }
+  quiz.status = 'summary';
+  quiz.current = null;
+  renderRuleQuiz();
+  $('rule-quiz-more').focus();
+}
+
+function renderRuleQuiz() {
+  const quiz = ui.ruleQuiz;
+  $('rule-quiz-setup').hidden = quiz.status !== 'setup';
+  $('rule-quiz-loading').hidden = quiz.status !== 'loading';
+  $('rule-quiz-exercise').hidden = quiz.status !== 'question';
+  $('rule-quiz-summary').hidden = quiz.status !== 'summary';
+  $('rule-quiz-error').hidden = !quiz.error;
+  $('rule-quiz-error').textContent = quiz.error;
+  if (quiz.status === 'setup') renderRuleQuizSetup();
+  if (quiz.status === 'question') renderRuleQuizExercise();
+  if (quiz.status === 'summary') renderRuleQuizSummary();
+}
+
+function renderRuleQuizSetup() {
+  const rules = ui.ruleQuiz.overview?.rules ?? [];
+  const selectedIds = findSelectedRuleQuizIds();
+  $('rule-quiz-rules-summary').textContent = formatRuleQuizSelection(selectedIds.length, rules.length);
+  $('rule-quiz-rules-list').replaceChildren(...rules.map(rule => {
+    const item = document.createElement('li');
+    const label = document.createElement('label');
+    label.className = 'word-order__rule-option';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = String(rule.id);
+    input.checked = selectedIds.includes(rule.id);
+    const text = document.createElement('span');
+    const title = document.createElement('span');
+    title.className = 'rule-quiz__rule-title';
+    title.textContent = `${rule.code} · ${rule.title}`;
+    const stats = document.createElement('span');
+    stats.className = 'muted rule-quiz__rule-stats';
+    stats.textContent = formatRuleQuizRuleStats(rule);
+    text.append(title, stats);
+    label.append(input, text);
+    item.append(label);
+    return item;
+  }));
+  $('rule-quiz-start').disabled = !selectedIds.length || !ui.ruleQuiz.overview;
+}
+
+function renderRuleQuizExercise() {
+  const quiz = ui.ruleQuiz;
+  const { exercise, result, chosen } = quiz.current;
+  $('rule-quiz-progress').textContent = formatRuleQuizProgress(quiz.index, quiz.exercises.length);
+  $('rule-quiz-rule').textContent = `${exercise.rule_code} · ${exercise.rule_title}`;
+  $('rule-quiz-question').textContent = exercise.question;
+  renderRuleQuizSentence(exercise, result);
+  const isGap = exercise.kind === 'gap';
+  $('rule-quiz-form').hidden = !isGap || !!result;
+  $('rule-quiz-options').hidden = isGap;
+  if (!isGap) {
+    $('rule-quiz-options').classList.toggle('rule-quiz__options--sentences', !exercise.sentence);
+    $('rule-quiz-options').replaceChildren(...exercise.options.map(option => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'rule-quiz__option';
+      button.dataset.option = option;
+      button.textContent = option;
+      button.lang = 'nl';
+      button.disabled = !!result;
+      if (result && option === result.answer) button.classList.add('rule-quiz__option--right');
+      if (result && option === chosen && !result.is_correct) button.classList.add('rule-quiz__option--wrong');
+      return button;
+    }));
+  }
+  const message = $('rule-quiz-msg');
+  if (result) {
+    const others = result.accepted_answers.length ? ` (або: ${result.accepted_answers.join(', ')})` : '';
+    message.textContent = result.is_correct ? `✓ Правильно${others}` : `✗ Правильно: ${result.answer}${others}`;
+    message.className = `msg ${result.is_correct ? 'ok' : 'bad'}`;
+  } else {
+    message.textContent = '';
+    message.className = 'msg';
+  }
+  $('rule-quiz-translation').hidden = !result?.translation;
+  $('rule-quiz-translation').textContent = result?.translation ?? '';
+  $('rule-quiz-explanation').hidden = !result;
+  $('rule-quiz-explanation').textContent = result?.explanation ?? '';
+  $('rule-quiz-skip').hidden = !!result;
+  $('rule-quiz-next').hidden = !result;
+  $('rule-quiz-next').textContent = quiz.index + 1 < quiz.exercises.length ? 'Далі' : 'Підсумок';
+}
+
+// The Dutch sentence with its gap: empty before the answer, the right answer after it.
+function renderRuleQuizSentence(exercise, result) {
+  const sentenceElement = $('rule-quiz-sentence');
+  const parts = splitRuleQuizSentence(exercise.sentence);
+  sentenceElement.hidden = !parts;
+  if (!parts) return;
+  const gap = document.createElement('span');
+  gap.className = `rule-quiz__gap${result ? (result.is_correct ? ' rule-quiz__gap--right' : ' rule-quiz__gap--wrong') : ''}`;
+  gap.textContent = result ? result.answer : '＿＿＿';
+  const pieces = [parts.before, gap, parts.after];
+  if (exercise.hint) {
+    const hint = document.createElement('span');
+    hint.className = 'muted rule-quiz__hint';
+    hint.textContent = ` (${exercise.hint})`;
+    pieces.push(hint);
+  }
+  sentenceElement.replaceChildren(...pieces);
+}
+
+function renderRuleQuizSummary() {
+  const results = ui.ruleQuiz.results;
+  $('rule-quiz-result').textContent = formatRuleQuizResult(results);
+  $('rule-quiz-mistakes').replaceChildren(...results.filter(result => !result.is_correct).map(result => {
+    const item = document.createElement('li');
+    const sentence = document.createElement('p');
+    sentence.className = 'rule-quiz__mistake-sentence';
+    sentence.lang = 'nl';
+    const { exercise } = result;
+    sentence.textContent = exercise.sentence ? exercise.sentence.replace('___', result.answer) : result.answer;
+    const detail = document.createElement('p');
+    detail.className = 'muted rule-quiz__mistake-detail';
+    const givenText = result.given === null ? 'не знаю' : `твоя відповідь: ${result.given}`;
+    detail.textContent = `${exercise.rule_code} · ${givenText} — ${result.explanation}`;
+    item.append(sentence, detail);
+    return item;
+  }));
+}
+
 // ---------- wiring ----------
 
 function bindEvents() {
@@ -2984,6 +3226,25 @@ function bindEvents() {
   $('word-order-next').addEventListener('click', handleWordOrderNext);
   $('word-order-more').addEventListener('click', handleWordOrderMore);
   $('word-order-generate').addEventListener('click', handleWordOrderGenerate);
+  $('rule-quiz-rules-list').addEventListener('change', handleRuleQuizRulesChange);
+  $('rule-quiz-rules-all').addEventListener('click', () => setRuleQuizRules(null));
+  $('rule-quiz-rules-none').addEventListener('click', () => setRuleQuizRules([]));
+  $('rule-quiz-start').addEventListener('click', startRuleQuizSet);
+  $('rule-quiz-more').addEventListener('click', startRuleQuizSet);
+  $('rule-quiz-back').addEventListener('click', () => {
+    ui.ruleQuiz.status = 'setup';
+    loadRuleQuizOverview();
+  });
+  $('rule-quiz-form').addEventListener('submit', event => {
+    event.preventDefault();
+    submitRuleQuizAnswer($('rule-quiz-input').value, false);
+  });
+  $('rule-quiz-options').addEventListener('click', event => {
+    const option = event.target.closest('button[data-option]');
+    if (option) submitRuleQuizAnswer(option.dataset.option, false);
+  });
+  $('rule-quiz-skip').addEventListener('click', () => submitRuleQuizAnswer('', true));
+  $('rule-quiz-next').addEventListener('click', showNextRuleQuizExercise);
   $('word-order-import-button').addEventListener('click', () => $('word-order-file').click());
   $('word-order-file').addEventListener('change', handleWordOrderImport);
   $('word-order-list').addEventListener('click', handleWordOrderListClick);

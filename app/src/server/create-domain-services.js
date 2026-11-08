@@ -23,6 +23,8 @@ import { createPracticeResetService } from '../domains/practice/practice-reset-s
 import { createPracticeService } from '../domains/practice/practice-service.js';
 import { createPracticeSettings } from '../domains/practice/practice-settings.js';
 import { createPriorityService } from '../domains/practice/priority-service.js';
+import { createRuleExerciseRepository } from '../domains/rule-exercises/rule-exercise-repository.js';
+import { createRuleExerciseService } from '../domains/rule-exercises/rule-exercise-service.js';
 import { createRuleRepository } from '../domains/rules/rule-repository.js';
 import { createRuleService } from '../domains/rules/rule-service.js';
 import { createSectionRepository } from '../domains/sections/section-repository.js';
@@ -112,13 +114,21 @@ export function createDomainServices({
     practiceSettings,
     ...sharedDependencies,
   });
+  const openRouterClient = createOpenRouterClient({
+    apiKey: configuration.openRouterApiKey,
+    model: configuration.openRouterModel,
+  });
   const wordOrderService = createWordOrderService({
     wordOrderRepository: createWordOrderRepository({ database }),
-    openRouterClient: createOpenRouterClient({
-      apiKey: configuration.openRouterApiKey,
-      model: configuration.openRouterModel,
-    }),
+    openRouterClient,
     ...sharedDependencies,
+  });
+  const ruleExerciseService = createRuleExerciseService({
+    ruleExerciseRepository: createRuleExerciseRepository({ database }),
+    ruleService,
+    openRouterClient,
+    runInTransaction,
+    clock,
   });
   const textService = createTextService({
     textRepository: createTextRepository({ database }),
@@ -165,5 +175,6 @@ export function createDomainServices({
     artifactExportService,
     artifactImportService,
     deckService,
+    ruleExerciseService,
   });
 }

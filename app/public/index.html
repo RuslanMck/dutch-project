@@ -75,6 +75,11 @@
           <span class="practice-tile__name">Фрази</span>
           <span id="home-tile-phrases" class="practice-tile__line"></span>
         </button>
+        <button class="practice-tile practice-tile--rule-quiz" type="button" data-tab="rule-quiz">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM9 9h5M9 13h3"/></svg></span>
+          <span class="practice-tile__name">Вправи з правил</span>
+          <span id="home-tile-rule-quiz" class="practice-tile__line">Граматика в реченнях</span>
+        </button>
         <button id="home-tile-struggling-button" class="practice-tile practice-tile--struggling" type="button">
           <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg></span>
           <span class="practice-tile__name">Важкі слова</span>
@@ -461,6 +466,54 @@
           <summary>Список речень</summary>
           <ul id="word-order-list" class="list"></ul>
         </details>
+      </section>
+    </section>
+
+    <!-- Вправи з правил -->
+    <section id="tab-rule-quiz" class="tab" data-tab="rule-quiz" hidden>
+      <div id="rule-quiz-setup">
+        <details id="rule-quiz-rules-box" class="word-order__rules" open>
+          <summary id="rule-quiz-rules-summary">Правила: усі</summary>
+          <div class="word-order__rules-panel">
+            <div class="word-order__rules-tools">
+              <button id="rule-quiz-rules-all" type="button">Усі</button>
+              <button id="rule-quiz-rules-none" type="button">Жодного</button>
+            </div>
+            <ul id="rule-quiz-rules-list" class="word-order__rules-list"></ul>
+          </div>
+        </details>
+        <p class="muted rule-quiz__note">Кожен набір — нові речення: питання складає ШІ з твоїми словами.</p>
+        <button id="rule-quiz-start" class="primary rule-quiz__start" type="button">Почати: 10 питань</button>
+      </div>
+
+      <p id="rule-quiz-loading" class="muted rule-quiz__loading" role="status" hidden>Готую нові питання… це може тривати до хвилини.</p>
+      <p id="rule-quiz-error" class="msg bad" role="alert" hidden></p>
+
+      <div id="rule-quiz-exercise" class="rule-quiz__card" hidden>
+        <p id="rule-quiz-progress" class="muted rule-quiz__progress"></p>
+        <p id="rule-quiz-rule" class="rule-quiz__rule"></p>
+        <p id="rule-quiz-question" class="rule-quiz__question"></p>
+        <p id="rule-quiz-sentence" class="rule-quiz__sentence" lang="nl"></p>
+        <form id="rule-quiz-form" class="rule-quiz__form" autocomplete="off">
+          <input id="rule-quiz-input" class="rule-quiz__input" lang="nl" autocomplete="off" autocorrect="off"
+            autocapitalize="none" spellcheck="false" placeholder="нідерландською" aria-label="Відповідь">
+          <button id="rule-quiz-check" class="primary" type="submit">Перевірити</button>
+        </form>
+        <div id="rule-quiz-options" class="rule-quiz__options"></div>
+        <p id="rule-quiz-msg" class="msg" aria-live="polite"></p>
+        <p id="rule-quiz-translation" class="muted rule-quiz__translation" hidden></p>
+        <p id="rule-quiz-explanation" class="rule-quiz__explanation" hidden></p>
+        <div class="rule-quiz__actions">
+          <button id="rule-quiz-skip" type="button">Не знаю</button>
+          <button id="rule-quiz-next" class="primary" type="button" hidden>Далі</button>
+        </div>
+      </div>
+
+      <section id="rule-quiz-summary" class="practice-summary rule-quiz__summary" aria-label="Підсумок" hidden>
+        <p id="rule-quiz-result" class="practice-summary__text" role="status"></p>
+        <ul id="rule-quiz-mistakes" class="rule-quiz__mistakes"></ul>
+        <button id="rule-quiz-more" class="primary" type="button">Ще 10 питань</button>
+        <button id="rule-quiz-back" type="button">Інші правила</button>
       </section>
     </section>
 

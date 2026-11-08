@@ -109,6 +109,9 @@ export const answerWordOrder = (id, tiles) => request('POST', `/api/word-order/s
 export const listOrderSentences = () => request('GET', '/api/word-order/sentences');
 export const deleteOrderSentence = id => request('DELETE', `/api/word-order/sentences/${enc(id)}`);
 export const importOrderSentences = markdown => request('POST', '/api/word-order/import', { markdown });
+export const getRuleQuizRules = () => request('GET', '/api/rule-exercises/rules');
+export const startRuleQuizSet = (ruleIds, count) => request('POST', '/api/rule-exercises/sets', { rule_ids: ruleIds, count });
+export const answerRuleQuiz = (id, answer, skipped = false) => request('POST', `/api/rule-exercises/${enc(id)}/answers`, { answer, skipped });
 export const generateOrderSentences = count => request('POST', '/api/word-order/generate', { count });
 
 // The practice set must be live: a stored copy counts as offline unless allowOfflineCache is set (the read-only cards).

@@ -506,6 +506,7 @@ export const TAB_TITLES = Object.freeze({
   cards: 'Картки',
   phrases: 'Фрази',
   'word-order': 'Порядок слів',
+  'rule-quiz': 'Вправи з правил',
   table: 'Слова',
   rules: 'Правила',
   texts: 'Тексти',
@@ -521,6 +522,7 @@ export const TAB_SUBTITLES = Object.freeze({
   cards: 'Гортай і згадуй',
   phrases: 'Фрази з діалогів',
   'word-order': 'Склади речення',
+  'rule-quiz': 'Граматика в реченнях',
   table: 'Усі слова з перекладом',
   rules: 'Граматика з номерами правил',
   texts: 'Тексти для читання',
@@ -1056,6 +1058,7 @@ export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
   home: 'home',
   cards: 'home',
   'word-order': 'home',
+  'rule-quiz': 'home',
   phrases: 'home',
   decks: 'decks',
   practice: 'practice',
@@ -1261,4 +1264,39 @@ export function buildLocalRoundSummary({ tally, introducedCount, hardWords }) {
     ],
     words: hardWords.map(word => ({ ...word, difficulty: 'hard' })),
   };
+}
+
+// ---------- Вправи з правил ----------
+
+// The sentence around its gap: { before, after } (the gap is ___), or null when the exercise has no sentence.
+export function splitRuleQuizSentence(sentence) {
+  if (!sentence) return null;
+  const gapIndex = sentence.indexOf('___');
+  if (gapIndex === -1) return { before: sentence, after: '' };
+  return { before: sentence.slice(0, gapIndex), after: sentence.slice(gapIndex + 3) };
+}
+
+// The line under a rule in the list: "12 відповідей · правильно 75%", or "ще не тренувалось".
+export function formatRuleQuizRuleStats(rule) {
+  if (!rule.answer_count) return 'ще не тренувалось';
+  const percent = Math.round((rule.correct_count / rule.answer_count) * 100);
+  return `${rule.answer_count} ${pluralize(rule.answer_count, ['відповідь', 'відповіді', 'відповідей'])} · правильно ${percent}%`;
+}
+
+// "Правила: усі" / "Правила: 3 з 11" / "Правила: жодного".
+export function formatRuleQuizSelection(selectedCount, totalCount) {
+  if (selectedCount === 0) return 'Правила: жодного';
+  return selectedCount === totalCount ? 'Правила: усі' : `Правила: ${selectedCount} з ${totalCount}`;
+}
+
+// "Питання 3 з 10".
+export function formatRuleQuizProgress(index, total) {
+  return `Питання ${index + 1} з ${total}`;
+}
+
+// The end of a set: "Правильно 7 з 10 🎉" (all right) or "Правильно 7 з 10".
+export function formatRuleQuizResult(results) {
+  const correctCount = results.filter(result => result.is_correct).length;
+  const text = `Правильно ${correctCount} з ${results.length}`;
+  return correctCount === results.length && results.length ? `${text} 🎉` : text;
 }
