@@ -5,4 +5,4 @@ model come from `configuration/`) and a `fetchFunction`, so tests can replace th
 
 | File | What it does |
 |---|---|
-| `openrouter-client.js` | `createOpenRouterClient({ apiKey, model, fetchFunction, timeoutMilliseconds })` → `{ isConfigured, completeChat(messages) }`. Asks for one JSON chat answer and returns its text. Errors never contain the API key. |
+| `openrouter-client.js` | `createOpenRouterClient({ apiKey, model, fetchFunction, timeoutMilliseconds })` → `{ isConfigured, completeChat(messages, { model }) }` (model: optional override for one request). Asks for one JSON chat answer and returns its text. Errors never contain the API key. |

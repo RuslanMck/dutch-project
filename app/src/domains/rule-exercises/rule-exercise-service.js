@@ -18,7 +18,7 @@ const MAXIMUM_OTHER_WORDS = 200;
 const LEARNING_STATUSES = Object.freeze(['learning', 'learned']);
 
 export function createRuleExerciseService({
-  ruleExerciseRepository, ruleService, openRouterClient, runInTransaction, clock, random = Math.random,
+  ruleExerciseRepository, ruleService, openRouterClient, model, runInTransaction, clock, random = Math.random,
   logger = console,
 }) {
   let generationInProgress = null;
@@ -95,7 +95,7 @@ export function createRuleExerciseService({
         existingSentences: ruleExerciseRepository.listExistingSentences({ ruleIds, limit: MAXIMUM_EXISTING_SENTENCES }),
         situations: pickSituations(random),
       });
-      const responseText = await openRouterClient.completeChat(messages);
+      const responseText = await openRouterClient.completeChat(messages, { model });
       const { exercises } = parseGeneratedRuleExercises(responseText, { ruleCodes: chosenRules.map(rule => rule.code) });
       const ruleIdByCode = new Map(chosenRules.map(rule => [rule.code, rule.id]));
       const createdAt = clock.now();

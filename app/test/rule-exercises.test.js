@@ -41,6 +41,7 @@ function createFixture({ answers = [] } = {}) {
     ruleExerciseRepository: createRuleExerciseRepository({ database: context.database }),
     ruleService: context.ruleService,
     openRouterClient: createOpenRouterClient({ apiKey: 'test-key', model: 'test/model', fetchFunction }),
+    model: 'deepseek/test-model',
     runInTransaction: createTransactionRunner({ database: context.database }),
     clock,
     random: mulberry32(7),
@@ -92,6 +93,7 @@ test('a set is generated when there is no stock, and the answers are checked and
   assert.equal(set.exercises.length, 2);
   assert.ok(set.exercises.every(exercise => exercise.answer === undefined && exercise.explanation === undefined));
   assert.equal(requests.length, 2);   // the set, then a background refill (the stock is empty again)
+  assert.equal(requests[0].model, 'deepseek/test-model');
 
   const gap = set.exercises.find(exercise => exercise.kind === 'gap');
   const wrong = service.answerExercise({ id: gap.id, answer: 'nieuw' });

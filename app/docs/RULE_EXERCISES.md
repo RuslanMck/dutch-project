@@ -16,7 +16,7 @@ order, whole sentences). The questions are made by the LLM on OpenRouter, so the
 
 Server: `src/domains/rule-exercises/` (prompt, repository, service, routes), migration `016-add-rule-exercises.sql`,
 `GET /api/rule-exercises/rules`, `POST /api/rule-exercises/sets { rule_ids?, count }`,
-`POST /api/rule-exercises/:id/answers { answer, skipped }`. Needs `OPENROUTER_API_KEY` (and optionally
-`OPENROUTER_MODEL`, default `anthropic/claude-sonnet-4.5`).
+`POST /api/rule-exercises/:id/answers { answer, skipped }`. Needs `OPENROUTER_API_KEY`. The model is
+`RULE_EXERCISE_MODEL` (default `deepseek/deepseek-v4-pro`, about $0.002 per batch); word order keeps `OPENROUTER_MODEL`.
 
 Not in the draft yet: statistics page, MCP tools, offline use, editing or deleting a bad question.

@@ -127,6 +127,7 @@ export function createDomainServices({
     ruleExerciseRepository: createRuleExerciseRepository({ database }),
     ruleService,
     openRouterClient,
+    model: configuration.ruleExerciseModel,
     runInTransaction,
     clock,
   });

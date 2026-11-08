@@ -8,10 +8,10 @@ const TIMEOUT_ERROR_NAMES = Object.freeze(['TimeoutError', 'AbortError']);
 export function createOpenRouterClient({ apiKey, model, fetchFunction = fetch, timeoutMilliseconds = 90000 } = {}) {
   const isConfigured = Boolean(apiKey);
 
-  // Returns choices[0].message.content of the answer.
-  async function completeChat(messages) {
+  // Returns choices[0].message.content of the answer. modelOverride: another model for this one request.
+  async function completeChat(messages, { model: modelOverride } = {}) {
     if (!isConfigured) throw new Error('OpenRouter: API key is not configured');
-    const response = await postChatRequest(messages);
+    const response = await postChatRequest(messages, modelOverride || model);
     if (!response.ok) {
       const providerMessage = await readProviderMessage(response);
       throw new Error(`OpenRouter: HTTP ${response.status}${providerMessage ? `: ${providerMessage}` : ''}`);
@@ -19,12 +19,12 @@ export function createOpenRouterClient({ apiKey, model, fetchFunction = fetch, t
     return readMessageContent(response);
   }
 
-  async function postChatRequest(messages) {
+  async function postChatRequest(messages, requestModel) {
     try {
       return await fetchFunction(OPENROUTER_CHAT_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages, response_format: { type: 'json_object' } }),
+        body: JSON.stringify({ model: requestModel, messages, response_format: { type: 'json_object' } }),
         signal: AbortSignal.timeout(timeoutMilliseconds),
       });
     } catch (error) {
