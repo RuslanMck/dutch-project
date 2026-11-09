@@ -28,9 +28,16 @@ const SYSTEM_PROMPT = [
   '- "gap": a Dutch sentence with exactly one gap written as ___ . The learner types what goes there (one word or a',
   '  short form, e.g. "mooie", "het", "grootste", "zijn", "deze"). Put the base form or the needed hint in "hint"',
   '  when the learner must change a word (e.g. hint "mooi" for answer "mooie"); null when the task is to choose a word',
-  '  (an article, a pronoun). "accepted_answers" lists other answers that are equally right (often []).',
-  '- "choice": 2 to 4 options, exactly one right; the sentence has one ___ gap, or is "" when the question asks to pick',
-  '  the right whole sentence (then the options are whole sentences; use this for word order).',
+  '  (an article, a pronoun). "accepted_answers" lists EVERY other answer that is also right in standard Dutch',
+  '  (deze and die, dit and dat, omdat and want, both verb orders at the end of a subclause, …); [] only when',
+  '  exactly one answer fits. Check this for each gap: a right answer the learner types must never count as wrong.',
+  '  The hint is the base form to change or a short meaning, never the answer itself when the task is to choose.',
+  '- "choice": 2 to 4 options and EXACTLY ONE of them is right in standard Dutch; check every other option is really',
+  '  wrong (e.g. do not offer both deze and die when nothing in the sentence decides). The sentence has one ___ gap,',
+  '  or is "" when the question asks to pick the right whole sentence (then the options are whole sentences; use this',
+  '  for word order).',
+  '- Demonstratives (deze/die/dit/dat): a choice or a gap with a single answer needs a word that decides near or far',
+  '  (hier, daar, «тут», «он там» in the question); otherwise accept both (deze and die, dit and dat).',
   '',
   'Rules:',
   '- Mix the kinds (about half each) and vary what is asked inside a rule: for adjectives de/het/een/plural/after the',
@@ -45,7 +52,11 @@ const SYSTEM_PROMPT = [
   '  right option).',
   '- "explanation": 1 or 2 Ukrainian sentences: why this answer is right, naming the rule code in brackets, e.g.',
   '  «het-слово в однині після een — прикметник без -e (5.5)». For a choice, say why the tempting wrong option is wrong.',
-  '- All Ukrainian is correct literary Ukrainian: no Russian words, russianisms or surzhyk.',
+  '- All Ukrainian is correct literary Ukrainian: no Russian words, russianisms, calques or surzhyk, with the right',
+  '  gender agreement (цей фільм, ця ятка). Use these forms: «стоїть на другому місці» (not «ставиться»), «ідеться про»',
+  '  (not «мається на увазі»), «має вигляд» (not «виглядає»), «розташований» or «є» (not «знаходиться»), «цей» (not',
+  '  «даний»), «неозначений / означений артикль», «правильно» (not «вірно»).',
+  '- Plain text only: no markdown (**, *), no LaTeX or formulas; write an arrow as →.',
   '',
   'Answer with a JSON object only, no text before or after it:',
   '{"exercises":[{"rule_code":"5.5","kind":"gap","question":"...","sentence":"Ik heb een ___ fiets.","hint":"nieuw",',
@@ -141,8 +152,14 @@ function toRuleExercise(candidate, ruleCodes) {
   };
 }
 
+// Plain text for the page: LaTeX arrows ($\rightarrow$, \to) become →, markdown ** is dropped, spaces collapse.
 function cleanText(value) {
-  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/\$?\\(?:rightarrow|to)\$?/g, '→')
+    .replace(/\*\*/g, '')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 function parseJsonObject(responseText) {

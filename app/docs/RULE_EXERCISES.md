@@ -17,6 +17,9 @@ order, whole sentences). The questions are made by the LLM on OpenRouter, so the
 Server: `src/domains/rule-exercises/` (prompt, repository, service, routes), migration `016-add-rule-exercises.sql`,
 `GET /api/rule-exercises/rules`, `POST /api/rule-exercises/sets { rule_ids?, count }`,
 `POST /api/rule-exercises/:id/answers { answer, skipped }`. Needs `OPENROUTER_API_KEY`. The model is
-`RULE_EXERCISE_MODEL` (default `deepseek/deepseek-v4-pro`, about $0.002 per batch); word order keeps `OPENROUTER_MODEL`.
+`RULE_EXERCISE_MODEL` (default `google/gemini-3.7-flash`, about $0.02 per batch of 12); word order keeps
+`OPENROUTER_MODEL`. Chosen in a comparison on 2026-11-09 (5 models, then Gemini against Claude Haiku 5.5 in 3 batches and
+8 tutor dialogues): the fewest Dutch mistakes, kept the right answer when the learner pushed back, the cleanest Ukrainian.
+The parser turns LaTeX arrows (`$\rightarrow$`) into → and drops markdown `**`.
 
 Not in the draft yet: statistics page, MCP tools, offline use, editing or deleting a bad question.

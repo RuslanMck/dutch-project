@@ -11,6 +11,7 @@ import {
 import {
   createRuleExerciseService, normalizeAnswer, spreadCount,
 } from '../src/domains/rule-exercises/rule-exercise-service.js';
+import { parseEnvironmentConfiguration } from '../src/configuration/environment-configuration.js';
 import { createOpenRouterClient } from '../src/integrations/openrouter-client.js';
 import { createTestContext, mulberry32 } from './database-test-helpers.js';
 
@@ -133,6 +134,28 @@ test('no rules chosen, or nothing to ask without OpenRouter, is a clear error', 
   plain.ruleService.createRule({ code: '5.5', title: 'Прикметник', body: '…' });
   await assert.rejects(plain.ruleExerciseService.startSet(), { message: /OpenRouter не налаштовано/ });
   assert.equal(plain.ruleExerciseService.listRuleOverview().can_generate, false);
+});
+
+test('the default model is Gemini 3.7 Flash; RULE_EXERCISE_MODEL overrides it', () => {
+  assert.equal(parseEnvironmentConfiguration({ NODE_ENV: 'test' }).ruleExerciseModel, 'google/gemini-3.7-flash');
+  assert.equal(parseEnvironmentConfiguration({ NODE_ENV: 'test', RULE_EXERCISE_MODEL: 'anthropic/claude-haiku-5.5' })
+    .ruleExerciseModel, 'anthropic/claude-haiku-5.5');
+});
+
+test('the prompt asks for every right answer, one right option, the Ukrainian style forms and plain text', () => {
+  const [system] = buildRuleExerciseMessages({ rules: [], countsByRuleCode: {} });
+  for (const phrase of ['EVERY other answer', 'EXACTLY ONE of them is right', 'not «ставиться»', 'not «мається на увазі»',
+    'not «знаходиться»', '«даний»', 'no LaTeX', 'Demonstratives']) {
+    assert.ok(system.content.includes(phrase), phrase);
+  }
+});
+
+test('LaTeX arrows become → and markdown ** is dropped from the texts', () => {
+  const { exercises } = parseGeneratedRuleExercises(JSON.stringify({ exercises: [{
+    ...adjectiveExercise,
+    explanation: 'het-слово **без** артикля $\\rightarrow$ прикметник з -e, ik \\to ben (5.5).',
+  }] }), { ruleCodes: ['5.5'] });
+  assert.equal(exercises[0].explanation, 'het-слово без артикля → прикметник з -e, ik → ben (5.5).');
 });
 
 test('helpers: the count spread over rules and the answer normalisation', () => {
