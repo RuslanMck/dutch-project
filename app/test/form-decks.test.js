@@ -33,18 +33,24 @@ test('the two zij / ze rows are told apart by their meaning', () => {
   assert.equal(formatFormQuestion(byFirst('ik'), 'nl_uk'), 'mij / me — мене, мені');
 });
 
-test('any one of the wanted forms is right, and the message shows all of them', () => {
+test('every wanted form must be typed, in any order; a missing one is named', () => {
   const ik = byFirst('ik');
   assert.deepEqual(splitForms('mij / me'), ['mij', 'me']);
-  assert.deepEqual(gradeFormAnswer(ik, 'uk_nl', 'me'), { counted: true, grade: 'good', message: '✓ Правильно: mij / me' });
-  assert.equal(gradeFormAnswer(ik, 'uk_nl', ' Mij ').grade, 'good');
-  assert.equal(gradeFormAnswer(ik, 'uk_nl', 'mij / me').grade, 'good');
-  assert.equal(gradeFormAnswer(ik, 'uk_nl', 'mij, me').grade, 'good');
-  assert.equal(gradeFormAnswer(ik, 'uk_nl', 'mij / ik').grade, 'again');
+  assert.deepEqual(gradeFormAnswer(ik, 'uk_nl', 'mij / me'), { counted: true, grade: 'good', message: '✓ Правильно' });
+  for (const typed of ['me/mij', 'Mij, me', ' me  mij ', 'mij; me', 'mij me mij']) {
+    assert.equal(gradeFormAnswer(ik, 'uk_nl', typed).grade, 'good', typed);
+  }
+  assert.deepEqual(gradeFormAnswer(ik, 'uk_nl', 'mij'),
+    { counted: true, grade: 'again', message: '✗ Не всі форми, бракує «me». Правильно: mij / me' });
+  assert.equal(gradeFormAnswer(ik, 'uk_nl', 'mij / ik').message, '✗ Правильно: mij / me');
   assert.equal(gradeFormAnswer(ik, 'uk_nl', 'mijn').grade, 'again');
-  assert.equal(gradeFormAnswer(ik, 'nl_uk', 'ik').message, '✓ Правильно');
-  assert.equal(gradeFormAnswer(byFirst('zij / ze', 'вони'), 'nl_uk', 'ze').grade, 'good');
-  assert.equal(gradeFormAnswer(byFirst('zij / ze', 'вони'), 'uk_nl', 'hun').grade, 'good');
+  assert.equal(gradeFormAnswer(ik, 'nl_uk', 'ik').grade, 'good');
+  const they = byFirst('zij / ze', 'вони');
+  assert.equal(gradeFormAnswer(they, 'uk_nl', 'hun / hen').message,
+    '✗ Не всі форми, бракує «ze». Правильно: hen / ze / hun');
+  assert.equal(gradeFormAnswer(they, 'uk_nl', 'hen ze hun').grade, 'good');
+  assert.equal(gradeFormAnswer(they, 'nl_uk', 'ze').grade, 'again');
+  assert.equal(gradeFormAnswer(they, 'nl_uk', 'zij/ze').grade, 'good');
 });
 
 test('an empty answer is not counted; dnk and «Не знаю» show the answer', () => {

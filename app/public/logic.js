@@ -379,20 +379,26 @@ export function revealFormAnswer(word, direction) {
   return { counted: true, grade: 'again', message: `✗ Правильно: ${findFormSides(word, direction).wanted}` };
 }
 
-// Any one of the wanted forms is right, and so is several of them («mij / me», «mij, me»). The message always shows
-// all the forms, so the other ones are seen too. No fuzzy match: the forms are short and one letter changes them.
+// Every wanted form must be typed, in any order, split by /, comma, semicolon or a space («mij / me», «me mij»). One
+// form missing is wrong too, and the message names it. No fuzzy match: the forms are short and one letter changes them.
 export function gradeFormAnswer(word, direction, input) {
   const { wanted } = findFormSides(word, direction);
   const forms = splitForms(wanted);
-  const typed = String(input ?? '').split(/[/,;]/).map(normalizeAnswerText).filter(Boolean);
+  const typed = [...new Set(String(input ?? '').split(/[/,;\s]+/).map(normalizeAnswerText).filter(Boolean))];
   if (!typed.length) return { counted: false, grade: null, message: 'Напиши форму нідерландською' };
   if (typed.length === 1 && typed[0] === 'dnk') return revealFormAnswer(word, direction);
-  if (typed.every(form => forms.includes(form))) {
-    const message = forms.length > 1 ? `✓ Правильно: ${wanted}` : '✓ Правильно';
-    return { counted: true, grade: 'good', message };
+  const isEveryTypedRight = typed.every(form => forms.includes(form));
+  const missing = forms.filter(form => !typed.includes(form));
+  if (isEveryTypedRight && !missing.length) return { counted: true, grade: 'good', message: '✓ Правильно' };
+  if (isEveryTypedRight) {
+    const missingText = missing.map(form => `«${form}»`).join(', ');
+    return { counted: true, grade: 'again', message: `✗ Не всі форми, бракує ${missingText}. Правильно: ${wanted}` };
   }
   return { counted: true, grade: 'again', message: `✗ Правильно: ${wanted}` };
 }
+
+// The input's placeholder in a form drill: every form is wanted.
+export const FORM_DRILL_PLACEHOLDER = 'усі форми через / або пробіл';
 
 // "Займенники · Раунд 1 з 2 · підмет → додаток · Залишилось: 7"
 export function formatFormDrillProgress({ title, deck, direction, queueLength }) {

@@ -56,6 +56,7 @@ import {
   buildRoundDrillButtons,
   formatCustomDrillProgress,
   FORM_DECKS,
+  FORM_DRILL_PLACEHOLDER,
   buildFormDrillEnd,
   buildFormDrillWords,
   formatFormDeckCount,
@@ -2038,7 +2039,8 @@ function renderCustomPractice() {
   $('practice-override-button').hidden = !isReady || !current.canOverride;
   if (isReady) {
     $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
-    $('practice-input').placeholder = drill.direction === 'uk_nl' || drill.formDeck ? 'нідерландською' : 'українською';
+    $('practice-input').placeholder = drill.formDeck ? FORM_DRILL_PLACEHOLDER
+      : drill.direction === 'uk_nl' ? 'нідерландською' : 'українською';
   }
   const progress = { title: drill.title, direction: drill.direction, queueLength: drill.queue.length };
   $('practice-progress').textContent = !isReady ? ''
