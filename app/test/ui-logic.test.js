@@ -1319,7 +1319,7 @@ test('leaving the custom drill puts the daily practice back for every target, ex
 });
 
 test('the struggling drill keeps its own name in the mode select; the other drills run as custom', () => {
-  assert.match(functionBody(appSource, 'function startCustomDrill('), /mode = 'custom'\s*}\) \{/);
+  assert.match(functionBody(appSource, 'function startCustomDrill('), /mode = 'custom'[^}]*}\) \{/);
   assert.match(functionBody(appSource, 'async function startStrugglingDrill() {'), /mode: 'struggling'/);
   assert.match(fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8'), /<option value="custom" hidden disabled>/);
 });
