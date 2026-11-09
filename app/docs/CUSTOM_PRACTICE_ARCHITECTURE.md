@@ -137,3 +137,15 @@ summary, the drill round planning and end summary text, the round-summary button
   left with 0 words stays; catalog difficulty over the last 10 answers, lifetime answer_count, and last_practiced_on;
   drill-words order, unknown ids and the 1000-id limit; REST and MCP (update `test/mcp.test.js` tool list).
 - Page logic as above.
+
+## 5. Ready-made form decks («Готові колоди»)
+
+Under the learner's decks the «Колоди» list shows «Готові колоди»: decks of word forms that come with the app
+(`FORM_DECKS` in `public/logic.js`), practised only. The first is «Займенники: підмет і додаток», the personal pronouns
+table (ik → mij / me, …). Each card pairs two forms with their Ukrainian meanings, shown with the question
+(«zij / ze — вона», «zij / ze — вони»), so rows with the same form differ.
+
+The custom drill runs it with `formDeck` set: round 1 shows the first form (підмет → додаток), round 2 the second
+(додаток → підмет). `gradeFormAnswer` accepts any one of the wanted forms or several of them («me», «mij / me»),
+strictly (no fuzzy match), and the message always shows all the forms. The cards are not dictionary words: no drill
+answer is logged, «Змінити» is hidden. A new form deck is a new entry in `FORM_DECKS`.

@@ -1268,6 +1268,11 @@ textarea {
   padding: 0;
 }
 
+.deck-section-title {
+  margin: 24px 0 0;
+  font-size: 1.05rem;
+}
+
 .deck-card {
   background: var(--garden-raised);
   border: 1px solid var(--garden-line);

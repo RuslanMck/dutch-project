@@ -55,6 +55,15 @@ import {
   buildCustomDrillEnd,
   buildRoundDrillButtons,
   formatCustomDrillProgress,
+  FORM_DECKS,
+  buildFormDrillEnd,
+  buildFormDrillWords,
+  formatFormDeckCount,
+  formatFormDrillProgress,
+  formatFormQuestion,
+  formatFormRoundStart,
+  gradeFormAnswer,
+  revealFormAnswer,
   planCustomDrill,
   checkAnswer,
   esc,
@@ -635,7 +644,7 @@ function applyWordEditToPractice(updated) {
 
 // The word on the practice screen that «Змінити» opens: the daily practice's, the article quiz's or the drill's.
 function findEditablePracticeWord() {
-  if (isCustomPracticeMode()) return ui.custom.current?.word ?? null;
+  if (isCustomPracticeMode()) return ui.custom.formDeck ? null : ui.custom.current?.word ?? null;
   return findCurrentPracticeWord();
 }
 
@@ -1797,6 +1806,7 @@ function createCustomDrill(status) {
     status,
     mode: 'custom',                  // the practice mode select shows while it runs: custom | struggling
     title: '',
+    formDeck: null,                  // a form deck (FORM_DECKS) when the drill asks word forms, not dictionary words
     source: 'custom',
     words: [],
     returnTo: { name: 'practice', onBack: null },
@@ -1835,12 +1845,13 @@ function isCustomPracticeMode() {
 // or { name, onBack }. The 'decks' name shows the Колоди tab (it must be in TABS) unless onBack is given.
 // mode: the practice mode select value while it runs ('custom', or 'struggling' for the Важкі слова drill).
 // Callers check that the learner is still on the tab they started from before calling it.
-function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom' }) {
+function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom', formDeck = null }) {
   const drill = createCustomDrill(words.length ? 'ready' : 'empty');
   const resolvedReturnTo = resolveReturnTo(returnTo);
   Object.assign(drill, {
     mode,
     title,
+    formDeck,
     source: findDrillSource({ mode, returnTo: resolvedReturnTo }),
     words: [...words],
     returnTo: resolvedReturnTo,
@@ -1857,8 +1868,8 @@ function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom'
 
 // «Ще раз»: the same words in a new order.
 function restartCustomDrill() {
-  const { title, words, returnTo, mode } = ui.custom;
-  startCustomDrill({ title, words, returnTo, mode });
+  const { title, words, returnTo, mode, formDeck } = ui.custom;
+  startCustomDrill({ title, words, returnTo, mode, formDeck });
 }
 
 // «Назад»: back to where the drill started. The FSRS session keeps its state, so a round summary (round-done) or the
@@ -1885,7 +1896,8 @@ function showNextCustomWord() {
   const drill = ui.custom;
   drill.feedback = null;
   if (!drill.queue.length && startNextRound(drill) === 'nl_uk') {
-    drill.feedback = { text: formatRoundStart('nl_uk'), ok: true };
+    const text = drill.formDeck ? formatFormRoundStart(drill.formDeck, 'nl_uk') : formatRoundStart('nl_uk');
+    drill.feedback = { text, ok: true };
   }
   if (drill.queue.length) {
     drill.current = { word: drill.queue[0], direction: drill.direction, checked: false, grade: null, canOverride: false };
@@ -1906,6 +1918,16 @@ function submitCustomAnswer() {
   }
   if (!drill.current) return;
   const { word, direction } = drill.current;
+  if (drill.formDeck) {
+    const formResult = gradeFormAnswer(word, direction, input.value);
+    if (!formResult.counted) {
+      setPracticeMessage({ text: formResult.message, ok: false });
+      input.focus();
+      return;
+    }
+    answerCustomWord(formResult);
+    return;
+  }
   const result = direction === 'uk_nl'
     ? gradeTranslationAnswer(word, input.value, { words: state.words })
     : gradeReverseTranslationAnswer(word, input.value);
@@ -1922,7 +1944,8 @@ function revealCustomAnswer() {
   const drill = ui.custom;
   if (!drill.current || drill.current.checked) return;
   const { word, direction } = drill.current;
-  answerCustomWord(direction === 'uk_nl' ? revealTranslationAnswer(word) : revealReverseTranslationAnswer(word));
+  if (drill.formDeck) answerCustomWord(revealFormAnswer(word, direction));
+  else answerCustomWord(direction === 'uk_nl' ? revealTranslationAnswer(word) : revealReverseTranslationAnswer(word));
   $('practice-btn').focus();
 }
 
@@ -1951,7 +1974,8 @@ function overrideCustomAnswer() {
 function advanceCustomWord() {
   const drill = ui.custom;
   const { current } = drill;
-  logDrillAnswer(drill, current, $('practice-input').value);
+  // The cards of a form deck are not dictionary words: the drill log has no word for them.
+  if (!drill.formDeck) logDrillAnswer(drill, current, $('practice-input').value);
   const key = answerKey(current.direction, current.word.id);
   if (!drill.answered.has(key)) {
     drill.answered.add(key);
@@ -1991,6 +2015,7 @@ function logDrillAnswer(drill, current, answerText) {
 // The question on screen: the Ukrainian in round 1, the Dutch with its article in round 2.
 function formatCustomQuestion(drill) {
   const { word, direction } = drill.current;
+  if (drill.formDeck) return formatFormQuestion(word, direction);
   return direction === 'uk_nl' ? word.uk : formatDutchWithArticle(word);
 }
 
@@ -2013,11 +2038,11 @@ function renderCustomPractice() {
   $('practice-override-button').hidden = !isReady || !current.canOverride;
   if (isReady) {
     $('practice-btn').textContent = current.checked ? 'Далі' : 'Перевірити';
-    $('practice-input').placeholder = drill.direction === 'uk_nl' ? 'нідерландською' : 'українською';
+    $('practice-input').placeholder = drill.direction === 'uk_nl' || drill.formDeck ? 'нідерландською' : 'українською';
   }
-  $('practice-progress').textContent = isReady
-    ? formatCustomDrillProgress({ title: drill.title, direction: drill.direction, queueLength: drill.queue.length })
-    : '';
+  const progress = { title: drill.title, direction: drill.direction, queueLength: drill.queue.length };
+  $('practice-progress').textContent = !isReady ? ''
+    : drill.formDeck ? formatFormDrillProgress({ ...progress, deck: drill.formDeck }) : formatCustomDrillProgress(progress);
   renderPracticeProgressBar(drill, isReady);
   $('practice-custom-note').hidden = !isReady;
   $('practice-schedule').textContent = '';
@@ -2035,7 +2060,9 @@ function renderCustomPractice() {
 // The end of the drill: the first-check counts per direction, and the note that the schedule did not change.
 function renderCustomEnd() {
   const drill = ui.custom;
-  const end = buildCustomDrillEnd({ firstTry: drill.firstTry, total: drill.total });
+  const end = drill.formDeck
+    ? buildFormDrillEnd({ deck: drill.formDeck, firstTry: drill.firstTry, total: drill.total })
+    : buildCustomDrillEnd({ firstTry: drill.firstTry, total: drill.total });
   $('practice-drill-result').textContent = end.resultText;
   $('practice-drill-note').textContent = end.noteText;
 }
@@ -3222,6 +3249,7 @@ function renderDecks() {
 
 function renderDeckList() {
   $('decks-list').replaceChildren(...decks.list.map(buildDeckCard));
+  $('form-decks-list').replaceChildren(...FORM_DECKS.map(buildFormDeckCard));
   syncDeckButtons();
   const loaded = decks.status === 'ready';
   $('decks-empty').hidden = !loaded || decks.list.length > 0;
@@ -3249,6 +3277,28 @@ function deckActionButton(label, act, id, className = '') {
   button.dataset.act = act;
   button.dataset.id = String(id);
   return button;
+}
+
+// A ready-made form deck: always there, practised only (its forms come with the app).
+function buildFormDeckCard(deck) {
+  const item = el('li', '', 'deck-card');
+  item.append(el('h3', deck.name, 'deck-card__name'));
+  item.append(el('p', deck.description, 'muted deck-card__description'));
+  item.append(el('p', formatFormDeckCount(deck.cards.length), 'muted deck-card__count'));
+  const actions = el('div', '', 'deck-card__actions');
+  const button = el('button', 'Практикувати', 'primary');
+  button.type = 'button';
+  button.dataset.formDeck = deck.id;
+  actions.append(button);
+  item.append(actions);
+  return item;
+}
+
+function practiceFormDeck(deckId) {
+  const deck = FORM_DECKS.find(item => item.id === deckId);
+  if (!deck) return;
+  decks.view = 'list';
+  startCustomDrill({ title: deck.name, words: buildFormDrillWords(deck), returnTo: 'decks', formDeck: deck });
 }
 
 function buildDeckCard(deck) {
@@ -3635,6 +3685,10 @@ function refreshDecksLive(collection) {
 function bindDeckEvents() {
   $('decks-create-button').addEventListener('click', startNewDeck);
   $('decks-list').addEventListener('click', handleDeckListClick);
+  $('form-decks-list').addEventListener('click', event => {
+    const button = event.target.closest('button[data-form-deck]');
+    if (button) practiceFormDeck(button.dataset.formDeck);
+  });
   $('decks-search').addEventListener('input', event => {
     decks.query = event.target.value;
     applyPicker();

@@ -319,6 +319,101 @@ export function buildCustomDrillEnd({ firstTry, total }) {
   };
 }
 
+// ---------- form decks (ready-made decks of word forms, e.g. the personal pronouns) ----------
+// A form deck pairs two forms of the same word (subject and object form). It is drilled as a custom drill: round 1
+// shows the first form and wants the second, round 2 the other way round. The drill keeps its direction keys
+// (uk_nl = first → second, nl_uk = second → first); the cards are not dictionary words, so nothing is logged.
+
+export const FORM_DECKS = Object.freeze([
+  Object.freeze({
+    id: 'personal-pronouns',
+    name: 'Займенники: підмет і додаток',
+    description: 'ik → mij / me, потім навпаки. Особові займенники з таблиці підручника.',
+    roundNames: Object.freeze({ uk_nl: 'підмет → додаток', nl_uk: 'додаток → підмет' }),
+    cards: Object.freeze([
+      { first: 'ik', second: 'mij / me', firstHint: 'я', secondHint: 'мене, мені' },
+      { first: 'jij / je', second: 'jou / je', firstHint: 'ти', secondHint: 'тебе, тобі' },
+      { first: 'u', second: 'u', firstHint: 'Ви (ввічливо)', secondHint: 'Вас, Вам (ввічливо)' },
+      { first: 'hij', second: 'hem', firstHint: 'він', secondHint: 'його, йому' },
+      { first: 'zij / ze', second: 'haar', firstHint: 'вона', secondHint: 'її, їй' },
+      { first: 'het', second: 'het', firstHint: 'воно', secondHint: 'його, йому (воно)' },
+      { first: 'wij / we', second: 'ons', firstHint: 'ми', secondHint: 'нас, нам' },
+      { first: 'jullie', second: 'jullie', firstHint: 'ви', secondHint: 'вас, вам' },
+      { first: 'zij / ze', second: 'hen / ze / hun', firstHint: 'вони', secondHint: 'їх, їм' },
+    ]),
+  }),
+]);
+
+// «9 пар форм» on the deck card.
+export function formatFormDeckCount(count) {
+  return `${count} ${pluralize(count, ['пара', 'пари', 'пар'])} форм`;
+}
+
+export function findFormDeck(id) {
+  return FORM_DECKS.find(deck => deck.id === id) ?? null;
+}
+
+// The drill's cards: one per pair, with an id unique across the form decks.
+export function buildFormDrillWords(deck) {
+  return deck.cards.map((card, index) => ({ id: `${deck.id}:${index + 1}`, ...card }));
+}
+
+// The forms of one side: «mij / me» -> ['mij', 'me'].
+export function splitForms(text) {
+  return String(text ?? '').split('/').map(normalizeAnswerText).filter(Boolean);
+}
+
+function findFormSides(word, direction) {
+  return direction === 'uk_nl'
+    ? { asked: word.first, askedHint: word.firstHint, wanted: word.second }
+    : { asked: word.second, askedHint: word.secondHint, wanted: word.first };
+}
+
+// The question: the asked form and its Ukrainian meaning, «ik — я», so the two «zij / ze» rows differ.
+export function formatFormQuestion(word, direction) {
+  const { asked, askedHint } = findFormSides(word, direction);
+  return askedHint ? `${asked} — ${askedHint}` : asked;
+}
+
+export function revealFormAnswer(word, direction) {
+  return { counted: true, grade: 'again', message: `✗ Правильно: ${findFormSides(word, direction).wanted}` };
+}
+
+// Any one of the wanted forms is right, and so is several of them («mij / me», «mij, me»). The message always shows
+// all the forms, so the other ones are seen too. No fuzzy match: the forms are short and one letter changes them.
+export function gradeFormAnswer(word, direction, input) {
+  const { wanted } = findFormSides(word, direction);
+  const forms = splitForms(wanted);
+  const typed = String(input ?? '').split(/[/,;]/).map(normalizeAnswerText).filter(Boolean);
+  if (!typed.length) return { counted: false, grade: null, message: 'Напиши форму нідерландською' };
+  if (typed.length === 1 && typed[0] === 'dnk') return revealFormAnswer(word, direction);
+  if (typed.every(form => forms.includes(form))) {
+    const message = forms.length > 1 ? `✓ Правильно: ${wanted}` : '✓ Правильно';
+    return { counted: true, grade: 'good', message };
+  }
+  return { counted: true, grade: 'again', message: `✗ Правильно: ${wanted}` };
+}
+
+// "Займенники · Раунд 1 з 2 · підмет → додаток · Залишилось: 7"
+export function formatFormDrillProgress({ title, deck, direction, queueLength }) {
+  const roundNumber = ROUND_DIRECTIONS.indexOf(direction) + 1;
+  return `${title} · Раунд ${roundNumber} з ${ROUND_DIRECTIONS.length} · ${deck.roundNames[direction]} · `
+    + formatQueueProgress(queueLength);
+}
+
+export function formatFormRoundStart(deck, direction) {
+  return `Раунд ${ROUND_DIRECTIONS.indexOf(direction) + 1}: ${deck.roundNames[direction]}`;
+}
+
+export function buildFormDrillEnd({ deck, firstTry, total }) {
+  const { uk_nl: first, nl_uk: second } = deck.roundNames;
+  return {
+    resultText: `Готово! Правильно з першого разу: ${first} ${firstTry.uk_nl} з ${total} · `
+      + `${second} ${firstTry.nl_uk} з ${total}.`,
+    noteText: 'Тренування форм — розклад слів не змінюється.',
+  };
+}
+
 // The drill buttons under a round summary. words are the round's words (round.words: id, difficulty), hardest first, so
 // each button's wordIds keep that order. A button with no words is hidden (hidden: true) with count 0.
 export function buildRoundDrillButtons(words) {
