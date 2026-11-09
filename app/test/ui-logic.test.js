@@ -178,7 +178,7 @@ test('checkAnswer all mode: "de huis" gives article message and counts as wrong'
   const r = checkAnswer(huis, 'de huis', 'all');
   assert.equal(r.counted, true);
   assert.equal(r.correct, false);
-  assert.match(r.message, /^Слово вірно, але артикль: ✗ → ✓/);
+  assert.match(r.message, /^Слово правильне, але артикль: ✗ → ✓/);
 });
 
 test('checkAnswer all mode: one letter off gives "Майже" and counts as wrong', () => {
@@ -231,19 +231,16 @@ test('gradeTranslationAnswer: word without article is good with the bare word', 
   assert.equal(gradeTranslationAnswer(appel, 'appel').grade, 'good');
 });
 
-test('gradeTranslationAnswer: wrong article on a de/het word is good with the right article named', () => {
+test('gradeTranslationAnswer: wrong article on a de/het word is again with the right answer', () => {
   const r = gradeTranslationAnswer(huis, 'de huis');
-  assert.equal(r.counted, true);
-  assert.equal(r.grade, 'good');
-  assert.equal(r.message, '✓ Правильно (артикль: het)');
+  assert.deepEqual(r, { counted: true, grade: 'again', message: '✗ Не той артикль. Правильно: het huis' });
 });
 
-test('gradeTranslationAnswer: missing article on a de/het word is good with the right article named', () => {
+test('gradeTranslationAnswer: missing article on a de/het word is again with the right answer', () => {
   const r = gradeTranslationAnswer(huis, 'huis');
-  assert.equal(r.counted, true);
-  assert.equal(r.grade, 'good');
-  assert.equal(r.message, '✓ Правильно (артикль: het)');
-  assert.equal(gradeTranslationAnswer({ nl: 'kat', uk: 'кіт', article: 'de' }, 'kat').message, '✓ Правильно (артикль: de)');
+  assert.deepEqual(r, { counted: true, grade: 'again', message: '✗ Потрібен артикль. Правильно: het huis' });
+  assert.equal(gradeTranslationAnswer({ nl: 'kat', uk: 'кіт', article: 'de' }, 'kat').message,
+    '✗ Потрібен артикль. Правильно: de kat');
 });
 
 test('gradeTranslationAnswer: right article on a de/het word is good with the plain message', () => {
@@ -256,10 +253,10 @@ test('gradeTranslationAnswer: article typed on a word without article is good wi
   assert.deepEqual(r, { counted: true, grade: 'good', message: '✓ Правильно' });
 });
 
-test('gradeTranslationAnswer: a wrong article with a spelling slip is hard, not good', () => {
+test('gradeTranslationAnswer: a wrong article with a spelling slip is again', () => {
   const r = gradeTranslationAnswer(huis, 'de huiz');
-  assert.equal(r.grade, 'hard');
-  assert.equal(r.message, 'Майже, перевір літери. Правильно: het huis');
+  assert.equal(r.grade, 'again');
+  assert.equal(r.message, '✗ Не той артикль, і перевір літери. Правильно: het huis');
 });
 
 test('gradeTranslationAnswer: an expression that starts with het is compared in full', () => {
@@ -269,14 +266,14 @@ test('gradeTranslationAnswer: an expression that starts with het is compared in 
   assert.equal(gradeTranslationAnswer(expression, 'is goed').grade, 'again');
 });
 
-test('gradeTranslationAnswer: one letter off is hard, with or without article', () => {
+test('gradeTranslationAnswer: one letter off is hard only with the right article', () => {
   const bare = gradeTranslationAnswer(huis, 'huiz');
-  assert.equal(bare.grade, 'hard');
-  assert.equal(bare.message, 'Майже, перевір літери. Правильно: het huis');
+  assert.equal(bare.grade, 'again');
+  assert.equal(bare.message, '✗ Потрібен артикль, і перевір літери. Правильно: het huis');
   const withArticle = gradeTranslationAnswer(huis, 'het huiz');
   assert.equal(withArticle.grade, 'hard');
   assert.equal(withArticle.message, 'Майже, перевір літери. Правильно: het huis');
-  assert.equal(gradeTranslationAnswer(huis, 'de huiz').grade, 'hard');
+  assert.equal(gradeTranslationAnswer(huis, 'de huiz').grade, 'again');
   assert.equal(gradeTranslationAnswer(appel, 'appl').grade, 'hard');
 });
 

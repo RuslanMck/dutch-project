@@ -45,8 +45,8 @@ article hints in exercises. I mark words I don't know with "DNK". Don't give ans
 same `session_id` for every `grade_word` call of the session. In round 1 give the words in blocks of 10: the
 Ukrainian text only, with no hints. Round 2 comes after it (see Sets below). Grade every answer, repeats too: `again`
 for a wrong answer or "DNK"; `hard` for the right word with a spelling slip, or a correct Dutch synonym that is not
-the dictionary word (explain the difference); `good` for a fully right answer. The article is optional: a missing or wrong `de` or `het` does not lower the grade,
-but I still want the right article shown. After each block show my answer, the right one (with the article) and a short explanation for
+the dictionary word (explain the difference); `good` for a fully right answer. The article is required: the right word with a missing or wrong `de` or `het` is
+`again`, and I want the right article shown. After each block show my answer, the right one (with the article) and a short explanation for
 every mistake, and for each word "повторень до вивчення: N" (`deck.times_left`) or that it is learned
 (`deck.has_learned`). A word comes back at the end of the queue until it is learned (`deck.in_deck` false); grade
 those repeats with `grade_word` too (they return `is_repeat: true`). `grade_word` logs the error itself, so do not

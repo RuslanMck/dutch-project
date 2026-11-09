@@ -330,7 +330,7 @@ Ruslan's new rules; the decisions are settled.
 
 ### 10.2 Web
 
-- **Article optional.** `gradeTranslationAnswer`: the article no longer affects the grade. A missing or wrong
+- **Article optional** (replaced by §11: the article is required again). `gradeTranslationAnswer`: the article no longer affects the grade. A missing or wrong
   de/het with the right word → `good`, message «✓ Правильно (артикль: de)» when the article was missing or wrong.
   Spelling slip (Levenshtein ≤ 1) → `hard`; otherwise `again`. Expressions whose own text starts with de/het
   (no `article`) are still compared in full first.
@@ -642,3 +642,12 @@ set per 19.3. The batch gives `directions_left`. The reset supersedes `phrase_an
   selector applies to word cards only. Grades post with `direction`; the same round order rule; the count line names
   the round.
 - Round summary screen: each word shows its mistakes per direction (`UA→NL: 1 · NL→UA: 0`).
+
+## 11. Article required again (09.11.2026)
+
+The learner asked for de/het to count again. `gradeTranslationAnswer` (UA → NL): the right word with a missing article
+→ `again`, «✗ Потрібен артикль. Правильно: het huis»; with a wrong one → `again`, «✗ Не той артикль. Правильно: …».
+A spelling slip (Levenshtein ≤ 1) is `hard` only with the right article; with a missing or wrong one it is `again`.
+Words without an article and expressions whose own text starts with de/het are unchanged. The same-meaning hint still
+ignores the article. Claude's instructions (`mcp-instructions.js`, the grade_word tool, the grade schema,
+`docs/CLAUDE_PROJECT_INSTRUCTIONS.md`) say the same. This replaces «Article optional» in §10.2.

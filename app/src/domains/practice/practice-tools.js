@@ -50,8 +50,8 @@ export function registerPracticeTools({
     title: 'Grade word',
     description: 'Record an answer to a word in one direction: "uk_nl" (round 1, the Ukrainian was shown and the '
       + 'Dutch answered; the default) or "nl_uk" (round 2, the Dutch was shown and the Ukrainian answered). Grades: '
-      + '"good" fully right; the article is optional, so a missing or wrong de/het still counts as good (say what '
-      + 'the right article is). "hard" (uk_nl only) a spelling slip of one letter or a correct Dutch synonym; for '
+      + '"good" fully right, with the article; a missing or wrong de/het is "again" (say what the right article '
+      + 'is). "hard" (uk_nl only) a spelling slip of one letter or a correct Dutch synonym; for '
       + 'nl_uk the Ukrainian is "good" when it is right (any fitting translation, judge the meaning), otherwise '
       + '"again"; "again" wrong or not known. The first answer per word per session schedules its FSRS review and, '
       + 'for again and hard, logs a word error. Every answer, repeats too, moves the word in the learning deck: each '

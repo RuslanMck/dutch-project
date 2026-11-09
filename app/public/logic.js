@@ -73,7 +73,7 @@ export function checkAnswer(word, input, mode) {
       return {
         counted: true,
         correct: false,
-        message: `Слово вірно, але артикль: ✗ → ✓ (${typedArticle} → ${rightArticle})`,
+        message: `Слово правильне, але артикль: ✗ → ✓ (${typedArticle} → ${rightArticle})`,
       };
     }
     return { counted: true, correct: true, message: '✓ Правильно' };
@@ -96,10 +96,10 @@ export function revealTranslationAnswer(word) {
 }
 
 // FSRS translation check: the learner types the Dutch for a Ukrainian word.
-// Returns { counted, grade, message }. grade is 'good' (the word is right; the article is optional), 'hard' (one
+// Returns { counted, grade, message }. grade is 'good' (the word with its de/het), 'hard' (one
 // letter off) or 'again' (anything else, including "DNK"). counted=false means nothing is graded.
-// The article never changes the grade: a missing or wrong de/het with the right word is 'good', and the message names
-// the right article. Punctuation, typographic quotes and extra spaces are ignored on both sides (normalizeAnswerText).
+// The article is required: the right word with a missing or wrong de/het is 'again', and the message says which.
+// A spelling slip counts as 'hard' only with the right article. Punctuation, typographic quotes and extra spaces are ignored on both sides (normalizeAnswerText).
 // The meanings of a Ukrainian translation: split on , and ;, with notes in brackets left out. «брати, замовляти (розм.)»
 // -> ['брати', 'замовляти'].
 export function splitTranslationMeanings(uk) {
@@ -107,7 +107,7 @@ export function splitTranslationMeanings(uk) {
 }
 
 // UA -> NL: the learner typed another dictionary word that shares a meaning with the asked one («heerlijk» for lekker,
-// both «смачний»). Returns { word, meaning } for that word, or null. The article is optional, as in the grading.
+// both «смачний»). Returns { word, meaning } for that word, or null. The article is optional here: it is only a hint.
 export function findSameMeaningWord(word, input, words = []) {
   const normalizedInput = normalizeAnswerText(input);
   if (!normalizedInput) return null;
@@ -138,11 +138,12 @@ export function gradeTranslationAnswer(word, input, { words = [] } = {}) {
   const typedArticle = articleMatch ? articleMatch[1] : '';
   const rest = articleMatch ? articleMatch[2] : normalizedInput;
 
+  // A word without an article typed with one is simply right; a de/het word needs its own article.
+  const isArticleRight = article === '' || typedArticle === article;
+  const articleMessage = typedArticle ? '✗ Не той артикль' : '✗ Потрібен артикль';
   if (rest === normalizedTarget) {
-    // A word without an article typed with one is simply right; a missing or wrong article is named.
-    const isArticleMissingOrWrong = article !== '' && typedArticle !== article;
-    if (!isArticleMissingOrWrong) return { counted: true, grade: 'good', message: '✓ Правильно' };
-    return { counted: true, grade: 'good', message: `✓ Правильно (артикль: ${article})` };
+    if (isArticleRight) return { counted: true, grade: 'good', message: '✓ Правильно' };
+    return { counted: true, grade: 'again', message: `${articleMessage}. Правильно: ${right}` };
   }
 
   // Another word with the same meaning is not a mistake: nothing is graded and the learner tries again.
@@ -158,9 +159,10 @@ export function gradeTranslationAnswer(word, input, { words = [] } = {}) {
 
   // Both readings are compared, so an expression that starts with de or het is not cut before the comparison.
   const distance = Math.min(levenshtein(rest, normalizedTarget), levenshtein(normalizedInput, normalizedTarget));
-  if (distance <= 1) {
+  if (distance <= 1 && isArticleRight) {
     return { counted: true, grade: 'hard', message: `Майже, перевір літери. Правильно: ${right}` };
   }
+  if (distance <= 1) return { counted: true, grade: 'again', message: `${articleMessage}, і перевір літери. Правильно: ${right}` };
   return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
 }
 

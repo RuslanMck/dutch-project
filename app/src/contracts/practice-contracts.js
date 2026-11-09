@@ -21,10 +21,10 @@ const MAXIMUM_FREQUENCY_ENTRIES_PER_CALL = 20000;
 const REVIEW_LIMIT_DESCRIPTION = 'most overdue reviews to return; default all due reviews';
 const PREVIEW_CHAPTER_DESCRIPTION = 'chapter to preview; default the current chapter';
 
-// The article is optional in translation practice: a missing or wrong de/het does not change the grade.
+// The article is required in translation practice: the right word with a missing or wrong de/het is 'again'.
 export const practiceGradeSchema = z.enum(PRACTICE_GRADE_VALUES).describe(
-  "'good' right word, article optional (a missing or wrong de/het still counts as good); 'hard' right word with a "
-  + "spelling slip, or a correct Dutch synonym; 'again' wrong, or the learner did not know it (DNK)",
+  "'good' right word with its article; 'hard' right word and article with a spelling slip, or a correct Dutch "
+  + "synonym; 'again' wrong, a missing or wrong de/het, or the learner did not know it (DNK)",
 );
 
 // Phrases are graded by the learner as well as by Claude, so the grade is described for either side.
