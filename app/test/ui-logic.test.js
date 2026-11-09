@@ -21,6 +21,11 @@ import {
   gradeTranslationAnswer,
   findSameMeaningWord,
   splitTranslationMeanings,
+  splitRuleQuizSentence,
+  formatRuleQuizRuleStats,
+  formatRuleQuizSelection,
+  formatRuleQuizProgress,
+  formatRuleQuizResult,
   buildWordEditPatch,
   renderRuleBody,
   formatDutchWithArticle,
@@ -1658,4 +1663,19 @@ test('gradeReverseTranslationAnswer: the notes in brackets may be left out', () 
   assert.equal(gradeReverseTranslationAnswer(lekker, 'смачний (звичайне слово)').grade, 'good');
   assert.equal(gradeReverseTranslationAnswer(nemen, 'брати; замовляти').grade, 'good');
   assert.equal(gradeReverseTranslationAnswer(lekker, 'чудовий').grade, 'again');
+});
+
+test('rule quiz helpers: the gap, the rule line, the selection, the progress and the result', () => {
+  assert.deepEqual(splitRuleQuizSentence('Ik heb een ___ fiets.'), { before: 'Ik heb een ', after: ' fiets.' });
+  assert.deepEqual(splitRuleQuizSentence('Geen gat.'), { before: 'Geen gat.', after: '' });
+  assert.equal(splitRuleQuizSentence(''), null);
+  assert.equal(formatRuleQuizRuleStats({ answer_count: 0, correct_count: 0 }), 'ще не тренувалось');
+  assert.equal(formatRuleQuizRuleStats({ answer_count: 12, correct_count: 9 }), '12 відповідей · правильно 75%');
+  assert.equal(formatRuleQuizRuleStats({ answer_count: 2, correct_count: 1 }), '2 відповіді · правильно 50%');
+  assert.equal(formatRuleQuizSelection(11, 11), 'Правила: усі');
+  assert.equal(formatRuleQuizSelection(3, 11), 'Правила: 3 з 11');
+  assert.equal(formatRuleQuizSelection(0, 11), 'Правила: жодного');
+  assert.equal(formatRuleQuizProgress(2, 10), 'Питання 3 з 10');
+  assert.equal(formatRuleQuizResult([{ is_correct: true }, { is_correct: false }]), 'Правильно 1 з 2');
+  assert.equal(formatRuleQuizResult([{ is_correct: true }]), 'Правильно 1 з 1 🎉');
 });

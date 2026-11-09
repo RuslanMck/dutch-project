@@ -32,6 +32,7 @@ export function parseEnvironmentConfiguration(environment, { shouldRequireSecret
     backupRetentionCount: variables.BACKUP_KEEP,
     openRouterApiKey: variables.OPENROUTER_API_KEY,
     openRouterModel: variables.OPENROUTER_MODEL,
+    ruleExerciseModel: variables.RULE_EXERCISE_MODEL,
   });
 }
 

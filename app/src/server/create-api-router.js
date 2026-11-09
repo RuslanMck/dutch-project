@@ -7,6 +7,7 @@ import { createDeckRoutes } from '../domains/decks/deck-routes.js';
 import { createMistakeRoutes } from '../domains/mistakes/mistake-routes.js';
 import { createPhraseRoutes } from '../domains/phrases/phrase-routes.js';
 import { createPracticeRoutes } from '../domains/practice/practice-routes.js';
+import { createRuleExerciseRoutes } from '../domains/rule-exercises/rule-exercise-routes.js';
 import { createRuleRoutes } from '../domains/rules/rule-routes.js';
 import { createStatisticsRoutes } from '../domains/statistics/statistics-routes.js';
 import { createTextRoutes } from '../domains/texts/text-routes.js';
@@ -27,6 +28,7 @@ export function createApiRouter({
   statisticsService,
   artifactExportService,
   deckService,
+  ruleExerciseService,
   changeEventBus,
   logger = console,
 }) {
@@ -41,6 +43,7 @@ export function createApiRouter({
   apiRouter.use(createStatisticsRoutes({ statisticsService }));
   apiRouter.use(createArtifactExportRoutes({ artifactExportService }));
   apiRouter.use(createDeckRoutes({ deckService }));
+  apiRouter.use(createRuleExerciseRoutes({ ruleExerciseService }));
   apiRouter.use(createServerSentEventsRoutes({ changeEventBus }));
   apiRouter.use((request, response) => response.status(404).json({ error: 'not found' }));
   apiRouter.use(createRestErrorHandler({ logger }));
