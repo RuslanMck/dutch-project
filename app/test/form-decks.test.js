@@ -37,7 +37,7 @@ test('every wanted form must be typed, in any order; a missing one is named', ()
   const ik = byFirst('ik');
   assert.deepEqual(splitForms('mij / me'), ['mij', 'me']);
   assert.deepEqual(gradeFormAnswer(ik, 'uk_nl', 'mij / me'), { counted: true, grade: 'good', message: '✓ Правильно' });
-  for (const typed of ['me/mij', 'Mij, me', ' me  mij ', 'mij; me', 'mij me mij']) {
+  for (const typed of ['me/mij', 'Mij, me', ' me  mij ', 'mij; me', 'mij me mij', 'mij.me', 'mij - me', 'me|mij!', '(mij) + me']) {
     assert.equal(gradeFormAnswer(ik, 'uk_nl', typed).grade, 'good', typed);
   }
   assert.deepEqual(gradeFormAnswer(ik, 'uk_nl', 'mij'),

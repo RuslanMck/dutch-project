@@ -386,7 +386,7 @@ export function revealFormAnswer(word, direction) {
 export function gradeFormAnswer(word, direction, input) {
   const { wanted } = findFormSides(word, direction);
   const forms = splitForms(wanted);
-  const typed = [...new Set(String(input ?? '').split(/[/,;\s]+/).map(normalizeAnswerText).filter(Boolean))];
+  const typed = [...new Set(String(input ?? '').split(/[^\p{L}\p{N}']+/u).map(normalizeAnswerText).filter(Boolean))];
   if (!typed.length) return { counted: false, grade: null, message: 'Напиши форму нідерландською' };
   if (typed.length === 1 && typed[0] === 'dnk') return revealFormAnswer(word, direction);
   const isEveryTypedRight = typed.every(form => forms.includes(form));

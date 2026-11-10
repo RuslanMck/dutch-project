@@ -146,7 +146,7 @@ table (ik → mij / me, …). Each card pairs two forms with their Ukrainian mea
 («zij / ze — вона», «zij / ze — вони»), so rows with the same form differ.
 
 The custom drill runs it with `formDeck` set: round 1 shows the first form (підмет → додаток), round 2 the second
-(додаток → підмет). `gradeFormAnswer` wants every form, in any order, split by /, comma,
-semicolon or a space («mij / me», «me mij»); a missing form is wrong and the message names it. No fuzzy match. The
+(додаток → підмет). `gradeFormAnswer` wants every form, in any order, split by any symbol or space
+(«mij / me», «me mij», «mij, me.»); only the words count. A missing form is wrong and the message names it. No fuzzy match. The
 ordinary word drills keep their own checks, unchanged. The cards are not dictionary words: no drill
 answer is logged, «Змінити» is hidden. A new form deck is a new entry in `FORM_DECKS`.
