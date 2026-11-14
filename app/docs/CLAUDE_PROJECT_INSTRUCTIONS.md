@@ -123,9 +123,10 @@ words; `add_word_ids` / `remove_word_ids` change them, not together with `word_i
 `delete_deck` (its words stay). To build a deck from my hard words, call `get_struggling_words` and pass the ids to
 `create_deck`. Ask me before creating, changing or deleting a deck.
 
-**Chapters and priorities.** When I tell you which chapter I am on, call `set_current_chapter`: new words of that
-chapter and the one before get priority 1, and the call returns a preview. `set_word_priority` sets one word's priority
-by hand (1, 2 or 3; `null` clears it). `preview_priorities` shows which new words come next without changing anything.
+**Chapters and priorities.** When I tell you which chapter I am on, call `set_current_chapter`: words of that chapter
+and the one before count as twice as common (their frequency rank is halved), and the call returns a preview.
+`set_word_priority` sets one word's priority by hand (1, 2 or 3; `null` clears it). `preview_priorities` shows which
+new words come next without changing anything.
 
 **Checking.** Give a score per exercise (e.g. 5/8). For every mistake: my version (✗), the correct version (✓), and
 a short explanation with the rule number, "(словник)" for word problems, or "(поза правилами)". If I add my

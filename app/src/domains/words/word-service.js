@@ -4,6 +4,7 @@
 import { NotFoundError, ValidationError } from '../../errors/domain-errors.js';
 import { mapBlankTextToNull } from '../blank-text.js';
 import { describeCardState, parseCard } from '../practice/fsrs-scheduling.js';
+import { mapPriorityOverrideToTag, mapPriorityTagToOverride } from '../practice/priority-calculation.js';
 import { findStartOfDay, formatCalendarDateInTimeZone } from '../practice/practice-calendar.js';
 import { detectWordKind } from './expression-detection.js';
 
@@ -59,12 +60,14 @@ export function createWordService({
     return addScheduleFields(matchingWords.slice(0, limit));
   }
 
-  // The word enters the priority ranking in the same transaction, so its priority is never missing.
+  // The word enters the priority ranking in the same transaction, so its priority is never missing. A word from a later
+  // chapter than the current one makes that chapter current.
   function createWord(wordInput) {
     const newWord = mapWordInputToNewWord(wordInput);
     const wordId = runInTransaction(() => {
       const insertedWordId = insertWordWithLessonErrors(newWord);
       priorityService.assignNewWordRanking([insertedWordId]);
+      priorityService.followChapterOfAddedWords([insertedWordId]);
       return insertedWordId;
     });
     changeEventBus.publishChange('words');
@@ -91,6 +94,7 @@ export function createWordService({
         insertedWordIds.push(wordId);
       }
       priorityService.assignNewWordRanking(insertedWordIds);
+      priorityService.followChapterOfAddedWords(insertedWordIds);
       return { addedWordIds: insertedWordIds, skippedWords: duplicateWords };
     });
     if (addedWordIds.length) {
@@ -122,6 +126,12 @@ export function createWordService({
     });
     changeEventBus.publishChange('words');
     changeEventBus.publishChange('decks');
+  }
+
+  // The manual tag: 'first' («Вчити першим»), 'later' («Пізніше») or null for the automatic priority.
+  function setWordPriorityTag(wordId, priorityTag) {
+    priorityService.setWordPriority(wordId, mapPriorityTagToOverride(priorityTag));
+    return getWord(wordId);
   }
 
   function updateWordStatus(wordId, learningStatus) {
@@ -228,6 +238,7 @@ export function createWordService({
       ...word,
       state: describeCardState(parseCard(fsrsCard)),
       next_due_on: word.due_at === null ? null : formatCalendarDateInTimeZone(word.due_at, timeZone),
+      priority_tag: mapPriorityOverrideToTag(word.priority_override),
     }));
   }
 
@@ -308,6 +319,7 @@ export function createWordService({
     updateWord,
     deleteWord,
     updateWordStatus,
+    setWordPriorityTag,
     recordPracticeResult,
     recordPracticeError,
     logWordError,

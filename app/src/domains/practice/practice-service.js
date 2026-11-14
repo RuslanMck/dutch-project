@@ -19,6 +19,7 @@ import {
   replayDeckAnswers,
 } from './learning-deck.js';
 import { planMigration, summarizeMigration } from './migration-planning.js';
+import { mapPriorityOverrideToTag } from './priority-calculation.js';
 import { mapToStoredSet, openPracticeSet } from './practice-set.js';
 import { PRACTICE_DIRECTIONS, UK_TO_NL_DIRECTION, findWorseGrade } from './practice-direction.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
@@ -679,6 +680,7 @@ function mapToPracticeWord(wordRow) {
     kind: wordRow.kind,
     state: describeCardState(parseCard(wordRow.fsrs_card)),
     priority: wordRow.priority,
+    priority_tag: mapPriorityOverrideToTag(wordRow.priority_override),
     deck: describeDeckPositions(readDeckPositions(wordRow)),
   };
 }

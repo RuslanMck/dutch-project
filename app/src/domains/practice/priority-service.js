@@ -2,13 +2,16 @@
 // a chapter and imports the frequency list. Publishes 'words' after each write.
 import { NotFoundError } from '../../errors/domain-errors.js';
 import {
+  calculateEffectiveRank,
   calculateFrequencyRank,
   calculatePriority,
   compareQueueOrder,
+  PRIORITY_RULES_VERSION,
   parseChapterNumber,
 } from './priority-calculation.js';
 
 const PREVIEW_EXAMPLE_LIMIT = 10;
+const MAXIMUM_CHAPTER_NUMBER = 99;
 
 export function createPriorityService({
   practiceRepository,
@@ -50,6 +53,36 @@ export function createPriorityService({
     }
   }
 
+  // Words just added from a chapter after the current one make that chapter current, and every priority is then
+  // recalculated. Runs inside the caller's transaction and publishes nothing. A chapter above 99 is not taken.
+  function followChapterOfAddedWords(wordIds) {
+    const { currentChapter } = practiceSettings.readSettings();
+    const addedChapterNumbers = wordIds
+      .map(wordId => parseChapterNumber(getPracticeWordOrThrow(wordId).section_code))
+      .filter(chapterNumber => chapterNumber !== null && chapterNumber <= MAXIMUM_CHAPTER_NUMBER);
+    if (addedChapterNumbers.length === 0) return;
+    const newestChapterNumber = Math.max(...addedChapterNumbers);
+    if (newestChapterNumber <= currentChapter) return;
+    practiceSettings.saveCurrentChapter(newestChapterNumber);
+    recalculatePrioritiesInTransaction();
+  }
+
+  function readCurrentChapter() {
+    return practiceSettings.readSettings().currentChapter;
+  }
+
+  // Recalculates every word once when the stored priorities were made with older rules (settings marker
+  // priority_rules_version). Called at start-up; returns true when it ran.
+  function upgradePriorityRules() {
+    if (practiceSettings.readSettings().priorityRulesVersion >= PRIORITY_RULES_VERSION) return false;
+    runInTransaction(() => {
+      recalculatePrioritiesInTransaction();
+      practiceSettings.savePriorityRulesVersion(PRIORITY_RULES_VERSION);
+    });
+    changeEventBus.publishChange('words');
+    return true;
+  }
+
   // priority: 1, 2, 3 for a manual override, or null to clear it and go back to the computed priority.
   function setWordPriority(wordId, priority) {
     runInTransaction(() => {
@@ -71,10 +104,7 @@ export function createPriorityService({
   function setCurrentChapter(chapter) {
     runInTransaction(() => {
       practiceSettings.saveCurrentChapter(chapter);
-      const { currentChapter } = practiceSettings.readSettings();
-      for (const word of practiceRepository.listPracticeWords()) {
-        refreshPriority(word, { currentChapter, frequencyRank: word.frequency_rank });
-      }
+      recalculatePrioritiesInTransaction();
     });
     changeEventBus.publishChange('words');
     return previewPriorities({ chapter });
@@ -151,6 +181,9 @@ export function createPriorityService({
     recalculatePriorities,
     recalculatePrioritiesInTransaction,
     assignNewWordRanking,
+    followChapterOfAddedWords,
+    readCurrentChapter,
+    upgradePriorityRules,
     setWordPriority,
     setCurrentChapter,
     previewPriorities,
@@ -172,7 +205,12 @@ function mapToPreviewEntry(word, previewChapter) {
     uk: word.uk,
     section: word.section_code,
     priority,
-    chapterNumber,
+    priorityOverride: word.priority_override,
+    effectiveRank: calculateEffectiveRank({
+      frequencyRank: word.frequency_rank,
+      chapterNumber,
+      currentChapter: previewChapter,
+    }),
     frequencyRank: word.frequency_rank,
   };
 }

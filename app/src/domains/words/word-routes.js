@@ -10,6 +10,7 @@ import {
   recordPracticeResultInputSchema,
   updateWordInputSchema,
   wordPathParametersSchema,
+  wordPriorityTagInputSchema,
 } from '../../contracts/word-contracts.js';
 import { readRequestBody, removeBlankQueryValues } from '../../http/request-input.js';
 
@@ -29,6 +30,12 @@ export function createWordRoutes({ wordService }) {
   wordRouter.patch('/words/:id', (request, response) => {
     const { id } = wordPathParametersSchema.parse(request.params);
     response.json(wordService.updateWord(id, updateWordInputSchema.parse(readRequestBody(request))));
+  });
+
+  wordRouter.put('/words/:id/priority', (request, response) => {
+    const { id } = wordPathParametersSchema.parse(request.params);
+    const { tag } = wordPriorityTagInputSchema.parse(readRequestBody(request));
+    response.json(wordService.setWordPriorityTag(id, tag));
   });
 
   wordRouter.post('/words/categorize', async (request, response) => {

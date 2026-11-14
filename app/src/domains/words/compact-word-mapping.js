@@ -16,6 +16,7 @@ export function mapWordToCompactWord(word) {
     example_uk: word.example_uk,
     priority: word.priority,
     priority_override: word.priority_override,
+    priority_tag: word.priority_tag,
     frequency_rank: word.frequency_rank,
     state: word.state,
     next_due_on: word.next_due_on,

@@ -15,6 +15,7 @@ const database = createDatabaseConnection({ databasePath: configuration.database
 runDatabaseMigrations({ database, clock });   // before accepting requests
 const changeEventBus = createChangeEventBus({ clock });
 const services = createDomainServices({ database, changeEventBus, clock, configuration });
+services.priorityService.upgradePriorityRules();   // one-off: priorities made with older rules are recalculated
 const application = createApplication({ configuration, services, changeEventBus, clock });
 
 application.listen(configuration.port, () => console.log(`dutch-app listening on :${configuration.port}`));

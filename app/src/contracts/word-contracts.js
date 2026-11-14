@@ -1,6 +1,7 @@
 // Contracts for dictionary words: creating, changing, listing, searching, practice results and word errors.
 import { z } from 'zod';
 
+import { PRIORITY_TAG_VALUES } from '../domains/practice/priority-calculation.js';
 import { wordCategorySchema } from './category-contracts.js';
 import {
   articleSchema,
@@ -65,6 +66,12 @@ export const categorizeWordsInputSchema = z.object({
 });
 
 export const setWordStatusInputSchema = z.object({ status: learningStatusSchema });
+
+// PUT /api/words/:id/priority: the manual tag; null clears it and returns to the automatic priority.
+export const wordPriorityTagInputSchema = z.object({
+  tag: z.enum(PRIORITY_TAG_VALUES).nullable()
+    .describe("'first' = practise first («Вчити першим»), 'later' = later («Пізніше»), null = automatic"),
+}).strict();
 
 const wordListFilterSchema = z.object({
   status: learningStatusSchema.optional(),

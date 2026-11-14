@@ -15,9 +15,9 @@ const SESSION_GRADE_SQL = `CASE
 const PRACTICE_WORD_SELECT = `
   SELECT v_words.id, v_words.nl, v_words.uk, v_words.article, v_words.kind, v_words.section_code,
     v_words.status, v_words.fsrs_card, v_words.due_at, v_words.introduced_on, v_words.frequency_rank,
-    v_words.priority_override, v_words.priority, v_words.error_count, v_words.deck_required_correct,
-    v_words.deck_correct_count, v_words.deck_entered_by_lapse, v_words.deck_reverse_required_correct,
-    v_words.deck_reverse_correct_count, v_words.deck_reverse_entered_by_lapse
+    v_words.priority_override, v_words.priority, v_words.category, v_words.error_count,
+    v_words.deck_required_correct, v_words.deck_correct_count, v_words.deck_entered_by_lapse,
+    v_words.deck_reverse_required_correct, v_words.deck_reverse_correct_count, v_words.deck_reverse_entered_by_lapse
   FROM v_words
 `;
 
