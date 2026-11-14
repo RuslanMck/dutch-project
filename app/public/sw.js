@@ -15,6 +15,7 @@ const SHELL_URLS = [
   '/logic.js',
   '/offline-store.js',
   '/motion.js',
+  '/achievement-icons.js',
   '/app.css',
   '/icon.svg',
   '/manifest.webmanifest',

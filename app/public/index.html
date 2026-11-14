@@ -29,6 +29,7 @@
   </div>
 
   <div id="notice" class="notice" role="alert" hidden></div>
+<div id="achievement-toasts" class="achievement-toasts" aria-live="polite"></div>
 
   <main>
     <!-- 0 · Головна -->
@@ -90,6 +91,12 @@
 
     <!-- 0b · Профіль -->
     <section id="tab-profile" class="tab" data-tab="profile" hidden>
+      <section id="profile-achievements" class="achievements-card" aria-labelledby="profile-achievements-title" hidden>
+        <h2 id="profile-achievements-title" class="stats-card__title">Досягнення</h2>
+        <p id="profile-achievements-count" class="muted"></p>
+        <div id="profile-achievements-recent" class="medal-row"></div>
+        <button id="profile-achievements-open" class="ghost" type="button" data-tab="achievements">Усі досягнення</button>
+      </section>
       <nav class="profile-menu" aria-label="Інші розділи">
         <button class="profile-menu__link" type="button" data-tab="table"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Слова</span></button>
         <button class="profile-menu__link" type="button" data-tab="rules"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg><span>Правила</span></button>
@@ -98,6 +105,12 @@
       <form class="profile-logout" method="post" action="/auth/logout">
         <button class="ghost" type="submit">Вийти</button>
       </form>
+    </section>
+
+    <!-- 0c · Досягнення (from Профіль) -->
+    <section id="tab-achievements" class="tab" data-tab="achievements" aria-labelledby="page-title" hidden>
+      <p id="achievements-message" class="muted" role="status"></p>
+      <div id="achievements-groups"></div>
     </section>
 
     <!-- 1 · Таблиця -->
@@ -606,6 +619,18 @@
   <form id="word-sheet-view-actions" method="dialog" class="sheet__actions sheet__actions--pair">
     <button id="word-sheet-edit-button" class="ghost" type="button">Змінити</button>
     <button id="word-sheet-close" class="primary" type="submit">Закрити</button>
+  </form>
+</dialog>
+
+<dialog id="achievement-dialog" class="dialog achievement-dialog" aria-labelledby="achievement-dialog-title">
+  <div id="achievement-dialog-medal" class="medal medal--large" aria-hidden="true"></div>
+  <h2 id="achievement-dialog-title" class="dialog__title"></h2>
+  <p id="achievement-dialog-description" class="dialog__text"></p>
+  <p id="achievement-dialog-left" class="achievement-dialog__left"></p>
+  <div class="medal-bar" aria-hidden="true"><span id="achievement-dialog-bar"></span></div>
+  <p id="achievement-dialog-count" class="muted"></p>
+  <form method="dialog" class="dialog__actions">
+    <button class="primary" type="submit">Закрити</button>
   </form>
 </dialog>
 

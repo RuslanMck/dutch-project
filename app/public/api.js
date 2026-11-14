@@ -137,6 +137,8 @@ export const postDrillAnswer = body => request('POST', '/api/practice/drill-answ
 export const getRoundSummary = () => request('GET', '/api/practice/round-summary', undefined, { rejectOfflineCache: true });
 export const getStats = () => request('GET', '/api/stats');
 export const getActivity = period => request('GET', `/api/stats/activity?period=${enc(period)}`);
+// Medals by group, with each achievement's unlock and progress (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §2.2).
+export const getAchievements = () => request('GET', '/api/achievements');
 
 // Calls onChange(collection) for every live change. 'all' means refetch everything.
 // Uses SSE; while the stream is down (error or not yet open) it polls every 5 s.
