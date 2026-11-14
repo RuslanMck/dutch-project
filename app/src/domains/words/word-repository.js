@@ -66,11 +66,11 @@ export function createWordRepository({ database }) {
   ).pluck();
   const insertWordStatement = database.prepare(`
     INSERT INTO words (
-      nl, uk, article, kind, example_nl, example_uk, topic_id, section_code, status, added_at, updated_at
+      nl, uk, article, kind, example_nl, example_uk, topic_id, section_code, status, category, added_at, updated_at
     )
     VALUES (
       @dutchText, @ukrainianText, @article, @kind, @exampleDutch, @exampleUkrainian, @topicId, @sectionCode,
-      @learningStatus, @addedAt, @addedAt
+      @learningStatus, @category, @addedAt, @addedAt
     )
   `);
   const deleteWordStatement = database.prepare('DELETE FROM words WHERE id = @wordId');
@@ -134,6 +134,7 @@ export function createWordRepository({ database }) {
       topicId: word.topicId,
       sectionCode: word.sectionCode,
       learningStatus: word.learningStatus,
+      category: word.category ?? null,
       addedAt: word.addedAt,
     });
     return Number(insertResult.lastInsertRowid);

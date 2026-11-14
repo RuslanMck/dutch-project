@@ -244,6 +244,7 @@ export function createWordService({
       topicId: ensureTopic(newWord.topicName),
       sectionCode: sectionService.ensureSection(newWord.sectionCode),
       learningStatus: resolveNewWordStatus(newWord.learningStatus),
+      category: newWord.category,
       addedAt: timestamp,
     });
     for (let errorIndex = 0; errorIndex < newWord.lessonErrorCount; errorIndex += 1) {
@@ -328,6 +329,7 @@ function mapWordInputToNewWord(wordInput) {
     exampleUkrainian: mapBlankTextToNull(wordInput.example_uk),
     sectionCode: mapBlankTextToNull(wordInput.section),
     topicName: mapBlankTextToNull(wordInput.topic),
+    category: wordInput.category ?? null,
     learningStatus: wordInput.status ?? 'new',
     lessonErrorCount: wordInput.err ?? 0,
   };

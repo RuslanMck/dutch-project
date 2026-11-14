@@ -34,6 +34,7 @@ export const createWordInputSchema = z.object({
   example_uk: createOptionalTextSchema().describe('Ukrainian translation of the example'),
   section: createOptionalTextSchema().describe("textbook chapter code, e.g. '6.1'"),
   topic: createOptionalTextSchema().describe('free-text dictionary topic, e.g. "У кафе"'),
+  category: wordCategorySchema.optional().describe('category id, e.g. "food"; omitted = sorted later by the categorizer'),
   status: learningStatusSchema.nullish(),
   kind: wordKindSchema.nullish().describe('auto-detected when omitted'),
   err: z.number().int().min(0).max(100).nullish().describe('lesson errors to record on the new word'),

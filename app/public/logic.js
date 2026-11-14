@@ -610,7 +610,7 @@ export const TAB_TITLES = Object.freeze({
   phrases: 'Фрази',
   'word-order': 'Порядок слів',
   'rule-quiz': 'Вправи з правил',
-  table: 'Слова',
+  table: 'Словник',
   rules: 'Правила',
   texts: 'Тексти',
   stats: 'Статистика',
@@ -628,7 +628,7 @@ export const TAB_SUBTITLES = Object.freeze({
   phrases: 'Фрази з діалогів',
   'word-order': 'Склади речення',
   'rule-quiz': 'Граматика в реченнях',
-  table: 'Усі слова з перекладом',
+  table: 'Усі твої слова',
   rules: 'Граматика з номерами правил',
   texts: 'Тексти для читання',
   stats: 'Як іде навчання',
@@ -1208,7 +1208,7 @@ export function formatStrugglingTileLine(count) {
   return count ? formatWordTotal(count) : 'Немає важких слів';
 }
 
-// The word sheet on Слова: what each row shows. word: one word of the list.
+// The word sheet on Словник: what its details show. word: one word of the list.
 export function buildWordDetailView(word) {
   const details = [
     ['Статус', formatLearningStatus(word.status)],
@@ -1216,7 +1216,8 @@ export function buildWordDetailView(word) {
     ['Помилок', String(word.error_count ?? 0)],
   ];
   if (word.section) details.push(['Глава', word.section]);
-  if (word.topic) details.push(['Тема', word.topic]);
+  const theme = categoryName(word.category) || word.topic;
+  if (theme) details.push(['Тема', theme]);
   return {
     article: word.article || '',
     dutch: word.nl,
@@ -1246,7 +1247,120 @@ export function buildWordEditPatch(word, values) {
   for (const [field, value] of Object.entries(next)) {
     if (value !== String(word[field] ?? '')) patch[field] = value;
   }
+  // Тема: '' («—», визначить автоматично) is sent as null, which clears the category.
+  const category = values.category || null;
+  if (category !== (word.category || null)) patch.category = category;
   return { patch };
+}
+
+// ---------- Словник (docs/WORD_PRIORITY_AND_DICTIONARY.md §3) ----------
+
+// Client copy of src/contracts/category-contracts.js: the same ids and names, in the same order.
+export const WORD_CATEGORIES = Object.freeze([
+  Object.freeze({ id: 'food', name: 'Їжа й напої' }),
+  Object.freeze({ id: 'home', name: 'Дім і побут' }),
+  Object.freeze({ id: 'clothes', name: 'Одяг' }),
+  Object.freeze({ id: 'colours', name: 'Кольори' }),
+  Object.freeze({ id: 'numbers', name: 'Числа й час' }),
+  Object.freeze({ id: 'people', name: 'Люди й родина' }),
+  Object.freeze({ id: 'body', name: 'Тіло й здоров\'я' }),
+  Object.freeze({ id: 'city', name: 'Місто й транспорт' }),
+  Object.freeze({ id: 'work', name: 'Робота й навчання' }),
+  Object.freeze({ id: 'nature', name: 'Природа й погода' }),
+  Object.freeze({ id: 'leisure', name: 'Відпочинок і хобі' }),
+  Object.freeze({ id: 'feelings', name: 'Почуття й характер' }),
+  Object.freeze({ id: 'actions', name: 'Дії' }),
+  Object.freeze({ id: 'talk', name: 'Розмова й фрази' }),
+  Object.freeze({ id: 'other', name: 'Інше' }),
+]);
+
+// The Ukrainian name of a category id, or '' when there is none.
+export function categoryName(categoryId) {
+  return WORD_CATEGORIES.find(category => category.id === categoryId)?.name ?? '';
+}
+
+// The filter chips: «Усі», the three statuses, then the two priority tags (one is chosen at a time).
+export const DICTIONARY_FILTERS = Object.freeze(['all', 'new', 'learning', 'learned', 'first', 'later']);
+
+// The priority segmented control: value is the button's name, tag the server's tag (null = auto).
+export const PRIORITY_TAG_CHOICES = Object.freeze([
+  Object.freeze({ value: 'auto', tag: null, label: 'Авто' }),
+  Object.freeze({ value: 'first', tag: 'first', label: 'Вчити першим' }),
+  Object.freeze({ value: 'later', tag: 'later', label: 'Пізніше' }),
+]);
+
+const WORD_STATUS_CHIP_LABEL = Object.freeze({ new: 'нове', learning: 'вчу', learned: 'вивчене' });
+
+// One word prepared for the list, built once per data change: the folded search text and the fields the filters read.
+export function buildDictionaryEntry(word) {
+  return {
+    id: word.id,
+    search: foldSearchText(`${word.nl ?? ''} ${word.uk ?? ''}`),
+    status: word.status ?? 'new',
+    tag: word.priority_tag ?? null,
+    category: word.category || null,
+  };
+}
+
+// True when the entry passes the search, the filter chip and the category ('' = every category). query is already
+// folded (foldSearchText), so a keystroke folds it once, not once per word.
+export function matchesDictionaryFilter(entry, { query = '', filter = 'all', category = '' } = {}) {
+  if (query && !entry.search.includes(query)) return false;
+  if (filter === 'new' || filter === 'learning' || filter === 'learned') {
+    if (entry.status !== filter) return false;
+  } else if (filter === 'first' || filter === 'later') {
+    if (entry.tag !== filter) return false;
+  }
+  return !category || entry.category === category;
+}
+
+// The chips under a word's row, in order: category, status, priority tag, next review. Empty ones are left out.
+export function buildWordChips(word) {
+  const chips = [];
+  const category = categoryName(word.category);
+  if (category) chips.push({ tone: 'category', text: category });
+  if (Object.hasOwn(WORD_STATUS_CHIP_LABEL, word.status)) chips.push({ tone: word.status, text: WORD_STATUS_CHIP_LABEL[word.status] });
+  if (word.priority_tag === 'first') chips.push({ tone: 'first', text: '★ першим' });
+  else if (word.priority_tag === 'later') chips.push({ tone: 'later', text: 'пізніше' });
+  const nextDate = formatShortDate(word.next_due_on);
+  if (nextDate) chips.push({ tone: 'due', text: `повтор ${nextDate}` });
+  return chips;
+}
+
+// One suggested word as the checklist shows it: "de fiets — велосипед · Місто й транспорт".
+export function formatSuggestionLine(suggestion) {
+  const dutch = [suggestion.article, suggestion.nl].filter(Boolean).join(' ');
+  const category = categoryName(suggestion.category);
+  return `${dutch} — ${suggestion.uk}${category ? ` · ${category}` : ''}`;
+}
+
+// The POST body that adds a suggested word (the add form's fields; the category is kept).
+export function buildSuggestionWordBody(suggestion) {
+  const body = { nl: suggestion.nl, uk: suggestion.uk, article: suggestion.article || '' };
+  if (suggestion.category) body.category = suggestion.category;
+  return body;
+}
+
+// «Додано 3 слова», «Додано 1 слово», «Додано 5 слів».
+export function formatAddedWords(count) {
+  return `Додано ${formatWordTotal(count)}`;
+}
+
+// The add sheet's form values → the POST body, and the priority tag to set after the add (null = auto). Dutch and
+// Ukrainian are required (error names the field to fix).
+export function buildNewWordBody(values) {
+  const nl = String(values.nl ?? '').trim();
+  const uk = String(values.uk ?? '').trim();
+  if (!nl) return { error: 'nl' };
+  if (!uk) return { error: 'uk' };
+  const body = { nl, uk, article: values.article || '' };
+  if (values.category) body.category = values.category;
+  for (const field of ['section', 'example_nl', 'example_uk']) {
+    const text = String(values[field] ?? '').trim();
+    if (text) body[field] = text;
+  }
+  const choice = PRIORITY_TAG_CHOICES.find(option => option.value === (values.priority || 'auto'));
+  return { body, priorityTag: choice?.tag ?? null };
 }
 
 // The practice progress bar: share of the set already done, from the words still queued and the most queued so far.
