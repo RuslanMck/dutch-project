@@ -4,7 +4,7 @@ import * as api from './api.js';
 import { offlineStore, flushOutbox, getStore as getOfflineStore } from './offline-store.js';
 import {
   replayClass, makeSprout, makeGrowingPot, makeFlame, showInputResult, snapshotTiles, playTileMoves, waveTiles,
-  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill,
+  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill, countUpNumbers,
 } from './motion.js';
 import {
   buildHomeSummary,
@@ -56,6 +56,9 @@ import {
   splitIntoRounds,
   TAB_TITLES,
   TAB_SUBTITLES,
+  buildGoalView,
+  buildWeekSlides,
+  buildCalendarGrid,
   buildActivityTiles,
   buildChartView,
   buildOverviewTiles,
@@ -110,7 +113,7 @@ import {
 } from './logic.js';
 
 const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
-  'stats'];
+  'stats', 'week'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -158,6 +161,12 @@ const ui = {
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
   // Statistics page: the chosen period, its activity and the vocabulary counts, and the bar tapped in the chart.
   stats: { period: 'week', status: 'idle', activity: null, overview: null, selectedBarKey: null },
+  goal: null,                        // the daily goal { goal, today: { date, answers } }; null when unknown (offline)
+  // Тиждень у підсумку: period current | previous; status idle | loading | ready | failed; slides and the one shown.
+  week: { period: 'current', status: 'idle', slides: [], index: 0 },
+  // Календар занять: view = buildCalendarGrid of the last load (null when it failed); selected = the day tapped.
+  // animated: the cells have popped in during this visit.
+  calendar: { view: null, selected: null, animated: false },
   armed: null,                       // { kind: 'phrase', id }: the phrase row waiting for a second click on delete
   table: { q: '', topic: '', sheetWordId: null },   // sheetWordId: the word shown in the open word sheet
   // Cards: 'words' shows today's practice batch without grades; 'phrases' grades like the practice does.
@@ -336,6 +345,7 @@ const RENDER = {
   'rule-quiz': renderRuleQuiz,
   texts: renderTexts,
   stats: renderStats,
+  week: () => {},                    // drawn by renderWeek when the tab is shown, not on every render
 };
 
 function render() {
@@ -377,9 +387,12 @@ function showTab(name) {
     if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = 'fsrs';
     ensureFsrsSession();
   }
-  if (ui.tab === 'home') loadHomeStrugglingCount();
+  if (ui.tab === 'home') { loadHomeStrugglingCount(); loadGoal(); }
+  if (ui.tab === 'profile') loadGoal();
   if (ui.tab === 'cards') ensureCardsBatch();
-  if (ui.tab === 'stats') loadStats();
+  if (ui.tab === 'stats') { loadStats(); loadCalendar(); }
+  if (ui.tab === 'week') loadWeek();
+  else stopWeekTimer();
   if (ui.tab === 'decks') loadDeckList();
   if (ui.tab === 'word-order') refreshWordOrderIfNeeded();
   if (ui.tab === 'rule-quiz') loadRuleQuizOverview();
@@ -404,6 +417,7 @@ async function loadHomeStrugglingCount() {
 }
 
 function renderHome() {
+  renderHomeGoal();
   const summary = buildHomeSummary({ words: state.words, phraseCount: state.phrases.length, now: Date.now() });
   $('home-continue-line').textContent = summary.line;
   $('home-progress').setAttribute('aria-valuenow', String(summary.startedPercent));
@@ -430,6 +444,165 @@ function handleHomeStrugglingTile() {
   handleStrugglingButtonClick();
 }
 
+// ---------- Головна: ціль на день ----------
+
+// The goal card's ring and line. A card with no goal (the request failed) stays hidden.
+function renderHomeGoal() {
+  const card = $('home-goal');
+  const goal = ui.goal;
+  card.hidden = !goal;
+  if (!goal) return;
+  const view = buildGoalView({ goal: goal.goal, answers: goal.today.answers });
+  card.classList.toggle('goal-card--reached', view.reached);
+  $('home-goal-arc').style.strokeDashoffset = String(100 - view.percent);
+  $('home-goal-answers').textContent = view.number;
+  $('home-goal-of').textContent = view.ofText;
+  $('home-goal-line').textContent = view.line;
+}
+
+// The petals burst once per day, the first time the goal is seen reached on Головна.
+function celebrateGoalOnce() {
+  const goal = ui.goal;
+  if (!goal || !buildGoalView({ goal: goal.goal, answers: goal.today.answers }).reached) return;
+  let celebrated = null;
+  try { celebrated = localStorage.getItem('goalCelebrated'); } catch { /* storage unavailable */ }
+  if (celebrated === goal.today.date) return;
+  try { localStorage.setItem('goalCelebrated', goal.today.date); } catch { /* storage unavailable */ }
+  celebrateWhenShown($('home-goal'), { petalCount: 24 });
+}
+
+function renderProfileGoal() {
+  $('profile-goal').hidden = !ui.goal;
+  const input = $('goal-input');
+  if (ui.goal && document.activeElement !== input) input.value = String(ui.goal.goal);
+}
+
+// The goal is read when Головна or Профіль opens. A failed read hides the goal card and the goal field.
+async function loadGoal() {
+  try {
+    ui.goal = await api.getGoal();
+  } catch {
+    ui.goal = null;
+  }
+  renderHomeGoal();
+  renderProfileGoal();
+  if (ui.tab === 'home') celebrateGoalOnce();
+}
+
+async function handleGoalSave(event) {
+  event.preventDefault();
+  const message = $('goal-message');
+  const value = Number($('goal-input').value);
+  if (!Number.isInteger(value) || value < 5 || value > 500) {
+    message.textContent = 'Ціль має бути від 5 до 500 відповідей.';
+    return;
+  }
+  try {
+    ui.goal = await api.saveGoal(value);
+    message.textContent = 'Збережено';
+    renderHomeGoal();
+    renderProfileGoal();
+  } catch (error) {
+    message.textContent = error.message || 'Не вдалося зберегти';
+  }
+}
+
+// ---------- Тиждень у підсумку (story slides) ----------
+
+const WEEK_SLIDE_MS = 4000;
+// The background of each slide, in turn (light palette tokens).
+const WEEK_TINTS = ['--garden-peach', '--garden-sand', '--garden-blush', '--garden-tint', '--garden-mustard', '--garden-periwinkle'];
+let weekTimer = 0;
+
+function stopWeekTimer() {
+  clearTimeout(weekTimer);
+  weekTimer = 0;
+}
+
+// The next slide comes after WEEK_SLIDE_MS; the last one stays.
+function scheduleWeekAdvance() {
+  stopWeekTimer();
+  const { slides, index } = ui.week;
+  if (ui.tab !== 'week' || index >= slides.length - 1) return;
+  weekTimer = setTimeout(() => goWeekSlide(ui.week.index + 1), WEEK_SLIDE_MS);
+}
+
+async function loadWeek() {
+  const period = ui.week.period;
+  Object.assign(ui.week, { status: 'loading', slides: [], index: 0 });
+  stopWeekTimer();
+  renderWeek();
+  try {
+    const week = await api.getWeek(period);
+    if (ui.week.period !== period) return;
+    Object.assign(ui.week, { status: 'ready', slides: buildWeekSlides(week) });
+  } catch {
+    if (ui.week.period !== period) return;
+    ui.week.status = 'failed';
+  }
+  renderWeek();
+}
+
+function renderWeek() {
+  for (const button of document.querySelectorAll('#week-periods [data-week-period]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.weekPeriod === ui.week.period));
+  }
+  const messageByStatus = { loading: 'Завантаження…', failed: 'Не вдалося завантажити тиждень' };
+  $('week-message').textContent = messageByStatus[ui.week.status] ?? '';
+  const hasSlides = ui.week.status === 'ready' && ui.week.slides.length > 0;
+  $('week-story').hidden = !hasSlides;
+  if (hasSlides) renderWeekSlide();
+  else stopWeekTimer();
+}
+
+// The progress segments on top, then the slide. The slide rises in; its number counts up when it has one.
+function renderWeekSlide() {
+  const { slides, index } = ui.week;
+  const slide = slides[index];
+  const isLast = index === slides.length - 1;
+  $('week-progress').replaceChildren(...slides.map((_, position) => {
+    const segment = document.createElement('span');
+    segment.className = 'week-story__segment';
+    if (position < index || (position === index && isLast)) segment.classList.add('week-story__segment--done');
+    if (position === index && !isLast) segment.classList.add('week-story__segment--timed');
+    const fill = document.createElement('span');
+    fill.className = 'week-story__fill';
+    segment.append(fill);
+    return segment;
+  }));
+  $('week-slide').style.setProperty('--week-tint', `var(${WEEK_TINTS[index % WEEK_TINTS.length]})`);
+  $('week-slide-title').textContent = slide.title;
+  $('week-slide-big').textContent = slide.big;
+  $('week-slide-text').textContent = slide.text;
+  $('week-slide-big').classList.toggle('week-story__big--text', slide.id === 'empty');
+  replayClass($('week-slide'), 'week-slide--in');
+  if (slide.countUp) countUpNumbers([$('week-slide-big')]);
+  scheduleWeekAdvance();
+}
+
+// Moves to a slide; the index stays inside the slides (no loop).
+function goWeekSlide(index) {
+  const { slides } = ui.week;
+  const next = Math.min(Math.max(index, 0), slides.length - 1);
+  if (!slides.length || next === ui.week.index) return;
+  ui.week.index = next;
+  renderWeekSlide();
+}
+
+// The right half of the story goes on, the left half goes back.
+function handleWeekZoneClick(event) {
+  const zone = event.target.closest('[data-week-step]');
+  if (!zone) return;
+  goWeekSlide(ui.week.index + Number(zone.dataset.weekStep));
+}
+
+function handleWeekPeriodClick(event) {
+  const button = event.target.closest('[data-week-period]');
+  if (!button || button.dataset.weekPeriod === ui.week.period) return;
+  ui.week.period = button.dataset.weekPeriod;
+  loadWeek();
+}
+
 // ---------- statistics ----------
 
 // The period's activity and the vocabulary counts, fetched each time the page or the period changes. A reply for
@@ -450,6 +623,49 @@ async function loadStats() {
   }
   stats.selectedBarKey = null;
   renderStats();
+}
+
+// ---------- Статистика: календар занять ----------
+
+// The last 12 weeks, one cell a day. Loaded when Статистика opens; a failed load hides the card.
+async function loadCalendar() {
+  try {
+    const { days } = await api.getCalendar(84);
+    ui.calendar.view = buildCalendarGrid(days);
+  } catch {
+    ui.calendar.view = null;
+  }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const view = ui.calendar.view;
+  $('stats-calendar').hidden = !view;
+  if (!view) return;
+  // The cells pop in as a wave only the first time the card renders in this visit.
+  const animate = !ui.calendar.animated;
+  ui.calendar.animated = true;
+  const selected = ui.calendar.selected;
+  $('stats-calendar-grid').innerHTML = view.weeks.map((week, column) => week.map(cell => {
+    if (!cell) return '<span class="calendar__spacer" aria-hidden="true"></span>';
+    const classes = ['calendar__cell', `calendar__cell--l${cell.level}`];
+    if (animate) classes.push('calendar__cell--pop');
+    return `<button type="button" class="${classes.join(' ')}" style="--col: ${column}" data-date="${esc(cell.date)}"
+      aria-label="${esc(cell.label)}" aria-pressed="${String(cell.date === selected)}"></button>`;
+  }).join('')).join('');
+  const chosen = view.weeks.flat().find(cell => cell?.date === selected);
+  $('stats-calendar-detail').textContent = chosen ? chosen.label : 'Торкніться дня, щоб побачити деталі.';
+}
+
+// A tap on a day shows its numbers under the grid; the grid itself is not rebuilt (its wave may still be running).
+function handleCalendarClick(event) {
+  const cell = event.target.closest('button[data-date]');
+  if (!cell) return;
+  ui.calendar.selected = cell.dataset.date;
+  for (const button of $('stats-calendar-grid').querySelectorAll('button[data-date]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.date === cell.dataset.date));
+  }
+  $('stats-calendar-detail').textContent = cell.getAttribute('aria-label');
 }
 
 // «Зараз» of the streak: a flickering flame, and digits that roll when the streak grew since it was last seen.
@@ -3238,6 +3454,10 @@ function bindEvents() {
     if (event.target === $('word-sheet')) $('word-sheet').close();
   });
   $('stats-periods').addEventListener('click', handleStatsPeriodClick);
+  $('stats-calendar-grid').addEventListener('click', handleCalendarClick);
+  $('goal-form').addEventListener('submit', handleGoalSave);
+  $('week-periods').addEventListener('click', handleWeekPeriodClick);
+  $('week-story').addEventListener('click', handleWeekZoneClick);
   // A mouse already selected the bar on hover, so its click keeps it; a tap toggles it.
   $('stats-chart').addEventListener('click', event => {
     handleChartBarSelect(event, { isToggle: event.pointerType !== 'mouse' });

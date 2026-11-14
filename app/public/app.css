@@ -2196,3 +2196,163 @@ input { transition: border-color .25s, background-color .25s; }
     transition-duration: .01ms !important;
   }
 }
+
+/* ---------- Ціль на день, Тиждень у підсумку, Календар занять (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §4) ---------- */
+
+/* Головна: the daily goal ring. The petals fall inside the card, so it is the positioned holder. */
+.goal-card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--garden-raised);
+  border-radius: var(--garden-radius);
+  box-shadow: var(--garden-shadow);
+}
+
+.goal-card__ring { position: relative; width: 84px; height: 84px; flex: none; }
+.goal-ring { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+.goal-ring__track, .goal-ring__arc { fill: none; stroke-width: 10; }
+.goal-ring__track { stroke: var(--garden-tint); }
+.goal-ring__arc {
+  stroke: var(--garden-primary);
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset .9s var(--motion-spring), stroke .3s;
+}
+.goal-card--reached .goal-ring__arc { stroke: var(--garden-forest); }
+
+.goal-ring__number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: var(--garden-weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.goal-ring__number small { font-size: 11px; font-weight: var(--garden-weight-regular); color: var(--garden-ink-soft); }
+
+.goal-card__text { flex: 1; min-width: 0; }
+.goal-card__title { margin: 0; font-size: 16px; font-weight: var(--garden-weight-heavy); }
+.goal-card__line { margin: 4px 0 0; font-size: 14px; color: var(--garden-ink-soft); }
+
+/* Профіль: the goal field under the menu. */
+.goal-form__label { display: block; margin-bottom: 8px; font-weight: var(--garden-weight-strong); }
+.goal-form__row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.goal-form__message { min-height: 1.4em; margin: 8px 0 0; font-size: 14px; }
+
+/* Тиждень у підсумку: story slides with progress segments on top. */
+.practice-tile--week { background: var(--garden-line); }
+
+.week-story__progress { display: flex; gap: 4px; margin: 4px 0 10px; }
+.week-story__segment {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--garden-tint);
+}
+.week-story__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--garden-primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.week-story__segment--done .week-story__fill { transform: scaleX(1); }
+.week-story__segment--timed .week-story__fill { animation: week-fill 4s linear forwards; }
+@keyframes week-fill { to { transform: scaleX(1); } }
+
+.week-story__body { position: relative; }
+.week-story__slide {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 20px;
+  text-align: center;
+  background: var(--week-tint, var(--garden-peach));
+  border-radius: var(--garden-radius-lg);
+  box-shadow: var(--garden-shadow);
+}
+.week-slide--in { animation: motion-rise .45s var(--motion-out) both; }
+.week-story__title { margin: 0; font-size: 16px; font-weight: var(--garden-weight-strong); color: var(--garden-ink-soft); }
+.week-story__big {
+  margin: 0;
+  font-size: 56px;
+  line-height: 1.05;
+  font-weight: var(--garden-weight-heavy);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.week-story__big--text { font-size: 24px; }
+.week-story__text { margin: 0; font-size: 16px; }
+.week-story__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.week-story__zone--back { left: 0; }
+.week-story__zone--next { right: 0; }
+.segmented--two { grid-template-columns: 1fr 1fr; margin-top: 16px; }
+
+/* Статистика: the calendar of 12 weeks, weeks are columns from Monday. */
+.calendar__scroll { overflow-x: auto; padding-bottom: 4px; }
+.calendar__grid {
+  --calendar-cell: 18px;
+  display: grid;
+  grid-template-rows: repeat(7, var(--calendar-cell));
+  grid-auto-flow: column;
+  grid-auto-columns: var(--calendar-cell);
+  gap: 3px;
+  width: max-content;
+}
+.calendar__cell {
+  display: block;
+  width: var(--calendar-cell);
+  height: var(--calendar-cell);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: var(--garden-tint);
+}
+button.calendar__cell { cursor: pointer; }
+.calendar__cell[aria-pressed="true"] { outline: 2px solid var(--garden-ink); outline-offset: 1px; }
+.calendar__cell--l0 { background: var(--garden-tint); }
+.calendar__cell--l1 { background: #e6d6ad; }
+.calendar__cell--l2 { background: var(--garden-primary); }
+.calendar__cell--l3 { background: var(--garden-olive); }
+.calendar__cell--l4 { background: var(--garden-forest); }
+.calendar__spacer { width: var(--calendar-cell); height: var(--calendar-cell); }
+.calendar__cell--pop { animation: calendar-pop .4s var(--motion-spring) both; animation-delay: calc(var(--col, 0) * 45ms); }
+@keyframes calendar-pop { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: none; } }
+.calendar__detail { min-height: 1.4em; margin: 10px 0 0; font-size: 14px; }
+.calendar__legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--garden-ink-soft);
+}
+.calendar__legend .calendar__cell { width: 14px; height: 14px; }
