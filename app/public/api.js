@@ -93,6 +93,10 @@ export const updateWord = (id, patch) => request('PATCH', `/api/words/${enc(id)}
 export const deleteWord = id => request('DELETE', `/api/words/${enc(id)}`);
 export const recordResult = (id, body) => request('POST', `/api/words/${enc(id)}/result`, body);
 export const listTopics = () => request('GET', '/api/topics');
+// The priority tag of a word: 'first' («Вчити першим»), 'later' («Пізніше») or null («Авто»).
+export const setWordPriorityTag = (id, tag) => request('PUT', `/api/words/${enc(id)}/priority`, { tag });
+// Часті слова, яких бракує: { suggestions: [{ nl, article, uk, category, frequency_rank }] }. Nothing is saved.
+export const getWordSuggestions = (limit = 30) => request('POST', '/api/words/suggestions', { limit });
 
 export const listRules = () => request('GET', '/api/rules');
 export const listPatterns = () => request('GET', '/api/mistake-patterns');

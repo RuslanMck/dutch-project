@@ -58,7 +58,7 @@ export const updateWordInputSchema = createWordInputSchema
   .extend({
     kind: wordKindSchema.optional(),
     status: learningStatusSchema.optional(),
-    category: wordCategorySchema.optional().describe(
+    category: wordCategorySchema.nullish().describe(
       'category id: food, home, clothes, colours, numbers, people, body, city, work, nature, leisure, feelings, '
       + 'actions, talk or other; null clears it',
     ),

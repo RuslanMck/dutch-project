@@ -18,6 +18,17 @@ import {
   pickLoadingPhrase,
   chooseStreakRollStart,
   formatStrugglingTileLine,
+  WORD_CATEGORIES,
+  foldSearchText,
+  buildDictionaryEntry,
+  matchesDictionaryFilter,
+  buildWordChips,
+  formatSuggestionLine,
+  buildSuggestionWordBody,
+  formatAddedWords,
+  buildNewWordBody,
+  formatWordTotal,
+  PRIORITY_TAG_CHOICES,
   advanceDrillQueue,
   buildAlsoOrderLines,
   formatWrongFormsLine,
@@ -86,7 +97,6 @@ import {
   checkAnswer,
   esc,
   formatDutchWithArticle,
-  formatShortDate,
   formatStrugglingDrillButton,
   gradeReverseTranslationAnswer,
   gradeTranslationAnswer,
@@ -193,7 +203,8 @@ const ui = {
   // animated: the cells have popped in during this visit.
   calendar: { view: null, selected: null, animated: false },
   armed: null,                       // { kind: 'phrase', id }: the phrase row waiting for a second click on delete
-  table: { q: '', topic: '', sheetWordId: null },   // sheetWordId: the word shown in the open word sheet
+  table: { q: '', filter: 'all', category: '', sheetWordId: null },   // filter: a chip; sheetWordId: the open word sheet
+  suggest: { items: [] },            // Часті слова, яких бракує: the suggestions on screen
   // Cards: 'words' shows today's practice batch without grades; 'phrases' grades like the practice does.
   cards: {
     mode: 'words',
@@ -473,9 +484,10 @@ function renderHome() {
   $('home-tile-word-order').textContent = formatRuleFilterSummary(wordOrder.rules);
   $('home-tile-phrases').textContent = summary.phrasesLine;
   $('home-tile-struggling').textContent = formatStrugglingTileLine(ui.home.strugglingCount);
+  $('home-tile-dictionary').textContent = formatWordTotal(state.words.length);
 }
 
-// The home search opens Слова with the query in its search field.
+// The home search opens Словник with the query in its search field.
 function handleHomeSearch(event) {
   event.preventDefault();
   const query = $('home-search-input').value.trim();
@@ -980,48 +992,206 @@ function deleteWordEverywhere(wordId) {
   act(() => api.deleteWord(wordId), ['words', 'topics']);
 }
 
-// ---------- 1 · Таблиця ----------
+// ---------- 1 · Словник ----------
 
-function syncTopicOptions() {
-  const sel = $('table-topic');
-  const names = state.topics.map(t => t.name);
-  const key = names.join('\u0001');
-  if (sel.dataset.key === key) return;
-  sel.dataset.key = key;
-  if (ui.table.topic && !names.includes(ui.table.topic)) ui.table.topic = '';
-  sel.innerHTML = '<option value="">усі теми</option>' +
-    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  sel.value = ui.table.topic;
+// Fills a category select: the first option is the empty choice, the rest are WORD_CATEGORIES in their order.
+function fillCategorySelect(select, emptyLabel) {
+  select.innerHTML = `<option value="">${esc(emptyLabel)}</option>` +
+    WORD_CATEGORIES.map(category => `<option value="${esc(category.id)}">${esc(category.name)}</option>`).join('');
 }
 
-function renderTable() {
-  const { q, topic } = ui.table;
-  syncTopicOptions();
-  const nq = normalise(q);
-  const rows = state.words
-    .filter(word => (!topic || word.topic === topic) &&
-      (!nq || normalise(word.nl).includes(nq) || normalise(word.uk).includes(nq)))
-    .sort((a, b) => a.added_at - b.added_at);
+// The rows of Словник, one per word, newest first. Built once per data change (state.words is replaced only when it
+// changed); a search, a filter chip or the category only toggles each row's hidden.
+const dictionary = { words: null, entries: [], rows: [] };
 
+function buildDictionaryRows() {
+  const sorted = [...state.words].sort((a, b) => b.added_at - a.added_at);
+  $('words-list').innerHTML = sorted.map(word => {
+    const article = word.article ? `<span class="art">${esc(word.article)}</span> ` : '';
+    const chips = buildWordChips(word)
+      .map(chip => `<span class="dict-chip dict-chip--${esc(chip.tone)}">${esc(chip.text)}</span>`).join('');
+    return `<li class="dict-row"><button class="dict-row__button" type="button" data-act="wopen" data-id="${word.id}">` +
+      `<span class="dict-row__word">${article}${esc(word.nl)}</span>` +
+      `<span class="dict-row__translation">${esc(word.uk)}</span>` +
+      (chips ? `<span class="dict-row__chips">${chips}</span>` : '') +
+      '</button></li>';
+  }).join('');
+  dictionary.words = state.words;
+  dictionary.entries = sorted.map(buildDictionaryEntry);
+  dictionary.rows = [...$('words-list').children];
+}
+
+// Shows the rows that the search, the filter chip and the category let through.
+function renderTable() {
+  if (dictionary.words !== state.words) buildDictionaryRows();
+  const { q, filter, category } = ui.table;
+  const criteria = { query: foldSearchText(q), filter, category };
+  let shown = 0;
+  dictionary.entries.forEach((entry, index) => {
+    const row = dictionary.rows[index];
+    const hide = !matchesDictionaryFilter(entry, criteria);
+    if (row.hidden !== hide) row.hidden = hide;
+    if (!hide) shown += 1;
+  });
+  const empty = $('dict-empty');
+  empty.hidden = shown > 0;
+  empty.textContent = state.words.length ? 'Нічого не знайдено.' : 'Слів поки немає.';
+  for (const button of document.querySelectorAll('#tab-table [data-filter]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.filter === filter));
+  }
+  $('table-category').value = category;
   syncOpenWordSheet();
-  const body = $('words-body');
-  if (!rows.length) {
-    const emptyMessage = state.words.length ? 'Нічого не знайдено.' : 'Слів поки немає.';
-    body.innerHTML = `<tr><td colspan="6" class="empty">${emptyMessage}</td></tr>`;
+}
+
+function findSheetWord() {
+  return state.words.find(stored => stored.id === ui.table.sheetWordId);
+}
+
+// Marks the segmented button of one priority value (auto, first, later) inside a container.
+function setPriorityChoice(container, value) {
+  for (const button of container.querySelectorAll('[data-priority]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.priority === value));
+  }
+}
+
+// Like act, but a failure is shown in the open sheet: the notice line sits behind the dialog.
+async function actInSheet(fn, keys, message) {
+  try {
+    await fn();
+    if (keys.length) await refresh(keys);
+    return true;
+  } catch (error) {
+    message.textContent = error.offline ? OFFLINE_WRITE_NOTICE : error.message || 'Помилка';
+    return false;
+  }
+}
+
+// ----- «Додати слово» sheet -----
+
+function openAddSheet() {
+  const form = $('word-form');
+  form.reset();
+  form.elements.priority.value = 'auto';
+  setPriorityChoice(form, 'auto');
+  $('word-add-message').textContent = '';
+  $('word-add-sheet').showModal();
+  form.elements.nl.focus();
+}
+
+// The form stays open after a save, empty, for the next word (as the old add form did).
+async function handleWordAdd(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const values = Object.fromEntries(['nl', 'uk', 'article', 'category', 'section', 'example_nl', 'example_uk', 'priority']
+    .map(field => [field, form.elements[field].value]));
+  const { body, priorityTag, error } = buildNewWordBody(values);
+  if (error) {
+    form.elements[error].focus();
     return;
   }
-  body.innerHTML = rows.map(word => {
-    const nextDate = formatShortDate(word.next_due_on);
-    const nextDateCell = nextDate ? `<time datetime="${esc(word.next_due_on)}">${esc(nextDate)}</time>` : '';
-    return `<tr>
-      <td class="w"><button class="word-link" type="button" data-act="wopen" data-id="${word.id}">${word.article ? `<span class="art">${esc(word.article)}</span> ` : ''}${esc(word.nl)}</button></td>
-      <td>${esc(word.section || '')}</td>
-      <td>${esc(word.uk)}</td>
-      <td>${nextDateCell}</td>
-      <td>${word.priority ? `P${esc(word.priority)}` : ''}</td>
-      <td><button class="del" type="button" data-act="wdel" data-id="${word.id}" aria-label="Видалити слово ${esc(word.nl)}">${CLOSE_ICON}</button></td>
-    </tr>`;
-  }).join('');
+  const saved = await actInSheet(async () => {
+    const created = await api.addWord(body);
+    if (priorityTag) await api.setWordPriorityTag(created.id, priorityTag);
+  }, ['words', 'topics'], $('word-add-message'));
+  if (!saved) return;
+  form.reset();
+  form.elements.priority.value = 'auto';
+  setPriorityChoice(form, 'auto');
+  $('word-add-message').textContent = '';
+  form.elements.nl.focus();
+}
+
+// ----- the word sheet: priority at once, and «Видалити» -----
+
+// Saves the tag at once. A failed save puts the segmented control back to the word's stored tag.
+async function handleSheetPriorityClick(event) {
+  const button = event.target.closest('button[data-priority]');
+  const word = findSheetWord();
+  if (!button || !word) return;
+  const choice = PRIORITY_TAG_CHOICES.find(option => option.value === button.dataset.priority);
+  const container = $('word-sheet-priority');
+  setPriorityChoice(container, choice.value);
+  let failed = true;
+  await act(async () => {
+    await api.setWordPriorityTag(word.id, choice.tag);
+    failed = false;
+  }, ['words']);
+  if (failed) setPriorityChoice(container, word.priority_tag || 'auto');
+}
+
+function handleSheetDelete() {
+  const word = findSheetWord();
+  if (!word) return;
+  askDeleteWord(word, () => {
+    deleteWordEverywhere(word.id);
+    $('word-sheet').close();
+    $('table-q').focus();
+  });
+}
+
+// ----- Часті слова, яких бракує -----
+
+// The card shows one of its parts: the button (idle), the growing pot (loading) or the checklist (list).
+function setSuggestView(view) {
+  $('suggest-button').hidden = view !== 'idle';
+  $('suggest-loading').hidden = view !== 'loading';
+  $('suggest-form').hidden = view !== 'list';
+  if (view === 'loading') {
+    const pot = $('suggest-loading-pot');
+    if (!pot.firstChild) pot.append(makeGrowingPot());
+  }
+}
+
+async function loadWordSuggestions() {
+  const message = $('suggest-message');
+  message.textContent = '';
+  ui.suggest.items = [];
+  setSuggestView('loading');
+  try {
+    const { suggestions = [] } = await api.getWordSuggestions(30);
+    ui.suggest.items = suggestions;
+    if (!suggestions.length) {
+      setSuggestView('idle');
+      message.textContent = 'Нових слів не знайдено.';
+      return;
+    }
+    $('suggest-list').innerHTML = suggestions.map((suggestion, index) =>
+      `<li class="deck-row"><label class="deck-row__label">` +
+      `<input class="deck-row__check" type="checkbox" data-index="${index}" checked>` +
+      `<span class="deck-row__text"><span class="deck-row__word">${esc(formatSuggestionLine(suggestion))}</span></span>` +
+      '</label></li>').join('');
+    updateSuggestCount();
+    setSuggestView('list');
+  } catch (error) {
+    setSuggestView('idle');
+    message.textContent = error.offline ? OFFLINE_WRITE_NOTICE : error.message || 'Помилка';
+  }
+}
+
+function updateSuggestCount() {
+  const count = $('suggest-list').querySelectorAll('input:checked').length;
+  $('suggest-add').textContent = `Додати вибрані (${count})`;
+  $('suggest-add').disabled = count === 0;
+}
+
+async function handleSuggestionAdd(event) {
+  event.preventDefault();
+  const chosen = [...$('suggest-list').querySelectorAll('input:checked')]
+    .map(input => ui.suggest.items[Number(input.dataset.index)]);
+  if (!chosen.length) return;
+  $('suggest-add').disabled = true;
+  // The bulk add is not in the API: each word is posted with the add call, in order.
+  let added = 0;
+  await act(async () => {
+    for (const suggestion of chosen) {
+      await api.addWord(buildSuggestionWordBody(suggestion));
+      added += 1;
+    }
+  }, ['words', 'topics']);
+  ui.suggest.items = [];
+  setSuggestView('idle');
+  $('suggest-add').disabled = false;
+  $('suggest-message').textContent = added ? formatAddedWords(added) : '';
 }
 
 // A live refresh while the sheet is open shows the word's new values, or closes the sheet if it was deleted. An open
@@ -1047,6 +1217,7 @@ function openWordSheet(word) {
   $('word-sheet-example-uk').textContent = view.exampleUkrainian;
   $('word-sheet-details').innerHTML = view.details
     .map(([label, value]) => `<div class="sheet__detail"><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('');
+  setPriorityChoice($('word-sheet-priority'), word.priority_tag || 'auto');
   if (!$('word-sheet').open) $('word-sheet').showModal();
 }
 
@@ -1056,6 +1227,7 @@ function setWordSheetEditing(isEditing) {
   $('word-sheet-view-actions').hidden = isEditing;
   $('word-sheet-translation').hidden = isEditing;
   $('word-sheet-details').hidden = isEditing;
+  $('word-sheet-priority').hidden = isEditing;
   if (isEditing) $('word-sheet-example').hidden = true;
 }
 
@@ -1065,6 +1237,7 @@ function startWordEdit() {
   const form = $('word-sheet-edit');
   for (const field of ['nl', 'uk', 'section', 'example_nl', 'example_uk']) form.elements[field].value = word[field] ?? '';
   form.elements.article.value = word.article || '';
+  form.elements.category.value = word.category || '';
   setWordSheetEditing(true);
   form.elements.uk.focus();
 }
@@ -1074,7 +1247,7 @@ async function saveWordEdit() {
   const form = $('word-sheet-edit');
   const word = state.words.find(stored => stored.id === ui.table.sheetWordId);
   if (!word) return;
-  const values = Object.fromEntries(['nl', 'uk', 'article', 'section', 'example_nl', 'example_uk']
+  const values = Object.fromEntries(['nl', 'uk', 'article', 'category', 'section', 'example_nl', 'example_uk']
     .map(field => [field, form.elements[field].value]));
   const { patch, error } = buildWordEditPatch(word, values);
   if (error) {
@@ -4045,55 +4218,50 @@ function bindEvents() {
   });
   deleteDialog.addEventListener('close', () => { pendingConfirm = null; });
 
-  // Таблиця
-  $('word-form').addEventListener('submit', event => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const nl = form.elements.nl.value.trim();
-    const uk = form.elements.uk.value.trim();
-    if (!nl || !uk) {
-      (nl ? form.elements.uk : form.elements.nl).focus();
-      return;
-    }
-    const body = { nl, uk, article: form.elements.article.value };
-    const section = form.elements.section.value.trim();
-    if (section) body.section = section;
-    const exampleDutchText = form.elements.example_nl.value.trim();
-    const exampleUkrainianText = form.elements.example_uk.value.trim();
-    if (exampleDutchText) body.example_nl = exampleDutchText;
-    if (exampleUkrainianText) body.example_uk = exampleUkrainianText;
-    act(async () => {
-      await api.addWord(body);
-      form.reset();
-      form.elements.nl.focus();
-    }, ['words', 'topics']);
-  });
+  // Словник
+  fillCategorySelect($('table-category'), 'усі теми');
+  fillCategorySelect($('word-form').elements.category, '— визначить автоматично');
+  fillCategorySelect($('word-sheet-edit').elements.category, '— визначить автоматично');
   $('table-q').addEventListener('input', event => {
     ui.table.q = event.target.value;
     renderTable();
   });
-  $('table-topic').addEventListener('change', event => {
-    ui.table.topic = event.target.value;
+  $('table-category').addEventListener('change', event => {
+    ui.table.category = event.target.value;
     renderTable();
   });
-  $('words-body').addEventListener('click', event => {
+  for (const button of document.querySelectorAll('#tab-table [data-filter]')) {
+    button.addEventListener('click', () => {
+      ui.table.filter = button.dataset.filter;
+      renderTable();
+    });
+  }
+  $('words-list').addEventListener('click', event => {
     const opener = event.target.closest('button[data-act="wopen"]');
-    if (opener) {
-      const word = state.words.find(stored => stored.id === Number(opener.dataset.id));
-      if (word) openWordSheet(word);
-      return;
-    }
-    const button = event.target.closest('button[data-act="wdel"]');
-    if (!button) return;
-    const word = state.words.find(stored => stored.id === Number(button.dataset.id));
-    if (word) {
-      askDeleteWord(word, () => {
-        deleteWordEverywhere(word.id);
-        // The deleted row's button is gone; the search field is the next stop.
-        $('table-q').focus();
-      });
-    }
+    const word = opener && state.words.find(stored => stored.id === Number(opener.dataset.id));
+    if (word) openWordSheet(word);
   });
+  $('word-add-open').addEventListener('click', openAddSheet);
+  $('word-add-cancel').addEventListener('click', () => $('word-add-sheet').close());
+  $('word-add-sheet').addEventListener('click', event => {
+    if (event.target === $('word-add-sheet')) $('word-add-sheet').close();
+  });
+  $('word-form').addEventListener('click', event => {
+    const button = event.target.closest('button[data-priority]');
+    if (!button) return;
+    $('word-form').elements.priority.value = button.dataset.priority;
+    setPriorityChoice($('word-form'), button.dataset.priority);
+  });
+  $('word-form').addEventListener('submit', handleWordAdd);
+  $('word-sheet-priority').addEventListener('click', handleSheetPriorityClick);
+  $('word-sheet-delete-button').addEventListener('click', handleSheetDelete);
+  $('suggest-button').addEventListener('click', loadWordSuggestions);
+  $('suggest-list').addEventListener('change', updateSuggestCount);
+  $('suggest-cancel').addEventListener('click', () => {
+    ui.suggest.items = [];
+    setSuggestView('idle');
+  });
+  $('suggest-form').addEventListener('submit', handleSuggestionAdd);
 
   // Картки
   $('cards-mode').addEventListener('change', event => {

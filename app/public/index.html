@@ -109,6 +109,11 @@
           <span class="practice-tile__name">Важкі слова</span>
           <span id="home-tile-struggling" class="practice-tile__line"></span>
         </button>
+        <button class="practice-tile practice-tile--dictionary" type="button" data-tab="table">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h7v14H4zM13 5h7v14h-7zM6.5 9h2M6.5 12h2M15.5 9h2M15.5 12h2"/></svg></span>
+          <span class="practice-tile__name">Словник</span>
+          <span id="home-tile-dictionary" class="practice-tile__line"></span>
+        </button>
         <button class="practice-tile practice-tile--week" type="button" data-tab="week">
           <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14v14H5zM5 10h14M9 3v4M15 3v4"/></svg></span>
           <span class="practice-tile__name">Тиждень у підсумку</span>
@@ -136,7 +141,7 @@
         <button id="profile-achievements-open" class="ghost" type="button" data-tab="achievements">Усі досягнення</button>
       </section>
       <nav class="profile-menu" aria-label="Інші розділи">
-        <button class="profile-menu__link" type="button" data-tab="table"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Слова</span></button>
+        <button class="profile-menu__link" type="button" data-tab="table"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Словник</span></button>
         <button class="profile-menu__link" type="button" data-tab="rules"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg><span>Правила</span></button>
         <button class="profile-menu__link" type="button" data-tab="texts"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg><span>Тексти</span></button>
       </nav>
@@ -172,61 +177,44 @@
       <div id="achievements-groups"></div>
     </section>
 
-    <!-- 1 · Таблиця -->
+    <!-- 1 · Словник -->
     <section id="tab-table" class="tab" data-tab="table" hidden>
-      <form id="word-form" class="form" autocomplete="off">
-        <label class="field">
-          <span>Слово</span>
-          <input name="nl" required autocapitalize="none" spellcheck="false">
-        </label>
-        <label class="field">
-          <span>Переклад</span>
-          <input name="uk" required>
-        </label>
-        <label class="field">
-          <span>Артикль</span>
-          <select name="article">
-            <option value="">—</option>
-            <option value="de">de</option>
-            <option value="het">het</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Глава</span>
-          <input name="section" inputmode="decimal" placeholder="6.1">
-        </label>
-        <label class="field wide">
-          <span>Приклад NL</span>
-          <input name="example_nl" autocapitalize="none" spellcheck="false">
-        </label>
-        <label class="field wide">
-          <span>Приклад UK</span>
-          <input name="example_uk">
-        </label>
-        <button class="primary wide" type="submit">Додати</button>
-      </form>
-
-      <div class="toolbar">
-        <input id="table-q" type="search" placeholder="Пошук" aria-label="Пошук у словах">
-        <select id="table-topic" aria-label="Тема"><option value="">усі теми</option></select>
+      <div class="dict-toolbar">
+        <input id="table-q" type="search" placeholder="Пошук" aria-label="Пошук у словах" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <button id="word-add-open" class="primary" type="button">Додати слово</button>
       </div>
-
-      <div class="table-wrap">
-        <table class="words">
-          <caption class="sr-only">Слова</caption>
-          <thead>
-            <tr>
-              <th scope="col">Слово</th>
-              <th scope="col">Глава</th>
-              <th scope="col">Переклад</th>
-              <th scope="col">Наступне</th>
-              <th scope="col">Пріоритет</th>
-              <th scope="col"><span class="sr-only">Видалити</span></th>
-            </tr>
-          </thead>
-          <tbody id="words-body"></tbody>
-        </table>
+      <div class="dict-chips" role="group" aria-label="Фільтр слів">
+        <button type="button" data-filter="all" aria-pressed="true">Усі</button>
+        <button type="button" data-filter="new" aria-pressed="false">Нові</button>
+        <button type="button" data-filter="learning" aria-pressed="false">Вчу</button>
+        <button type="button" data-filter="learned" aria-pressed="false">Вивчені</button>
       </div>
+      <div class="dict-chips" role="group" aria-label="Пріоритет слів">
+        <button type="button" data-filter="first" aria-pressed="false">Вчити першим</button>
+        <button type="button" data-filter="later" aria-pressed="false">Пізніше</button>
+      </div>
+      <select id="table-category" class="dict-category" aria-label="Тема"><option value="">усі теми</option></select>
+
+      <p id="dict-empty" class="empty" hidden></p>
+      <ul id="words-list" class="dict-list" aria-label="Слова"></ul>
+
+      <section id="suggest-card" class="stats-card dict-suggest" aria-labelledby="suggest-title">
+        <h2 id="suggest-title" class="stats-card__title">Часті слова, яких бракує</h2>
+        <p class="muted">Поширені нідерландські слова, яких ще немає у словнику.</p>
+        <button id="suggest-button" class="ghost" type="button">Підказати слова</button>
+        <div id="suggest-loading" class="dict-suggest__loading" role="status" hidden>
+          <span id="suggest-loading-pot" class="dict-suggest__pot" aria-hidden="true"></span>
+          <p class="muted">Шукаю слова…</p>
+        </div>
+        <form id="suggest-form" class="dict-suggest__form" hidden>
+          <ul id="suggest-list" class="deck-catalog" aria-label="Пропоновані слова"></ul>
+          <div class="sheet__actions sheet__actions--pair">
+            <button id="suggest-cancel" class="ghost" type="button">Скасувати</button>
+            <button id="suggest-add" class="primary" type="submit">Додати вибрані (0)</button>
+          </div>
+        </form>
+        <p id="suggest-message" class="muted" role="status"></p>
+      </section>
     </section>
 
     <!-- 2 · Картки -->
@@ -710,6 +698,14 @@
     <p id="word-sheet-example-nl" class="sheet__example-nl"></p>
     <p id="word-sheet-example-uk" class="sheet__example-uk"></p>
   </div>
+  <div id="word-sheet-priority" class="sheet__priority" role="group" aria-labelledby="word-sheet-priority-label">
+    <span id="word-sheet-priority-label" class="sheet__priority-label">Пріоритет</span>
+    <div class="segmented segmented--three">
+      <button type="button" data-priority="auto" aria-pressed="false">Авто</button>
+      <button type="button" data-priority="first" aria-pressed="false">Вчити першим</button>
+      <button type="button" data-priority="later" aria-pressed="false">Пізніше</button>
+    </div>
+  </div>
   <dl id="word-sheet-details" class="sheet__details"></dl>
   <form id="word-sheet-edit" class="form sheet__edit" autocomplete="off" hidden>
     <label class="field">
@@ -729,6 +725,10 @@
       <input name="uk" required>
     </label>
     <label class="field">
+      <span>Тема</span>
+      <select name="category" class="category-select"></select>
+    </label>
+    <label class="field">
       <span>Глава</span>
       <input name="section" inputmode="decimal" placeholder="6.1">
     </label>
@@ -745,9 +745,65 @@
       <button class="primary" type="submit">Зберегти</button>
     </div>
   </form>
-  <form id="word-sheet-view-actions" method="dialog" class="sheet__actions sheet__actions--pair">
+  <form id="word-sheet-view-actions" method="dialog" class="sheet__actions sheet__actions--three">
     <button id="word-sheet-edit-button" class="ghost" type="button">Змінити</button>
+    <button id="word-sheet-delete-button" class="ghost danger-text" type="button">Видалити</button>
     <button id="word-sheet-close" class="primary" type="submit">Закрити</button>
+  </form>
+</dialog>
+
+<dialog id="word-add-sheet" class="sheet" aria-labelledby="word-add-title">
+  <div class="sheet__grab" aria-hidden="true"></div>
+  <div class="sheet__head">
+    <h2 id="word-add-title" class="sheet__title">Додати слово</h2>
+  </div>
+  <form id="word-form" class="form sheet__edit" autocomplete="off">
+    <label class="field">
+      <span>Слово</span>
+      <input name="nl" required autocapitalize="none" autocorrect="off" spellcheck="false">
+    </label>
+    <label class="field">
+      <span>Переклад</span>
+      <input name="uk" required>
+    </label>
+    <label class="field">
+      <span>Артикль</span>
+      <select name="article">
+        <option value="">—</option>
+        <option value="de">de</option>
+        <option value="het">het</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Тема</span>
+      <select name="category" class="category-select"></select>
+    </label>
+    <label class="field">
+      <span>Глава</span>
+      <input name="section" inputmode="decimal" placeholder="6.1">
+    </label>
+    <label class="field wide">
+      <span>Приклад NL</span>
+      <input name="example_nl" autocapitalize="none" autocorrect="off" spellcheck="false">
+    </label>
+    <label class="field wide">
+      <span>Приклад UK</span>
+      <input name="example_uk">
+    </label>
+    <div class="field wide">
+      <span id="word-add-priority-label">Пріоритет</span>
+      <div class="segmented segmented--three" role="group" aria-labelledby="word-add-priority-label">
+        <button type="button" data-priority="auto" aria-pressed="true">Авто</button>
+        <button type="button" data-priority="first" aria-pressed="false">Вчити першим</button>
+        <button type="button" data-priority="later" aria-pressed="false">Пізніше</button>
+      </div>
+      <input type="hidden" name="priority" value="auto">
+    </div>
+    <p id="word-add-message" class="muted wide" role="status"></p>
+    <div class="sheet__actions sheet__actions--pair wide">
+      <button id="word-add-cancel" class="ghost" type="button">Скасувати</button>
+      <button class="primary" type="submit">Додати</button>
+    </div>
   </form>
 </dialog>
 
