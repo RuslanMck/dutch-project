@@ -1403,3 +1403,34 @@ export function formatRuleQuizResult(results) {
   const text = `Правильно ${correctCount} з ${results.length}`;
   return correctCount === results.length && results.length ? `${text} 🎉` : text;
 }
+
+// ---------- motion (docs/MOTION.md) ----------
+
+// How many petals fall on a finish screen: a strong result gets more, a weak one none, so it never feels fake.
+export function choosePetalCount(correctCount, total) {
+  if (!total) return 0;
+  const share = correctCount / total;
+  if (share >= 0.9) return 36;
+  if (share >= 0.7) return 20;
+  return 0;
+}
+
+// The captions under the growing sprout while the model writes the rule exercises, shown in turn.
+export const RULE_QUIZ_LOADING_PHRASES = Object.freeze([
+  'Підбираю речення з твоїми словами…',
+  'Перевіряю артиклі й форми…',
+  'Складаю варіанти відповідей…',
+  'Пишу пояснення українською…',
+  'Ще трохи…',
+]);
+
+// The caption for the nth turn: the last one stays once the list is through.
+export function pickLoadingPhrase(turn) {
+  return RULE_QUIZ_LOADING_PHRASES[Math.min(Math.max(0, turn), RULE_QUIZ_LOADING_PHRASES.length - 1)];
+}
+
+// The streak value to roll from: the value seen last time when the streak grew since, else null (no roll).
+export function chooseStreakRollStart(seenValue, currentValue) {
+  const seen = Number.parseInt(seenValue, 10);
+  return Number.isInteger(seen) && seen >= 0 && seen < currentValue ? seen : null;
+}

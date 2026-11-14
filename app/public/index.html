@@ -492,7 +492,17 @@
         <button id="rule-quiz-start" class="primary rule-quiz__start" type="button">Почати: 10 питань</button>
       </div>
 
-      <p id="rule-quiz-loading" class="muted rule-quiz__loading" role="status" hidden>Готую нові питання… це може тривати до хвилини.</p>
+      <div id="rule-quiz-loading" class="rule-quiz__loading" role="status" hidden>
+        <span id="rule-quiz-loading-pot" class="rule-quiz__loading-pot"></span>
+        <p id="rule-quiz-loading-text" class="rule-quiz__loading-text">Готую нові питання…</p>
+        <p class="muted rule-quiz__loading-note">Це може тривати до хвилини.</p>
+        <div class="skeleton" aria-hidden="true">
+          <span class="skeleton__bone skeleton__bone--short"></span>
+          <span class="skeleton__bone"></span>
+          <span class="skeleton__bone skeleton__bone--medium"></span>
+          <span class="skeleton__bone skeleton__bone--field"></span>
+        </div>
+      </div>
       <p id="rule-quiz-error" class="msg bad" role="alert" hidden></p>
 
       <div id="rule-quiz-exercise" class="rule-quiz__card" hidden>
@@ -530,6 +540,7 @@
   </main>
 
   <nav id="bottom-nav" class="bottom-nav" aria-label="Розділи">
+    <span id="bottom-nav-pill" class="bottom-nav__pill" aria-hidden="true"></span>
     <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg><span>Головна</span></button>
     <button class="bottom-nav__item" type="button" data-tab="decks" data-nav="decks"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h12v14H7zM4 7v13h12"/></svg><span>Колоди</span></button>
     <button class="bottom-nav__play" type="button" data-tab="practice" data-nav="practice" aria-label="Практика"><svg class="garden-icon garden-icon--filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></button>

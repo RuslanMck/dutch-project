@@ -3,11 +3,18 @@
 import * as api from './api.js';
 import { offlineStore, flushOutbox, getStore as getOfflineStore } from './offline-store.js';
 import {
+  replayClass, makeSprout, makeGrowingPot, makeFlame, showInputResult, snapshotTiles, playTileMoves, waveTiles,
+  celebrateWhenShown, turnOver, renderOdometer, placeNavPill,
+} from './motion.js';
+import {
   buildHomeSummary,
   computeQueueProgressPercent,
   buildWordDetailView,
   buildWordEditPatch,
   findNavigationSection,
+  choosePetalCount,
+  pickLoadingPhrase,
+  chooseStreakRollStart,
   formatStrugglingTileLine,
   advanceDrillQueue,
   buildAlsoOrderLines,
@@ -335,7 +342,12 @@ function render() {
   if (state.loaded) RENDER[ui.tab]();
 }
 
+// The bottom menu's order, for the side a new page slides in from.
+const NAVIGATION_ORDER = ['home', 'decks', 'practice', 'stats', 'profile'];
+
 function showTab(name) {
+  const previousTab = ui.tab;
+  const previousSection = findNavigationSection(previousTab);
   ui.tab = TABS.includes(name) ? name : 'home';
   ui.armed = null;                   // switching tabs disarms the phrase delete
   try { localStorage.setItem('tab', ui.tab); } catch { /* storage unavailable */ }
@@ -344,6 +356,15 @@ function showTab(name) {
   for (const item of document.querySelectorAll('#bottom-nav [data-nav]')) {
     if (item.dataset.nav === section) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
+  }
+  placeNavPill($('bottom-nav'), $('bottom-nav-pill'));
+  if (previousTab && previousTab !== ui.tab) {
+    replayClass(document.querySelector(`#bottom-nav [data-nav="${section}"] .garden-icon`), 'hop');
+    const step = NAVIGATION_ORDER.indexOf(section) - NAVIGATION_ORDER.indexOf(previousSection);
+    const page = $(`tab-${ui.tab}`);
+    page.style.setProperty('--enter-x', step > 0 ? '28px' : step < 0 ? '-28px' : '0px');
+    page.style.setProperty('--enter-y', step ? '0px' : '10px');
+    replayClass(page, 'tab-enter');
   }
   // Головна has its own gold header with the greeting.
   $('top-header').hidden = ui.tab === 'home';
@@ -431,6 +452,23 @@ async function loadStats() {
   renderStats();
 }
 
+// «Зараз» of the streak: a flickering flame, and digits that roll when the streak grew since it was last seen.
+function decorateStreakTile(current) {
+  const value = document.querySelector('#stats-streak .stat-tile__value');
+  if (!value || !Number.isInteger(current)) return;
+  let seen = null;
+  try { seen = localStorage.getItem('streakSeen'); } catch { /* storage unavailable */ }
+  const word = value.textContent.replace(/^\d+\s*/, '');
+  const digits = document.createElement('span');
+  digits.className = 'odometer';
+  value.classList.add('streak-value');
+  value.dataset.streak = String(current);
+  value.replaceChildren(makeFlame(), digits, document.createTextNode(` ${word}`));
+  // On the page first: a detached element has no start position to roll from.
+  renderOdometer(digits, current, chooseStreakRollStart(seen, current));
+  try { localStorage.setItem('streakSeen', String(current)); } catch { /* storage unavailable */ }
+}
+
 function renderTiles(tiles) {
   return tiles.map(tile => `
     <div class="stat-tile">
@@ -469,7 +507,14 @@ function renderStats() {
   $('stats-chart-detail').textContent = selectedBar?.detail
     ?? (chartView.isEmpty ? 'За цей період відповідей немає.' : 'Торкніться стовпчика, щоб побачити деталі.');
 
+  // A re-render keeps the decorated value of the same streak, so a roll in progress plays to its end.
+  const shownStreak = document.querySelector('#stats-streak .streak-value');
   $('stats-streak').innerHTML = renderTiles(buildStreakTiles(activity.streak));
+  if (shownStreak?.dataset.streak === String(activity.streak.current)) {
+    document.querySelector('#stats-streak .stat-tile__value').replaceWith(shownStreak);
+  } else {
+    decorateStreakTile(activity.streak.current);
+  }
   $('stats-hardest').innerHTML = activity.hardest_words.length
     ? activity.hardest_words.map(word => `<li>${esc(formatHardestWord(word))}</li>`).join('')
     : '<li class="muted">Помилок за період немає.</li>';
@@ -860,7 +905,7 @@ function handleCardClick() {
     if (!cards.phrases.queue.length || cards.phrases.revealed) return;
     cards.phrases.revealed = true;
   }
-  renderCards();
+  turnOver($('card'), renderCards);
 }
 
 // A phrase grade from a button, or from «Не знаю» (which grades again). Only the first grade in a session is posted.
@@ -1540,6 +1585,8 @@ function renderPractice() {
   if (isFsrs) renderFsrsPractice();
   else if (mode === 'art') renderArticlePractice();
   else renderCustomPractice();
+  animateNewPracticeQuestion();
+  celebratePracticeSummaries();
 }
 
 // The word's example sentence under the result, right or wrong, once the answer is checked. The practice words carry
@@ -1552,10 +1599,50 @@ function renderPracticeExample(current) {
   $('practice-example-uk').textContent = dutchText ? (known.example_uk || '') : '';
 }
 
-function setPracticeMessage(feedback) {
+// isChecked: the feedback is the result of a checked answer, so the input shows it too (green, or red with a shake).
+// A new feedback rises in, and «✓ …» grows a sprout; a re-render of the same feedback leaves it as it is.
+let shownPracticeFeedback = null;
+function setPracticeMessage(feedback, isChecked = false) {
   const messageElement = $('practice-msg');
+  const isNew = feedback !== shownPracticeFeedback;
+  shownPracticeFeedback = feedback;
+  showInputResult($('practice-input'), isChecked && feedback ? (feedback.ok ? 'right' : 'wrong') : null, isNew);
+  if (!isNew) return;
   messageElement.textContent = feedback ? feedback.text : '';
   messageElement.className = 'msg' + (feedback ? (feedback.ok ? ' ok' : ' bad') : '');
+  if (!feedback) return;
+  if (feedback.ok && feedback.text.startsWith('✓')) messageElement.prepend(makeSprout());
+  replayClass(messageElement, 'msg-enter');
+}
+
+// A new question slides in; the same question re-rendered stays still.
+let shownPracticeQuestion = '';
+function animateNewPracticeQuestion() {
+  const question = $('practice-q');
+  if (question.textContent === shownPracticeQuestion) return;
+  shownPracticeQuestion = question.textContent;
+  if (shownPracticeQuestion) replayClass(question, 'question-enter');
+}
+
+// The finish screens of the practice tab celebrate when they appear: numbers count up, petals for a good result.
+function celebratePracticeSummaries() {
+  const round = ui.fsrs.round ?? {};
+  const answers = Number(round.answer_count) || 0;
+  celebrateWhenShown($('practice-round'), {
+    petalCount: choosePetalCount(answers - (Number(round.mistake_count) || 0), answers),
+    numbers: $('practice-round-stats').querySelectorAll('strong'),
+  });
+  const { again, hard, good } = ui.fsrs.tally;
+  celebrateWhenShown($('practice-summary'), {
+    petalCount: choosePetalCount(good, again + hard + good),
+    numbers: $('practice-summary-list').querySelectorAll('strong'),
+  });
+  const drill = ui.custom;
+  const firstTry = (drill.firstTry?.uk_nl ?? 0) + (drill.firstTry?.nl_uk ?? 0);
+  celebrateWhenShown($('practice-drill-summary'), {
+    petalCount: choosePetalCount(firstTry, (drill.total ?? 0) * 2),
+    numbers: [$('practice-drill-result')],
+  });
 }
 
 function renderArticlePractice() {
@@ -1577,7 +1664,7 @@ function renderArticlePractice() {
   $('practice-q').hidden = false;
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
-  setPracticeMessage(practice.feedback);
+  setPracticeMessage(practice.feedback, !!practice.current?.checked);
   renderPracticeExample(practice.current);
   $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
 }
@@ -1633,7 +1720,7 @@ function renderFsrsPractice() {
   const strugglingButton = $('practice-struggling-button');
   strugglingButton.hidden = session.status !== 'done' || !session.strugglingCount;
   if (session.strugglingCount) strugglingButton.textContent = formatStrugglingDrillButton(session.strugglingCount);
-  setPracticeMessage(session.feedback);
+  setPracticeMessage(session.feedback, isReady && current.checked);
   renderPracticeExample(isReady ? current : null);
   if (session.status === 'done') renderPracticeSummary();
   const isRoundDone = session.status === 'round-done';
@@ -2079,7 +2166,7 @@ function renderCustomPractice() {
   $('practice-q').hidden = false;
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
-  setPracticeMessage(drill.feedback);
+  setPracticeMessage(drill.feedback, isReady && current.checked);
   renderPracticeExample(isReady && !drill.formDeck ? current : null);
   $('practice-drill-summary').hidden = drill.status !== 'done';
   if (drill.status === 'done') renderCustomEnd();
@@ -2422,6 +2509,7 @@ function renderWordOrderExercise() {
   exercise.answer.forEach((pileIndex, position) => {
     const tile = makeWordTile(exercise.pile[pileIndex].text, 'word-tile--answer');
     tile.dataset.position = String(position);
+    tile.dataset.pileIndex = String(pileIndex);
     tile.disabled = isLocked;
     answerBox.append(tile);
   });
@@ -2439,6 +2527,7 @@ function renderWordOrderExercise() {
     } else {
       const button = makeWordTile(tile.text, 'word-tile--pile');
       button.dataset.index = String(tile.index);
+      button.dataset.pileIndex = String(tile.index);
       button.disabled = isLocked;
       pileBox.append(button);
     }
@@ -2544,6 +2633,11 @@ function renderWordOrder() {
     $('word-order-result').textContent = formatWordOrderSummary(results.filter(Boolean).length, results.length);
   }
   $('word-order-more').disabled = wordOrder.loadingMore;
+  $('word-order-more').classList.toggle('is-busy', wordOrder.loadingMore);
+  celebrateWhenShown($('word-order-summary'), {
+    petalCount: choosePetalCount(results.filter(Boolean).length, results.length),
+    numbers: [$('word-order-result')],
+  });
 
   renderWordOrderSentences();
 }
@@ -2561,7 +2655,8 @@ function renderWordOrderSentences() {
   const generate = $('word-order-generate');
   generate.hidden = !canGenerate;
   generate.disabled = !!busy;
-  generate.textContent = busy === 'generate' ? 'Генерую…' : 'Згенерувати ще 20';
+  generate.textContent = busy === 'generate' ? 'Генерую' : 'Згенерувати ще 20';
+  generate.classList.toggle('is-busy', busy === 'generate');
   $('word-order-import-button').disabled = !!busy;
 
   const box = $('word-order-list');
@@ -2648,12 +2743,20 @@ function skipCurrentSentence() {
   showSentenceAt(wordOrder.index);
 }
 
+// The tiles that moved glide from their old place to the new one.
+function renderWordOrderExerciseWithMoves() {
+  const boxes = [$('word-order-answer'), $('word-order-pile')];
+  const rects = snapshotTiles(boxes);
+  renderWordOrderExercise();
+  playTileMoves(rects, boxes);
+}
+
 function handleWordOrderPileClick(event) {
   const button = event.target.closest('button[data-index]');
   if (!button || wordOrder.checked || wordOrder.checking) return;
   const pileIndex = Number(button.dataset.index);
   wordOrder.exercise = placeTile(wordOrder.exercise, pileIndex);
-  renderWordOrderExercise();
+  renderWordOrderExerciseWithMoves();
   focusWordOrderTarget(chooseFocusAfterPlace(wordOrder.exercise, pileIndex));
 }
 
@@ -2662,7 +2765,7 @@ function handleWordOrderAnswerClick(event) {
   if (!button || wordOrder.checked || wordOrder.checking) return;
   const position = Number(button.dataset.position);
   wordOrder.exercise = returnTile(wordOrder.exercise, position);
-  renderWordOrderExercise();
+  renderWordOrderExerciseWithMoves();
   focusWordOrderTarget(chooseFocusAfterReturn(wordOrder.exercise, position));
 }
 
@@ -2694,6 +2797,8 @@ async function handleWordOrderCheck() {
     // Only the first try of a sentence counts in the set's summary; «Ще раз» tries are recorded but not counted again.
     if (!wordOrder.isRetry) wordOrder.results.push(!!result.is_correct);
     renderWordOrderExercise();
+    if (result.is_correct) waveTiles($('word-order-answer'));
+    else replayClass($('word-order-answer'), 'shake');
     $('word-order-next').focus();
   } else {
     renderWordOrder();
@@ -2884,6 +2989,7 @@ function showRuleQuizExercise() {
   quiz.current = { exercise: quiz.exercises[quiz.index], result: null, chosen: null };
   $('rule-quiz-input').value = '';
   renderRuleQuiz();
+  replayClass($('rule-quiz-exercise'), 'rise-in');
   if (quiz.current.exercise.kind === 'gap') $('rule-quiz-input').focus();
 }
 
@@ -2935,6 +3041,33 @@ function renderRuleQuiz() {
   if (quiz.status === 'setup') renderRuleQuizSetup();
   if (quiz.status === 'question') renderRuleQuizExercise();
   if (quiz.status === 'summary') renderRuleQuizSummary();
+  renderRuleQuizLoader(quiz.status === 'loading');
+  const correctCount = quiz.results.filter(result => result.is_correct).length;
+  celebrateWhenShown($('rule-quiz-summary'), {
+    petalCount: choosePetalCount(correctCount, quiz.results.length),
+    numbers: [$('rule-quiz-result')],
+  });
+}
+
+// While the model writes the set: the sprout grows in its pot and the caption changes every 2 seconds.
+let ruleQuizLoaderTimer = 0;
+function renderRuleQuizLoader(isLoading) {
+  if (!isLoading) {
+    clearInterval(ruleQuizLoaderTimer);
+    ruleQuizLoaderTimer = 0;
+    return;
+  }
+  if (ruleQuizLoaderTimer) return;
+  const pot = $('rule-quiz-loading-pot');
+  if (!pot.firstChild) pot.append(makeGrowingPot());
+  let turn = 0;
+  const caption = $('rule-quiz-loading-text');
+  const showCaption = () => {
+    caption.textContent = pickLoadingPhrase(turn);
+    replayClass(caption, 'msg-enter');
+  };
+  showCaption();
+  ruleQuizLoaderTimer = setInterval(() => { turn += 1; showCaption(); }, 2000);
 }
 
 function renderRuleQuizSetup() {
@@ -2992,11 +3125,19 @@ function renderRuleQuizExercise() {
   const message = $('rule-quiz-msg');
   if (result) {
     const others = result.accepted_answers.length ? ` (або: ${result.accepted_answers.join(', ')})` : '';
-    message.textContent = result.is_correct ? `✓ Правильно${others}` : `✗ Правильно: ${result.answer}${others}`;
-    message.className = `msg ${result.is_correct ? 'ok' : 'bad'}`;
+    const text = result.is_correct ? `✓ Правильно${others}` : `✗ Правильно: ${result.answer}${others}`;
+    // The sprout and the rise play once, when the result arrives.
+    if (message.dataset.shown !== text) {
+      message.dataset.shown = text;
+      message.textContent = text;
+      message.className = `msg ${result.is_correct ? 'ok' : 'bad'}`;
+      if (result.is_correct) message.prepend(makeSprout());
+      replayClass(message, 'msg-enter');
+    }
   } else {
     message.textContent = '';
     message.className = 'msg';
+    delete message.dataset.shown;
   }
   $('rule-quiz-translation').hidden = !result?.translation;
   $('rule-quiz-translation').textContent = result?.translation ?? '';

@@ -1588,7 +1588,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .bottom-nav__item[aria-current="page"] { color: var(--garden-ink); }
-.bottom-nav__item[aria-current="page"] .garden-icon { background: var(--garden-sand); }
 
 .bottom-nav__play {
   justify-self: center;
@@ -1958,3 +1957,151 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .rule-quiz__mistakes li { padding: 10px 12px; border-radius: var(--garden-radius-sm); background: var(--garden-raised); }
 .rule-quiz__mistake-sentence { margin: 0 0 4px; font-weight: var(--garden-weight-strong); }
 .rule-quiz__mistake-detail { margin: 0; font-size: 0.9em; }
+
+/* ---------- Motion (docs/MOTION.md) ---------- */
+:root {
+  --motion-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --motion-out: cubic-bezier(.22, 1, .36, 1);
+  --garden-right-soft: #e4ead9;
+}
+
+@keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes motion-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); } 40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); } 80% { transform: translateX(3px); }
+}
+@keyframes motion-pop { to { transform: scale(1); } }
+@keyframes motion-draw { to { stroke-dashoffset: 0; } }
+@keyframes motion-pulse { 50% { transform: scale(1.04); } }
+@keyframes motion-wave { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
+@keyframes motion-hop { 40% { transform: translateY(-5px) scale(1.12); } }
+@keyframes motion-enter {
+  from { opacity: 0; transform: translate(var(--enter-x, 0px), var(--enter-y, 10px)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes motion-glint { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@keyframes motion-shimmer { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+@keyframes motion-dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75%, 100% { content: '...'; } }
+@keyframes motion-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.06, .96) rotate(2deg); } }
+@keyframes motion-grow { 0% { transform: scaleY(.15); } 55%, 100% { transform: scaleY(1); } }
+@keyframes motion-sway {
+  0%, 30% { transform: scale(0) rotate(0); } 60% { transform: scale(1) rotate(-6deg); } 100% { transform: scale(1) rotate(4deg); }
+}
+
+/* Buttons give under the finger. */
+button:not(:disabled):active { transform: scale(.96); }
+button { transition: transform .12s var(--motion-out), background-color .2s, color .2s, box-shadow .2s; }
+
+/* Checked answer: green, or red with a shake. */
+input.input--right { border-color: var(--garden-forest); background-color: var(--garden-right-soft); }
+input.input--wrong { border-color: var(--garden-wrong); background-color: var(--garden-blush); }
+input { transition: border-color .25s, background-color .25s; }
+.shake { animation: motion-shake .42s var(--motion-out); }
+.msg-enter { animation: motion-rise .35s var(--motion-out) both; }
+.question-enter { animation: motion-enter .35s var(--motion-out) both; --enter-x: 18px; --enter-y: 0px; }
+.practice-example:not([hidden]) { animation: motion-rise .4s .2s var(--motion-out) both; }
+
+.sprout { width: 1.5em; height: 1.5em; margin: -0.3em 0.3em -0.3em 0; vertical-align: middle; overflow: visible; }
+.sprout__stem { stroke-dasharray: 22; stroke-dashoffset: 22; animation: motion-draw .45s ease-out forwards; }
+.sprout__leaf { transform-box: fill-box; transform: scale(0); animation: motion-pop .4s var(--motion-spring) forwards; }
+.sprout__leaf--left { transform-origin: right bottom; animation-delay: .3s; }
+.sprout__leaf--right { transform-origin: left bottom; animation-delay: .42s; }
+
+/* Progress bars: a springy width, a passing shine, green when full. */
+.progress-bar__fill { position: relative; transition: width .6s var(--motion-spring), background-color .4s; }
+.progress-bar__fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 252, 247, .7) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: motion-glint 2.4s linear infinite;
+}
+.progress-bar__fill[style*="width: 100%"] { background: var(--garden-forest); }
+
+/* Word order: right bounces, wrong shakes. The flying tiles are scripted (motion.js). */
+.wave { animation: motion-wave .5s var(--motion-spring) both; }
+.is-busy::after { content: ''; display: inline-block; width: 1.2em; text-align: left; animation: motion-dots 1.2s steps(1) infinite; }
+
+/* Rule exercises */
+.rule-quiz__loading { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 0; text-align: center; }
+.rule-quiz__loading[hidden] { display: none; }
+.rule-quiz__loading-pot { width: 72px; height: 72px; }
+.rule-quiz__loading-text { margin: 0; font-weight: var(--garden-weight-strong); color: var(--garden-ink-soft); min-height: 1.5em; }
+.rule-quiz__loading-note { margin: 0 0 12px; font-size: 13px; }
+.growing-pot { width: 100%; height: 100%; }
+.growing-pot__plant { transform-box: fill-box; transform-origin: center bottom; animation: motion-grow 1.8s var(--motion-out) infinite; }
+.growing-pot__leaf { transform-box: fill-box; animation: motion-sway 1.8s ease-in-out infinite; }
+.growing-pot__leaf--left { transform-origin: right bottom; }
+.growing-pot__leaf--right { transform-origin: left bottom; animation-delay: .15s; }
+.skeleton { display: grid; gap: 8px; width: 100%; text-align: left; }
+.skeleton__bone {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--garden-tint) 0%, var(--garden-raised) 45%, var(--garden-tint) 90%);
+  background-size: 220% 100%;
+  animation: motion-shimmer 1.3s linear infinite;
+}
+.skeleton__bone--short { width: 45%; }
+.skeleton__bone--medium { width: 75%; }
+.skeleton__bone--field { height: 44px; border-radius: var(--garden-radius-sm); }
+.rise-in > :not([hidden]) { animation: motion-rise .4s var(--motion-out) both; }
+.rise-in > :nth-child(2) { animation-delay: .05s; }
+.rise-in > :nth-child(3) { animation-delay: .1s; }
+.rise-in > :nth-child(4) { animation-delay: .15s; }
+.rise-in > :nth-child(n+5) { animation-delay: .2s; }
+.rule-quiz__option--right { animation: motion-pulse .5s var(--motion-spring); }
+.rule-quiz__options:has(.rule-quiz__option--right) .rule-quiz__option:not(.rule-quiz__option--right):not(.rule-quiz__option--wrong) {
+  opacity: .45;
+  transition: opacity .3s;
+}
+.rule-quiz__gap--right { display: inline-block; animation: motion-pulse .5s var(--motion-spring); }
+.rule-quiz__gap--wrong { display: inline-block; animation: motion-shake .42s var(--motion-out); }
+
+/* Finish screens: petals fall inside the summary. */
+.practice-summary { position: relative; overflow: hidden; }
+.petal {
+  position: absolute;
+  top: -16px;
+  width: 10px;
+  height: 14px;
+  border-radius: 10px 0 10px 0;
+  pointer-events: none;
+}
+
+/* Bottom menu: the pill under the chosen item, the icon hops, the page slides in. */
+.bottom-nav__pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-sand);
+  opacity: 0;
+  transition: transform .45s var(--motion-spring), opacity .2s;
+  pointer-events: none;
+}
+.bottom-nav__pill--shown { opacity: 1; }
+.bottom-nav__item, .bottom-nav__play { position: relative; z-index: 1; }
+.hop { animation: motion-hop .45s var(--motion-spring); }
+.tab-enter { animation: motion-enter .35s var(--motion-out) both; }
+
+/* Streak: a flickering flame and rolling digits. */
+.streak-value { display: inline-flex; align-items: center; gap: 4px; }
+.flame { width: 1.3em; height: 1.3em; transform-origin: center bottom; animation: motion-flicker 1.6s ease-in-out infinite; }
+.odometer { display: inline-flex; line-height: 1; font-variant-numeric: tabular-nums; }
+.odometer__digit { display: inline-block; height: 1em; overflow: hidden; }
+.odometer__strip { display: flex; flex-direction: column; }
+.odometer__strip span { height: 1em; line-height: 1; }
+.odometer__strip--rolling { transition: transform .8s var(--motion-spring); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: .01ms !important;
+  }
+}
