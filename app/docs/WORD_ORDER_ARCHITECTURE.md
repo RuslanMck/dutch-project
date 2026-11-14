@@ -325,3 +325,10 @@ carry `wrong_forms`: single words that look like a word of the sentence but are 
 - The set: 2 or 3 extra tiles as before. The wrong forms come first (random order); random vocabulary words fill the
   rest when there are fewer. The set never says which tiles are extra.
 - Page: the sentences list shows a muted «хибні форми: gaat, ga» line.
+
+## 11. Result placement and trying again (14.11.2026)
+
+- The result («Правильно: …» and the other orders) shows right under the answer block, above the tiles.
+- After «Перевірити», «Ще раз» puts the same sentence back with all its tiles. The new try is checked and recorded as
+  usual, but only the first try of a sentence counts in the set's summary.
+- The summary has «Повторити ці речення»: the finished set again from its first sentence, with a new summary.

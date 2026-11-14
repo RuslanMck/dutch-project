@@ -901,6 +901,26 @@ details.rule > summary::-webkit-details-marker {
   overflow-wrap: anywhere;
 }
 
+.practice-example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.practice-example[hidden] {
+  display: none;
+}
+
+.practice-example__nl {
+  font-style: italic;
+}
+
+.practice-example__uk:empty {
+  display: none;
+}
+
 .practice-meta {
   display: flex;
   align-items: center;

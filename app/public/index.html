@@ -287,6 +287,8 @@
       <button id="practice-skip-button" class="practice-skip" type="button" hidden>Не знаю</button>
       <button id="practice-override-button" class="practice-skip" type="button" hidden>Я мав рацію</button>
       <p id="practice-msg" class="msg" aria-live="polite"></p>
+      <p id="practice-example" class="practice-example" hidden><span id="practice-example-nl"
+        class="practice-example__nl"></span><span id="practice-example-uk" class="practice-example__uk muted"></span></p>
       <p id="practice-schedule" class="muted practice-schedule"></p>
       <div id="practice-meta" class="practice-meta">
         <p id="practice-progress" class="muted practice-meta__progress"></p>
@@ -432,13 +434,13 @@
         <p id="word-order-uk" class="word-order__uk"></p>
         <p id="word-order-order-count" class="muted word-order__order-count"></p>
         <div id="word-order-answer" class="word-order__answer" aria-label="Відповідь"></div>
-        <div id="word-order-pile" class="word-order__pile"></div>
         <p id="word-order-msg" class="msg" aria-live="polite"></p>
         <p id="word-order-main" class="muted word-order__main" hidden></p>
         <div id="word-order-others" class="muted word-order__others" hidden>
           <p id="word-order-others-title" class="word-order__others-title"></p>
           <ul id="word-order-others-list" class="word-order__others-list"></ul>
         </div>
+        <div id="word-order-pile" class="word-order__pile"></div>
         <div id="word-order-schema" class="word-order__schema" hidden>
           <p id="word-order-rule" class="word-order__rule muted"></p>
           <div id="word-order-schema-row" class="word-order__schema-row"></div>
@@ -447,6 +449,7 @@
         <div class="word-order__actions">
           <button id="word-order-check" class="primary" type="button" disabled>Перевірити</button>
           <button id="word-order-skip" type="button">Пропустити</button>
+          <button id="word-order-retry" type="button" hidden>Ще раз</button>
           <button id="word-order-next" class="primary" type="button" hidden>Далі</button>
         </div>
       </div>
@@ -454,6 +457,7 @@
       <section id="word-order-summary" class="practice-summary" aria-label="Підсумок" hidden>
         <p id="word-order-result" class="practice-summary__text" role="status"></p>
         <button id="word-order-more" class="primary practice-summary__struggling-button" type="button">Ще 10</button>
+        <button id="word-order-repeat" class="practice-summary__extra-button" type="button">Повторити ці речення</button>
       </section>
 
       <section class="stats-card word-order__sentences" aria-labelledby="word-order-sentences-title">

@@ -230,7 +230,7 @@ const ui = {
 // list: every stored sentence, newest first. loaded: the set has been fetched at least once (live changes refetch only then).
 const wordOrder = {
   loaded: false, status: 'idle', canGenerate: false, sentences: [], index: 0, exercise: null,
-  checked: null, results: [], checking: false, busy: '', loadingMore: false, list: [],
+  checked: null, isRetry: false, results: [], checking: false, busy: '', loadingMore: false, list: [],
   rules: [...WORD_ORDER_RULES], ruleCounts: null,
 };
 const WORD_ORDER_RULES_KEY = 'wordOrderRules';
@@ -1542,6 +1542,16 @@ function renderPractice() {
   else renderCustomPractice();
 }
 
+// The word's example sentence under the result, right or wrong, once the answer is checked. The practice words carry
+// no example, so it comes from the word list; a form deck card has none.
+function renderPracticeExample(current) {
+  const known = current?.checked ? state.words.find(stored => stored.id === current.word.id) : null;
+  const dutchText = known?.example_nl || '';
+  $('practice-example').hidden = !dutchText;
+  $('practice-example-nl').textContent = dutchText;
+  $('practice-example-uk').textContent = dutchText ? (known.example_uk || '') : '';
+}
+
 function setPracticeMessage(feedback) {
   const messageElement = $('practice-msg');
   messageElement.textContent = feedback ? feedback.text : '';
@@ -1568,6 +1578,7 @@ function renderArticlePractice() {
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
   setPracticeMessage(practice.feedback);
+  renderPracticeExample(practice.current);
   $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
 }
 
@@ -1623,6 +1634,7 @@ function renderFsrsPractice() {
   strugglingButton.hidden = session.status !== 'done' || !session.strugglingCount;
   if (session.strugglingCount) strugglingButton.textContent = formatStrugglingDrillButton(session.strugglingCount);
   setPracticeMessage(session.feedback);
+  renderPracticeExample(isReady ? current : null);
   if (session.status === 'done') renderPracticeSummary();
   const isRoundDone = session.status === 'round-done';
   $('practice-round').hidden = !isRoundDone;
@@ -2068,6 +2080,7 @@ function renderCustomPractice() {
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
   setPracticeMessage(drill.feedback);
+  renderPracticeExample(isReady && !drill.formDeck ? current : null);
   $('practice-drill-summary').hidden = drill.status !== 'done';
   if (drill.status === 'done') renderCustomEnd();
 }
@@ -2313,6 +2326,7 @@ function applyWordOrderSet(set, { replace, showSet }) {
     index: 0,
     exercise: sentences.length ? createWordOrderState(sentences[0].tiles) : null,
     checked: null,
+    isRetry: false,
     results: [],
     status: !showSet ? 'norules' : sentences.length ? 'ready' : 'empty',
   });
@@ -2456,6 +2470,7 @@ function renderWordOrderExercise() {
   $('word-order-skip').disabled = isLocked;
   $('word-order-skip').hidden = !!checked;
   $('word-order-next').hidden = !checked;
+  $('word-order-retry').hidden = !checked;
   renderWordOrderSchema(checked);
 }
 
@@ -2618,6 +2633,7 @@ function focusAfterSentenceChange() {
 function showSentenceAt(index) {
   wordOrder.index = index;
   wordOrder.checked = null;
+  wordOrder.isRetry = false;
   if (index >= wordOrder.sentences.length) {
     wordOrder.status = 'done';
     wordOrder.exercise = null;
@@ -2675,7 +2691,8 @@ async function handleWordOrderCheck() {
     focusAfterSentenceChange();
   } else if (result && isStillOnScreen) {
     wordOrder.checked = result;
-    wordOrder.results.push(!!result.is_correct);
+    // Only the first try of a sentence counts in the set's summary; «Ще раз» tries are recorded but not counted again.
+    if (!wordOrder.isRetry) wordOrder.results.push(!!result.is_correct);
     renderWordOrderExercise();
     $('word-order-next').focus();
   } else {
@@ -2694,6 +2711,24 @@ function handleWordOrderSkip() {
 function handleWordOrderNext() {
   if (!wordOrder.checked) return;
   showSentenceAt(wordOrder.index + 1);
+  renderWordOrder();
+  focusAfterSentenceChange();
+}
+
+// «Ще раз»: the same sentence again, with the tiles back in the pile.
+function handleWordOrderRetry() {
+  const sentence = currentWordOrderSentence();
+  if (!sentence || !wordOrder.checked) return;
+  Object.assign(wordOrder, { checked: null, isRetry: true, exercise: createWordOrderState(sentence.tiles) });
+  renderWordOrder();
+  focusAfterSentenceChange();
+}
+
+// «Повторити ці речення»: the finished set again from its first sentence, with a new summary.
+function handleWordOrderRepeat() {
+  if (wordOrder.status !== 'done' || !wordOrder.sentences.length) return;
+  Object.assign(wordOrder, { status: 'ready', results: [] });
+  showSentenceAt(0);
   renderWordOrder();
   focusAfterSentenceChange();
 }
@@ -3253,6 +3288,8 @@ function bindEvents() {
   $('word-order-check').addEventListener('click', handleWordOrderCheck);
   $('word-order-skip').addEventListener('click', handleWordOrderSkip);
   $('word-order-next').addEventListener('click', handleWordOrderNext);
+  $('word-order-retry').addEventListener('click', handleWordOrderRetry);
+  $('word-order-repeat').addEventListener('click', handleWordOrderRepeat);
   $('word-order-more').addEventListener('click', handleWordOrderMore);
   $('word-order-generate').addEventListener('click', handleWordOrderGenerate);
   $('rule-quiz-rules-list').addEventListener('change', handleRuleQuizRulesChange);

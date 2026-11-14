@@ -651,3 +651,10 @@ A spelling slip (Levenshtein ≤ 1) is `hard` only with the right article; with 
 Words without an article and expressions whose own text starts with de/het are unchanged. The same-meaning hint still
 ignores the article. Claude's instructions (`mcp-instructions.js`, the grade_word tool, the grade schema,
 `docs/CLAUDE_PROJECT_INSTRUCTIONS.md`) say the same. This replaces «Article optional» in §10.2.
+
+## 12. Example under the result (14.11.2026)
+
+Once an answer is checked, right or wrong, the word's example (Приклад NL, with Приклад UK under it in muted text)
+shows under the result message, in the FSRS practice, the article practice and the custom drills. The practice words
+carry no example, so it is read from the word list (`renderPracticeExample` in app.js). No example, no line; a form
+deck card has none.
