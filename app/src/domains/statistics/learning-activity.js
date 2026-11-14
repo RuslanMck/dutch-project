@@ -269,9 +269,17 @@ export function summarizeWeek({ week, now, timeZone, answers, startedWords, lear
   const today = formatCalendarDateInTimeZone(now, timeZone);
   const currentMondayDate = resolvePeriodRange({ period: 'week', today, timeZone, firstAnswerAt: now }).fromDate;
   const endDate = week === 'previous' ? addDaysToCalendarDate(currentMondayDate, -1) : today;
-  // The activity is read at the start of the end day, so its "today" is the end of the week shown.
+  // The activity is read at the start of the end day, so its "today" is the end of the week shown. Later answers are
+  // left out, so the longest streak is the one known at the end of that week.
+  const weekEnd = findStartOfDay(addDaysToCalendarDate(endDate, 1), timeZone);
   const activity = summarizeLearningActivity({
-    period: 'week', now: findStartOfDay(endDate, timeZone), timeZone, answers, startedWords, learnedWords, wordsById,
+    period: 'week',
+    now: findStartOfDay(endDate, timeZone),
+    timeZone,
+    answers: answers.filter(answer => answer.answered_at < weekEnd),
+    startedWords,
+    learnedWords,
+    wordsById,
   });
   const { totals, chart, hardest_words: hardestWords, streak } = activity;
   const hardestWord = hardestWords[0];

@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { WORD_CATEGORIES } from '../src/contracts/category-contracts.js';
 import { ACHIEVEMENT_CATALOG, ACHIEVEMENT_GROUPS } from '../src/domains/achievements/achievement-catalog.js';
 import { calculateAchievementFacts } from '../src/domains/achievements/achievement-facts.js';
+import { createAchievementService } from '../src/domains/achievements/achievement-service.js';
 import { pluralize } from '../src/domains/ukrainian-plural.js';
 import { createTestContext } from './database-test-helpers.js';
 
@@ -68,6 +69,9 @@ test('the titles and descriptions use the right Ukrainian forms', () => {
   assert.equal(medal('days-365').title, '365 днів практики');
   assert.equal(medal('comeback').description, 'Повернися до практики після перерви в 3 дні');
 });
+
+const TODAY = Date.parse('2026-11-14T10:00:00+01:00');
+const YESTERDAY = Date.parse('2026-11-13T10:00:00+01:00');
 
 // Facts from plain rows: the time zone is Amsterdam (UTC+1 in November).
 function calculateFacts(overrides = {}) {
@@ -135,11 +139,13 @@ test('the comeback counts a gap of three days without answers, and the weekend n
 test('the facts count perfect sets, order and rule runs', () => {
   const facts = calculateFacts({
     deckSessionAnswers: [
-      ...['s1', 's1', 's1', 's1', 's1'].map(sessionId => ({ session_id: sessionId, grade: 'good' })),
+      ...['s1', 's1', 's1', 's1', 's1'].map(sessionId => ({ session_id: sessionId, grade: 'good', answered_at: YESTERDAY })),
       ...['s2', 's2', 's2', 's2', 's2'].map((sessionId, index) => ({
-        session_id: sessionId, grade: index === 2 ? 'hard' : 'good',
+        session_id: sessionId, grade: index === 2 ? 'hard' : 'good', answered_at: YESTERDAY,
       })),
-      { session_id: 's3', grade: 'good' },
+      { session_id: 's3', grade: 'good', answered_at: YESTERDAY },
+      // Today's session may still get a mistake: not counted yet.
+      ...['s4', 's4', 's4', 's4', 's4'].map(sessionId => ({ session_id: sessionId, grade: 'good', answered_at: TODAY })),
     ],
     orderAnswers: [1, 1, 0, 1, 1, 1].map((isCorrect, index) => ({ is_correct: isCorrect, answered_at: index })),
     ruleAnswers: [1, 0, 1, 1].map((isCorrect, index) => ({ is_correct: isCorrect, answered_at: index })),
@@ -176,7 +182,7 @@ test('the service lists every medal, locked at 0 for an empty database, with the
   assert.ok(achievements.every(achievement => achievement.unlocked === false));
   assert.deepEqual(achievements[0].progress, { current: 0, target: 10 });
   assert.deepEqual(Object.keys(achievements[0]).sort(),
-    ['description', 'group', 'icon', 'id', 'progress', 'title', 'unlocked']);
+    ['description', 'group', 'icon', 'id', 'progress', 'title', 'unlocked', 'unlocked_at']);
 });
 
 test('the service counts learned words per category and the drill answers of the database', () => {
@@ -211,4 +217,40 @@ test('the daily goal is the stored setting, 20 without one', () => {
   assert.equal(goalOne().unlocked, false);
   context.database.prepare("INSERT INTO practice_settings (name, value) VALUES ('daily_goal', '5')").run();
   assert.equal(goalOne().unlocked, true);
+});
+
+test('the facts count early answers from 5:00 to 8:00 only, not after midnight', () => {
+  const facts = calculateFacts({
+    activityAnswers: [
+      { kind: 'word', answered_at: Date.parse('2026-11-13T01:30:00+01:00') },
+      { kind: 'word', answered_at: Date.parse('2026-11-13T06:30:00+01:00') },
+    ],
+  });
+  assert.equal(facts.early_answers, 1);
+});
+
+test('a medal once unlocked is saved with its time and stays unlocked when the facts drop', () => {
+  const saved = new Map();
+  let learnedStatus = 'learned';
+  const repository = {
+    readFactSources: () => ({
+      words: Array.from({ length: 10 }, () => ({ status: learnedStatus, category: null })),
+      activityAnswers: [], deckAnswers: [], deckSessionAnswers: [], orderAnswers: [], ruleAnswers: [], dailyGoal: 20,
+    }),
+    listUnlocks: () => new Map(saved),
+    saveUnlocks: (ids, at) => { for (const id of ids) if (!saved.has(id)) saved.set(id, at); },
+  };
+  let now = Date.parse('2026-11-14T12:00:00+01:00');
+  const service = createAchievementService({
+    achievementRepository: repository,
+    practiceSettings: { readSettings: () => ({ timeZone: TIME_ZONE }) },
+    clock: { now: () => now },
+  });
+  const first = service.listAchievements().achievements.find(medal => medal.id === 'words-10');
+  assert.deepEqual([first.unlocked, first.unlocked_at], [true, now]);
+  const unlockedAt = now;
+  learnedStatus = 'learning';
+  now += 3_600_000;
+  const later = service.listAchievements().achievements.find(medal => medal.id === 'words-10');
+  assert.deepEqual([later.unlocked, later.unlocked_at, later.progress], [true, unlockedAt, { current: 10, target: 10 }]);
 });

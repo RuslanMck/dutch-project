@@ -1535,13 +1535,16 @@ function accuracySuffix(accuracy) {
 
 // The story slides of the week recap (§4.2). A slide whose data is null or 0 is left out. An empty week has one slide.
 // countUp: the big value starts with a number that counts up when the slide shows.
-export function buildWeekSlides(week) {
+export function buildWeekSlides(week, period = 'current') {
+  const isPrevious = period === 'previous';
   if (!week || !week.answers) {
-    return [{ id: 'empty', title: '', big: 'Цього тижня ще немає відповідей', text: "Почни практику, і тут з'явиться підсумок", countUp: false }];
+    return [isPrevious
+      ? { id: 'empty', title: '', big: 'Минулого тижня не було відповідей', text: 'Подивись цей тиждень', countUp: false }
+      : { id: 'empty', title: '', big: 'Цього тижня ще немає відповідей', text: "Почни практику, і тут з'явиться підсумок", countUp: false }];
   }
   const slides = [{
     id: 'answers',
-    title: 'Цього тижня',
+    title: isPrevious ? 'Минулого тижня' : 'Цього тижня',
     big: String(week.answers),
     text: `${pluralize(week.answers, ANSWER_WORDS)}${accuracySuffix(week.accuracy)}`,
     countUp: true,
@@ -1653,8 +1656,14 @@ export function summarizeAchievements(achievements = []) {
 
 // The latest unlocked medals for the Profile row. The list has no unlock times, so the later ones of the catalog
 // come first (the server lists each group from its first to its last target).
+// The latest unlocked medals, newest first by unlocked_at (catalog order breaks ties and covers a missing time).
 export function pickRecentAchievements(achievements = [], limit = ACHIEVEMENT_RECENT_COUNT) {
-  return achievements.filter(achievement => achievement.unlocked).reverse().slice(0, limit);
+  return achievements
+    .map((achievement, index) => ({ achievement, index }))
+    .filter(({ achievement }) => achievement.unlocked)
+    .sort((left, right) => (right.achievement.unlocked_at ?? 0) - (left.achievement.unlocked_at ?? 0) || right.index - left.index)
+    .slice(0, limit)
+    .map(({ achievement }) => achievement);
 }
 
 // The achievements of each group, in the server's group order; groups without achievements are left out.

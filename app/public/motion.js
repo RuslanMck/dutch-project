@@ -122,19 +122,30 @@ export function waveTiles(container) {
   });
 }
 
-// Counts the first number of each element up from 0 (the rest of its text stays).
+// Counts the first number of each element up from 0 (the rest of its text stays). A new count-up or stopCountUp on
+// an element ends the one running on it, so it never writes old text over new.
+const countUpRuns = new WeakMap();
+export function stopCountUp(elements) {
+  for (const element of elements) countUpRuns.delete(element);
+}
+
 export function countUpNumbers(elements, duration = 900) {
+  stopCountUp(elements);
   if (isMotionReduced()) return;
   const targets = [...elements].map(element => {
     const match = element.textContent.match(/\d+/);
     return match ? { element, text: element.textContent, match } : null;
   }).filter(Boolean);
   if (!targets.length) return;
+  const run = {};
+  for (const { element } of targets) countUpRuns.set(element, run);
   const start = performance.now();
   const tick = now => {
     const progress = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - progress, 3);
-    for (const { element, text, match } of targets) {
+    const liveTargets = targets.filter(({ element }) => countUpRuns.get(element) === run);
+    if (!liveTargets.length) return;
+    for (const { element, text, match } of liveTargets) {
       const value = Math.round(Number(match[0]) * eased);
       element.textContent = text.slice(0, match.index) + value + text.slice(match.index + match[0].length);
     }

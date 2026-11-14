@@ -212,3 +212,14 @@ tested.
 S1 and S2 are server parts; C1–C3 page parts coded against the shapes above. Each part works in its own git worktree
 and branch and touches only what its part needs; shared files (`index.html`, `app.js`, `logic.js`, `api.js`,
 `garden.css`, `create-domain-services.js`, `create-api-router.js`) get small, local additions so the branches merge.
+
+## 7. After the review (14.11.2026)
+- Unlocks are saved in `achievement_unlocks` (migration 017): a medal reached once stays unlocked (a lapsed word, a
+  set that turns imperfect) and carries `unlocked_at`; the Профіль row shows the newest by it.
+- A perfect set counts only sessions with no answer today (a day's session may still get a mistake).
+- «Ранній птах» is 5:00–8:00, not after midnight.
+- The categorizer never overwrites a category set by hand, and on-demand and background runs take turns.
+- The previous week's streak counts only answers up to its Sunday; its slides say «Минулого тижня».
+- The goal card refuses an offline stored copy and hides. Goal petals drop once a day (the stored date is the guard).
+- The calendar asks for exactly 12 columns (11 weeks and this week up to today).
+- A new count-up or text on the same element stops the running one (`stopCountUp`).

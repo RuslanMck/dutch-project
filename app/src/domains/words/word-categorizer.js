@@ -44,50 +44,56 @@ const SYSTEM_PROMPT = [
   '{"categories": {"<word id>": "<category id>"}}',
 ].join('\n');
 
-export function createWordCategorizer({ wordRepository, openRouterClient, model, changeEventBus, logger = console }) {
-  let runningRun = null;
-  let isRunRequested = false;
+export function createWordCategorizer({
+  wordRepository, openRouterClient, model, changeEventBus, clock = { now: () => Date.now() }, logger = console,
+}) {
+  // One run at a time, on demand or in the background: each waits for the one before, so no word is paid for twice.
+  let runQueue = Promise.resolve();
+  let isBackgroundRunQueued = false;
 
-  // Sorts up to limit uncategorized words, batch by batch. Returns { categorized, remaining }. Throws when OpenRouter
-  // has no key or a request fails.
-  async function categorizeUncategorizedWords({ limit = DEFAULT_LIMIT } = {}) {
-    if (!openRouterClient.isConfigured) throw new ValidationError(NOT_CONFIGURED_MESSAGE);
+  function runInTurn(task) {
+    const run = runQueue.then(task);
+    runQueue = run.catch(() => {});
+    return run;
+  }
+
+  // Sorts up to limit uncategorized words, batch by batch, after any run in progress. Returns { categorized,
+  // remaining }. Throws when OpenRouter has no key or a request fails.
+  function categorizeUncategorizedWords({ limit = DEFAULT_LIMIT } = {}) {
+    if (!openRouterClient.isConfigured) return Promise.reject(new ValidationError(NOT_CONFIGURED_MESSAGE));
+    return runInTurn(() => categorizeNow(limit));
+  }
+
+  async function categorizeNow(limit) {
     const words = wordRepository.listUncategorizedWords(limit);
     let categorized = 0;
     for (const batch of splitIntoBatches(words, WORDS_PER_REQUEST)) {
       const responseText = await openRouterClient.completeChat(buildMessages(batch), { model });
       const categoryByWordId = parseWordCategories(responseText, batch);
       for (const [wordId, category] of categoryByWordId) {
-        wordRepository.updateWord(wordId, { category });
-        categorized += 1;
+        if (wordRepository.setCategoryIfUnset(wordId, category, clock.now())) categorized += 1;
       }
       if (categoryByWordId.size) changeEventBus.publishChange('words');
     }
     return { categorized, remaining: wordRepository.countUncategorizedWords() };
   }
 
-  // Starts a background run unless there is no key. A run asked for while one is going runs once more after it. Returns
-  // the promise of the run (it never rejects: errors are logged), or null when nothing starts.
+  // Queues a background run unless there is no key or one is already waiting (it will see the new words too). Returns
+  // the promise of the run (it never rejects: errors are logged), or null when nothing is queued.
+  let queuedBackgroundRun = null;
   function categorizeInBackground() {
     if (!openRouterClient.isConfigured) return null;
-    if (runningRun) {
-      isRunRequested = true;
-      return runningRun;
-    }
-    runningRun = runUntilNoRequest().finally(() => { runningRun = null; });
-    return runningRun;
-  }
-
-  async function runUntilNoRequest() {
-    do {
-      isRunRequested = false;
+    if (isBackgroundRunQueued) return queuedBackgroundRun;
+    isBackgroundRunQueued = true;
+    queuedBackgroundRun = runInTurn(async () => {
+      isBackgroundRunQueued = false;
       try {
-        await categorizeUncategorizedWords();
+        await categorizeNow(DEFAULT_LIMIT);
       } catch (error) {
         logger.error('word categories: background run failed:', error.message);
-        return;
       }
-    } while (isRunRequested);
+    });
+    return queuedBackgroundRun;
   }
 
   return Object.freeze({ categorizeUncategorizedWords, categorizeInBackground });

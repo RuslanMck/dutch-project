@@ -7,7 +7,7 @@ const DEFAULT_DAILY_GOAL = 20;
 export function createAchievementRepository({ database, statisticsRepository }) {
   const selectWordStatusesStatement = database.prepare('SELECT status, category FROM words');
   const selectDeckSessionAnswersStatement = database.prepare(`
-    SELECT session_id, grade
+    SELECT session_id, grade, answered_at
     FROM deck_answers
     WHERE superseded_at IS NULL
   `);
@@ -24,6 +24,14 @@ export function createAchievementRepository({ database, statisticsRepository }) 
   const selectDailyGoalSettingStatement = database.prepare(
     "SELECT value FROM practice_settings WHERE name = 'daily_goal'",
   ).pluck();
+
+  const selectUnlocksStatement = database.prepare('SELECT achievement_id, unlocked_at FROM achievement_unlocks');
+  const insertUnlockStatement = database.prepare(`
+    INSERT OR IGNORE INTO achievement_unlocks (achievement_id, unlocked_at) VALUES (@achievementId, @unlockedAt)
+  `);
+  const insertUnlocksTransaction = database.transaction((achievementIds, unlockedAt) => {
+    for (const achievementId of achievementIds) insertUnlockStatement.run({ achievementId, unlockedAt });
+  });
 
   // The activity answers as the statistics list them: word (deck and review logs), phrase and drill answers.
   function readFactSources() {
@@ -49,5 +57,14 @@ export function createAchievementRepository({ database, statisticsRepository }) 
     return storedValue === undefined ? DEFAULT_DAILY_GOAL : JSON.parse(storedValue);
   }
 
-  return Object.freeze({ readFactSources });
+  // Map from achievement id to the instant it was first seen unlocked.
+  function listUnlocks() {
+    return new Map(selectUnlocksStatement.all().map(row => [row.achievement_id, row.unlocked_at]));
+  }
+
+  function saveUnlocks(achievementIds, unlockedAt) {
+    if (achievementIds.length) insertUnlocksTransaction(achievementIds, unlockedAt);
+  }
+
+  return Object.freeze({ readFactSources, listUnlocks, saveUnlocks });
 }

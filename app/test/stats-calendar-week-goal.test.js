@@ -102,8 +102,9 @@ test('week recap, previous week: Monday to Sunday before this one, streak at its
     learned_count: 0,
     best_day: { date: '2026-11-04', answers: 4, accuracy: 50 },
     hardest_word: { nl: 'hond', article: '', uk: 'пес', mistakes: 2 },
-    // 08.11 has no answers, so the streak at the end of that week is the one ending on 07.11.
-    streak: { current: 1, longest: 3 },
+    // 08.11 has no answers, so the streak at the end of that week is the one ending on 07.11; the longer streak of
+    // this week comes later and does not count.
+    streak: { current: 1, longest: 1 },
   });
 });
 

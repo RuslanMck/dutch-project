@@ -129,3 +129,10 @@ test('buildCalendarGrid: a Sunday ends a column and a new week starts on Monday'
   assert.equal(weeks[1][2], null);
   assert.deepEqual(buildCalendarGrid([]), { weeks: [] });
 });
+
+test('buildWeekSlides: the previous week says «Минулого тижня»', () => {
+  const slides = buildWeekSlides({ answers: 5, accuracy: 80, started_count: 0, learned_count: 0, best_day: null,
+    hardest_word: null, streak: { current: 0, longest: 0 }, active_seconds: 0, days_practised: 1 }, 'previous');
+  assert.equal(slides[0].title, 'Минулого тижня');
+  assert.equal(buildWeekSlides({ answers: 0 }, 'previous')[0].big, 'Минулого тижня не було відповідей');
+});

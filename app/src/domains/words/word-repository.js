@@ -58,6 +58,9 @@ export function createWordRepository({ database }) {
   const selectUncategorizedWordsStatement = database.prepare(
     'SELECT id, nl, uk FROM words WHERE category IS NULL ORDER BY id LIMIT @limit',
   );
+  const setCategoryIfUnsetStatement = database.prepare(
+    'UPDATE words SET category = @category, updated_at = @updatedAt WHERE id = @wordId AND category IS NULL',
+  );
   const countUncategorizedWordsStatement = database.prepare(
     'SELECT COUNT(*) FROM words WHERE category IS NULL',
   ).pluck();
@@ -113,6 +116,12 @@ export function createWordRepository({ database }) {
     return countUncategorizedWordsStatement.get();
   }
 
+  // The categorizer's write: only a word still without a category, so a category set by hand meanwhile stays.
+  // Returns true when the word was changed.
+  function setCategoryIfUnset(wordId, category, updatedAt) {
+    return setCategoryIfUnsetStatement.run({ wordId, category, updatedAt }).changes > 0;
+  }
+
   // Returns the new word's id.
   function createWord(word) {
     const insertResult = insertWordStatement.run({
@@ -156,6 +165,7 @@ export function createWordRepository({ database }) {
     listWordTextsAndArticles,
     listUncategorizedWords,
     countUncategorizedWords,
+    setCategoryIfUnset,
     createWord,
     updateWord,
     deleteWord,

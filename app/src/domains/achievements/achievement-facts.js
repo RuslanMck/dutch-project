@@ -5,13 +5,15 @@ import { calculateStreak, findLearnedMoments } from '../statistics/learning-acti
 
 const MILLISECONDS_PER_DAY = 86_400_000;
 const PERFECT_SET_MINIMUM_ANSWERS = 5;
+const EARLY_HOUR_FROM = 5;
 const EARLY_HOUR_BEFORE = 8;
 const NIGHT_HOUR_FROM = 23;
 const COMEBACK_GAP_DAYS = 3;
 const SATURDAY = 6;
 
 // words: [{ status, category }]; activityAnswers: [{ kind: 'word' | 'phrase' | 'drill', answered_at }];
-// deckAnswers: the counting deck answers (findLearnedMoments input); deckSessionAnswers: [{ session_id, grade }];
+// deckAnswers: the counting deck answers (findLearnedMoments input); deckSessionAnswers: [{ session_id, grade,
+// answered_at }];
 // orderAnswers and ruleAnswers: [{ is_correct, answered_at }] in order.
 export function calculateAchievementFacts({
   now, timeZone, dailyGoal, words, activityAnswers, deckAnswers, deckSessionAnswers, orderAnswers, ruleAnswers,
@@ -20,6 +22,7 @@ export function calculateAchievementFacts({
   const practisedDates = [...answerCountByDate.keys()].sort();
   const streak = calculateStreak(activityAnswers, formatCalendarDateInTimeZone(now, timeZone), timeZone);
   const learnedMoments = findLearnedMoments(deckAnswers);
+  const today = formatCalendarDateInTimeZone(now, timeZone);
 
   return {
     learned_words: words.filter(word => word.status === 'learned').length,
@@ -27,14 +30,14 @@ export function calculateAchievementFacts({
     answers: activityAnswers.length,
     days_practised: practisedDates.length,
     longest_streak: streak.longest,
-    perfect_sets: countPerfectSets(deckSessionAnswers),
+    perfect_sets: countPerfectSets(deckSessionAnswers, today, timeZone),
     most_words_learned_in_day: maximumCount(countByCalendarDate(learnedMoments.map(moment => moment.at), timeZone)),
     order_correct: countCorrect(orderAnswers),
     order_run: longestCorrectRun(orderAnswers),
     rules_correct: countCorrect(ruleAnswers),
     rules_run: longestCorrectRun(ruleAnswers),
     drill_answers: activityAnswers.filter(answer => answer.kind === 'drill').length,
-    early_answers: countAnswersAtHour(activityAnswers, timeZone, hour => hour < EARLY_HOUR_BEFORE),
+    early_answers: countAnswersAtHour(activityAnswers, timeZone, hour => hour >= EARLY_HOUR_FROM && hour < EARLY_HOUR_BEFORE),
     night_answers: countAnswersAtHour(activityAnswers, timeZone, hour => hour >= NIGHT_HOUR_FROM),
     weekends: countWeekendsWithSaturdayAndSunday(practisedDates),
     comebacks: countComebacks(practisedDates),
@@ -68,15 +71,19 @@ function countLearnedWordsByCategory(words) {
   return countByCategory;
 }
 
-// A perfect set: a deck session with at least five counting answers, every one of them good.
-function countPerfectSets(deckSessionAnswers) {
+// A perfect set: a deck session with at least five counting answers, every one of them good. A session runs for a
+// day, so only sessions with no answer today count: today's may still get a mistake.
+function countPerfectSets(deckSessionAnswers, today, timeZone) {
   const gradesBySession = new Map();
-  for (const { session_id: sessionId, grade } of deckSessionAnswers) {
+  const unfinishedSessions = new Set();
+  for (const { session_id: sessionId, grade, answered_at: answeredAt } of deckSessionAnswers) {
     if (!gradesBySession.has(sessionId)) gradesBySession.set(sessionId, []);
     gradesBySession.get(sessionId).push(grade);
+    if (formatCalendarDateInTimeZone(answeredAt, timeZone) >= today) unfinishedSessions.add(sessionId);
   }
-  return [...gradesBySession.values()]
-    .filter(grades => grades.length >= PERFECT_SET_MINIMUM_ANSWERS && grades.every(grade => grade === 'good'))
+  return [...gradesBySession.entries()]
+    .filter(([sessionId, grades]) => !unfinishedSessions.has(sessionId)
+      && grades.length >= PERFECT_SET_MINIMUM_ANSWERS && grades.every(grade => grade === 'good'))
     .length;
 }
 

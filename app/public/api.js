@@ -138,7 +138,8 @@ export const getRoundSummary = () => request('GET', '/api/practice/round-summary
 export const getStats = () => request('GET', '/api/stats');
 export const getActivity = period => request('GET', `/api/stats/activity?period=${enc(period)}`);
 // Головна and Профіль: the daily goal ({ goal, today: { date, answers } }).
-export const getGoal = () => request('GET', '/api/goal');
+// Offline a stored copy would show an old day as today, so it is refused and the card hides.
+export const getGoal = () => request('GET', '/api/goal', undefined, { rejectOfflineCache: true });
 export const saveGoal = goal => request('PUT', '/api/goal', { goal });
 // Тиждень у підсумку: week = 'current' | 'previous'.
 export const getWeek = week => request('GET', `/api/stats/week?week=${enc(week)}`);

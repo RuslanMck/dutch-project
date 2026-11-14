@@ -66,6 +66,7 @@ export function createDomainServices({
     openRouterClient,
     model: configuration.wordCategoryModel,
     changeEventBus,
+    clock,
     logger,
   });
   const practiceRepository = createPracticeRepository({ database });

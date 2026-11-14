@@ -4,7 +4,8 @@ import * as api from './api.js';
 import { offlineStore, flushOutbox, getStore as getOfflineStore } from './offline-store.js';
 import {
   replayClass, makeSprout, makeGrowingPot, makeFlame, showInputResult, snapshotTiles, playTileMoves, waveTiles,
-  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill, isMotionReduced, countUpNumbers,
+  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill, isMotionReduced, countUpNumbers, stopCountUp,
+  dropPetals,
 } from './motion.js';
 import { drawAchievementIcon } from './achievement-icons.js';
 import {
@@ -489,7 +490,8 @@ function celebrateGoalOnce() {
   try { celebrated = localStorage.getItem('goalCelebrated'); } catch { /* storage unavailable */ }
   if (celebrated === goal.today.date) return;
   try { localStorage.setItem('goalCelebrated', goal.today.date); } catch { /* storage unavailable */ }
-  celebrateWhenShown($('home-goal'), { petalCount: 24 });
+  // The stored date already keeps it to once a day, so the petals drop directly.
+  dropPetals($('home-goal'), 24);
 }
 
 function renderProfileGoal() {
@@ -556,7 +558,7 @@ async function loadWeek() {
   try {
     const week = await api.getWeek(period);
     if (ui.week.period !== period) return;
-    Object.assign(ui.week, { status: 'ready', slides: buildWeekSlides(week) });
+    Object.assign(ui.week, { status: 'ready', slides: buildWeekSlides(week, ui.week.period) });
   } catch {
     if (ui.week.period !== period) return;
     ui.week.status = 'failed';
@@ -592,6 +594,8 @@ function renderWeekSlide() {
     return segment;
   }));
   $('week-slide').style.setProperty('--week-tint', `var(${WEEK_TINTS[index % WEEK_TINTS.length]})`);
+  // A count-up of the slide before must not write its number over this one.
+  stopCountUp([$('week-slide-big')]);
   $('week-slide-title').textContent = slide.title;
   $('week-slide-big').textContent = slide.big;
   $('week-slide-text').textContent = slide.text;
@@ -651,7 +655,9 @@ async function loadStats() {
 // The last 12 weeks, one cell a day. Loaded when Статистика opens; a failed load hides the card.
 async function loadCalendar() {
   try {
-    const { days } = await api.getCalendar(84);
+    // 12 columns exactly: 11 full weeks and this week up to today.
+    const daysThisWeek = (new Date().getDay() + 6) % 7 + 1;
+    const { days } = await api.getCalendar(77 + daysThisWeek);
     ui.calendar.view = buildCalendarGrid(days);
   } catch {
     ui.calendar.view = null;
@@ -675,7 +681,7 @@ function renderCalendar() {
       aria-label="${esc(cell.label)}" aria-pressed="${String(cell.date === selected)}"></button>`;
   }).join('')).join('');
   const chosen = view.weeks.flat().find(cell => cell?.date === selected);
-  $('stats-calendar-detail').textContent = chosen ? chosen.label : 'Торкніться дня, щоб побачити деталі.';
+  $('stats-calendar-detail').textContent = chosen ? chosen.label : 'Торкнися дня, щоб побачити деталі.';
 }
 
 // A tap on a day shows its numbers under the grid; the grid itself is not rebuilt (its wave may still be running).
@@ -2187,6 +2193,7 @@ function renderSummaryItems(list, items) {
   items.forEach(([, value], index) => {
     const strong = rows[index].querySelector('strong');
     if (strong.dataset.value === String(value)) return;
+    stopCountUp([strong]);
     strong.dataset.value = String(value);
     strong.textContent = String(value);
   });
