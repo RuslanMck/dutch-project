@@ -148,8 +148,8 @@ over a basket it is answered. A right answer: the chip flies into the basket and
 pulses, its counter goes up («3 слова»), the next word pops in. A wrong answer: the basket shakes red, the chip flies
 back, the message shows «✗ Правильно: het huis» and the right basket glows; «Далі» (the existing button) continues.
 Released outside a basket: the chip springs back. Keyboard: the chip is focusable; arrow left = de, arrow right = het,
-and the baskets are also buttons (so it stays usable without dragging). Hint under the baskets:
-«Перетягни слово в кошик». Score line unchanged («Вірно: …» → change it to «Правильно: x з y»).
+and a tap on a basket answers too, with the same animation as a drop: the learner has two equal ways. Hint under the
+baskets: «Натисни на кошик або перетягни в нього слово». Score line unchanged («Вірно: …» → change it to «Правильно: x з y»).
 
 Tests: `test/letter-diff.test.js` (alignment cases: huiz/huis, fiest/fiets, morgan/morgen, nagerect/nagerecht,
 too far → null), the article hit test as a pure function `findBasketAt(point, rects)`.
