@@ -124,10 +124,15 @@ import {
   findNewUnlocks,
   markUnlockedSeen,
   formatAchievementToast,
+  formatKnownCheckChip,
+  toggleKnownCheckChoice,
+  buildKnownCheckPayload,
+  buildKnownCheckResult,
+  parseChapterInput,
 } from './logic.js';
 
 const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
-  'stats', 'week', 'achievements'];
+  'stats', 'week', 'achievements', 'known-check'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -178,6 +183,10 @@ const ui = {
   // Statistics page: the chosen period, its activity and the vocabulary counts, and the bar tapped in the chart.
   stats: { period: 'week', status: 'idle', activity: null, overview: null, selectedBarKey: null },
   goal: null,                        // the daily goal { goal, today: { date, answers } }; null when unknown (offline)
+  // Що я вже знаю: status idle | loading | ready | saving | failed; words: the batch; known: ids marked «знаю»;
+  // result: the text after «Готово» (null before it).
+  knownCheck: { status: 'idle', words: [], known: [], result: null, message: '' },
+  chapter: null,                     // Поточна глава (Профіль); null when unknown
   // Тиждень у підсумку: period current | previous; status idle | loading | ready | failed; slides and the one shown.
   week: { period: 'current', status: 'idle', slides: [], index: 0 },
   // Календар занять: view = buildCalendarGrid of the last load (null when it failed); selected = the day tapped.
@@ -379,6 +388,7 @@ const RENDER = {
   'rule-quiz': renderRuleQuiz,
   texts: renderTexts,
   stats: renderStats,
+  'known-check': renderKnownCheck,
   week: () => {},                    // drawn by renderWeek when the tab is shown, not on every render
 };
 
@@ -422,7 +432,8 @@ function showTab(name) {
     ensureFsrsSession();
   }
   if (ui.tab === 'home') { loadHomeStrugglingCount(); loadGoal(); }
-  if (ui.tab === 'profile') loadGoal();
+  if (ui.tab === 'profile') { loadGoal(); loadChapter(); }
+  if (ui.tab === 'known-check') loadKnownCheck();
   if (ui.tab === 'cards') ensureCardsBatch();
   if (ui.tab === 'stats') { loadStats(); loadCalendar(); }
   if (ui.tab === 'week') loadWeek();
@@ -538,6 +549,144 @@ async function handleGoalSave(event) {
     message.textContent = 'Збережено';
     renderHomeGoal();
     renderProfileGoal();
+  } catch (error) {
+    message.textContent = error.message || 'Не вдалося зберегти';
+  }
+}
+
+// ---------- Що я вже знаю (plan §4) ----------
+
+const KNOWN_CHECK_BATCH = 20;
+
+// A new batch of the new words; the tab opens with it and «Далі» loads the next one.
+async function loadKnownCheck() {
+  const check = ui.knownCheck;
+  if (check.status === 'loading' || check.status === 'saving') return;
+  Object.assign(check, { status: 'loading', words: [], known: [], result: null, message: 'Завантаження…' });
+  renderKnownCheck();
+  try {
+    const listing = await api.getKnownCheck(KNOWN_CHECK_BATCH);
+    check.words = listing.words;
+    // No new words left: the batch is empty and the result shows the end line.
+    check.result = listing.words.length ? null : { line: '', nextLabel: '', endLine: 'Нових слів більше немає' };
+    check.status = 'ready';
+    check.message = '';
+  } catch (error) {
+    check.words = [];
+    check.status = 'failed';
+    check.message = error.message || 'Не вдалося завантажити слова';
+  }
+  renderKnownCheck();
+}
+
+function buildKnownCheckChip(word, index) {
+  const chip = el('button', formatKnownCheckChip(word), 'known-check__chip');
+  chip.type = 'button';
+  chip.dataset.index = String(index);
+  return chip;
+}
+
+// The chips' «знаю» state (aria-pressed; the CSS draws the check).
+function syncKnownCheckChips() {
+  const check = ui.knownCheck;
+  for (const chip of $('known-check-chips').children) {
+    const wordId = check.words[Number(chip.dataset.index)].id;
+    chip.setAttribute('aria-pressed', String(check.known.includes(wordId)));
+  }
+}
+
+function renderKnownCheck() {
+  const check = ui.knownCheck;
+  const result = check.result;
+  const busy = check.status === 'loading' || check.status === 'saving';
+  $('known-check-message').textContent = check.message;
+  $('known-check-chips').replaceChildren(...(result ? [] : check.words.map(buildKnownCheckChip)));
+  $('known-check-actions').hidden = Boolean(result) || !check.words.length;
+  $('known-check-done').disabled = busy;
+  $('known-check-all').disabled = busy;
+  $('known-check-result').hidden = !result;
+  if (result) {
+    $('known-check-result-line').hidden = !result.line;
+    $('known-check-result-line').textContent = result.line;
+    $('known-check-next').hidden = !result.nextLabel;
+    $('known-check-next').textContent = result.nextLabel;
+    $('known-check-next').disabled = busy;
+    $('known-check-end').hidden = !result.endLine;
+    $('known-check-end').textContent = result.endLine;
+  }
+  syncKnownCheckChips();
+}
+
+function handleKnownCheckChipClick(event) {
+  const chip = event.target.closest('button[data-index]');
+  const check = ui.knownCheck;
+  if (!chip || check.status !== 'ready' || check.result) return;
+  check.known = toggleKnownCheckChoice(check.known, check.words[Number(chip.dataset.index)].id);
+  syncKnownCheckChips();
+}
+
+function handleKnownCheckAll() {
+  const check = ui.knownCheck;
+  if (check.status !== 'ready' || check.result) return;
+  check.known = check.words.map(word => word.id);
+  syncKnownCheckChips();
+}
+
+// «Готово»: the chosen words become known, the rest of the batch stay new.
+async function handleKnownCheckDone() {
+  const check = ui.knownCheck;
+  if (check.status !== 'ready' || check.result || !check.words.length) return;
+  const payload = buildKnownCheckPayload(check.words.map(word => word.id), check.known);
+  check.status = 'saving';
+  check.message = '';
+  renderKnownCheck();
+  try {
+    const answer = await api.postKnownCheck(payload.known_ids, payload.unknown_ids);
+    check.result = buildKnownCheckResult({ known: answer.known, remaining: answer.remaining });
+  } catch (error) {
+    check.message = error.message || 'Не вдалося зберегти';
+  }
+  check.status = 'ready';
+  renderKnownCheck();
+}
+
+// Practice in the de/het mode: Головна «Артикль» and the Колоди card.
+function openArticlePractice() {
+  ui.practice.mode = 'art';
+  $('practice-input').value = '';
+  pickArticleQuestion();
+  showTab('practice');
+}
+
+// ---------- Профіль: поточна глава (plan §4) ----------
+
+async function loadChapter() {
+  try {
+    ui.chapter = (await api.getChapter()).chapter;
+  } catch {
+    ui.chapter = null;
+  }
+  renderProfileChapter();
+}
+
+function renderProfileChapter() {
+  $('profile-chapter').hidden = ui.chapter == null;
+  const input = $('chapter-input');
+  if (ui.chapter != null && document.activeElement !== input) input.value = String(ui.chapter);
+}
+
+async function handleChapterSave(event) {
+  event.preventDefault();
+  const message = $('chapter-message');
+  const chapter = parseChapterInput($('chapter-input').value);
+  if (chapter === null) {
+    message.textContent = 'Глава має бути від 1 до 99.';
+    return;
+  }
+  try {
+    ui.chapter = (await api.saveChapter(chapter)).chapter;
+    message.textContent = 'Збережено';
+    renderProfileChapter();
   } catch (error) {
     message.textContent = error.message || 'Не вдалося зберегти';
   }
@@ -3843,6 +3992,11 @@ function bindEvents() {
   $('home-search-form').addEventListener('submit', handleHomeSearch);
   $('home-continue-button').addEventListener('click', () => showTab('practice'));
   $('home-tile-struggling-button').addEventListener('click', handleHomeStrugglingTile);
+  $('home-tile-article').addEventListener('click', openArticlePractice);
+  $('known-check-chips').addEventListener('click', handleKnownCheckChipClick);
+  $('known-check-all').addEventListener('click', handleKnownCheckAll);
+  $('known-check-done').addEventListener('click', handleKnownCheckDone);
+  $('known-check-next').addEventListener('click', loadKnownCheck);
   // A tap on the dimmed area around the word sheet closes it.
   $('word-sheet-edit-button').addEventListener('click', startWordEdit);
   $('word-sheet-edit-cancel').addEventListener('click', () => {
@@ -3864,6 +4018,7 @@ function bindEvents() {
   $('stats-periods').addEventListener('click', handleStatsPeriodClick);
   $('stats-calendar-grid').addEventListener('click', handleCalendarClick);
   $('goal-form').addEventListener('submit', handleGoalSave);
+  $('chapter-form').addEventListener('submit', handleChapterSave);
   $('week-periods').addEventListener('click', handleWeekPeriodClick);
   $('week-story').addEventListener('click', handleWeekZoneClick);
   // A mouse already selected the bar on hover, so its click keeps it; a tap toggles it.
@@ -4343,7 +4498,7 @@ function renderDecks() {
 
 function renderDeckList() {
   $('decks-list').replaceChildren(...decks.list.map(buildDeckCard));
-  $('form-decks-list').replaceChildren(...FORM_DECKS.map(buildFormDeckCard));
+  $('form-decks-list').replaceChildren(...FORM_DECKS.map(buildFormDeckCard), buildArticleDeckCard());
   syncDeckButtons();
   const loaded = decks.status === 'ready';
   $('decks-empty').hidden = !loaded || decks.list.length > 0;
@@ -4383,6 +4538,19 @@ function buildFormDeckCard(deck) {
   const button = el('button', 'Практикувати', 'primary');
   button.type = 'button';
   button.dataset.formDeck = deck.id;
+  actions.append(button);
+  item.append(actions);
+  return item;
+}
+
+// The de/het exercise in Колоди: it has no words of its own, it is practised in the Практика art mode.
+function buildArticleDeckCard() {
+  const item = el('li', '', 'deck-card');
+  item.append(el('h3', 'Артикль: de чи het', 'deck-card__name'));
+  const actions = el('div', '', 'deck-card__actions');
+  const button = el('button', 'Практикувати', 'primary');
+  button.type = 'button';
+  button.addEventListener('click', openArticlePractice);
   actions.append(button);
   item.append(actions);
   return item;

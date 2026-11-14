@@ -2521,3 +2521,45 @@ button.calendar__cell { cursor: pointer; }
 }
 .achievement-toast__text { font-weight: var(--garden-weight-strong); overflow-wrap: anywhere; }
 .achievement-toast--out { opacity: 0; transform: translateY(-8px); }
+
+/* Що я вже знаю (plan §4): two Головна tiles, the link in Практика, the chips and the result. */
+.practice-tile--known-check { background: var(--garden-mustard); }
+.practice-tile--article { background: var(--garden-sand); }
+
+.practice-known-link {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--garden-forest);
+  font-weight: var(--garden-weight-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.practice-known-link:focus-visible,
+.known-check__chip:focus-visible { outline: 2px solid var(--garden-ink); outline-offset: 3px; }
+
+.known-check__note { margin: 0 0 12px; }
+.known-check__chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.known-check__chip {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 2px solid var(--garden-line);
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+  font-size: 15px;
+  transition: background .2s, border-color .2s, color .2s;
+}
+.known-check__chip[aria-pressed="true"] {
+  background: var(--garden-forest);
+  border-color: var(--garden-forest);
+  color: var(--garden-paper);
+}
+.known-check__chip[aria-pressed="true"]::before { content: "✓ "; }
+.known-check__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.known-check__actions button { min-height: 44px; flex: 1 1 140px; }
+.known-check__result { display: grid; gap: 10px; margin-top: 12px; }
+.known-check__line { margin: 0; font-weight: var(--garden-weight-strong); }
+.known-check__result button { min-height: 44px; }

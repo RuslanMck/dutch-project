@@ -114,6 +114,16 @@
           <span class="practice-tile__name">Тиждень у підсумку</span>
           <span class="practice-tile__line">Підсумок тижня</span>
         </button>
+        <button id="home-tile-known-check" class="practice-tile practice-tile--known-check" type="button" data-tab="known-check">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg></span>
+          <span class="practice-tile__name">Що я вже знаю</span>
+          <span class="practice-tile__line">Пропусти знайомі слова</span>
+        </button>
+        <button id="home-tile-article" class="practice-tile practice-tile--article" type="button">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h7v10H4zM13 7h7v10h-7z"/></svg></span>
+          <span class="practice-tile__name">Артикль</span>
+          <span class="practice-tile__line">de чи het</span>
+        </button>
       </div>
     </section>
 
@@ -138,6 +148,17 @@
             <button type="submit" class="primary">Зберегти</button>
           </div>
           <p id="goal-message" class="muted goal-form__message" role="status"></p>
+        </form>
+      </section>
+      <section id="profile-chapter" class="stats-card goal-setting" aria-labelledby="profile-chapter-label" hidden>
+        <form id="chapter-form" class="goal-form" novalidate>
+          <label id="profile-chapter-label" class="goal-form__label" for="chapter-input">Поточна глава</label>
+          <div class="goal-form__row">
+            <input id="chapter-input" type="number" inputmode="numeric" min="1" max="99" step="1" required>
+            <button type="submit" class="primary">Зберегти</button>
+          </div>
+          <p id="chapter-hint" class="hint">Слова поточної і попередньої глави рахуються вдвічі поширенішими. Глава оновлюється сама, коли додаєш слова з новішої глави.</p>
+          <p id="chapter-message" class="muted goal-form__message" role="status"></p>
         </form>
       </section>
       <form class="profile-logout" method="post" action="/auth/logout">
@@ -325,6 +346,7 @@
           <option value="struggling">Важкі слова</option>
           <option value="custom" hidden disabled>Тренування</option>
         </select>
+        <button id="practice-known-check-link" class="practice-known-link" type="button" data-tab="known-check">Перевірити, що я вже знаю</button>
         <p id="practice-mode-hint" class="hint" hidden>"Переклад (FSRS)" — основна практика. Сесія — це слова, які ви зараз вивчаєте: вона триває, навіть кілька днів, доки всі слова не вивчені; прогрес зберігається. Нове слово треба назвати правильно 2 рази; кожна помилка додає ще один раз, до 6, а правильні відповіді зберігаються. Повтори теж рахуються. Набір іде у два раунди: спершу UA → NL, потім NL → UA; слово вивчене, коли його знаєте в обидва боки. Вивчене слово йде за розкладом повторень; якщо ви його забули, воно повертається в сесію. Коли всі нові слова сесії вивчені, одразу приходять наступні 10. "Артикль" — це тренування, яке нічого не змінює. "Важкі слова" — тренування слів, на які ви останнього разу відповіли неправильно або важко; нічого не змінює.</p>
       </div>
       <div id="practice-progress-bar" class="progress-bar practice-progress-bar" role="progressbar" aria-label="Прогрес набору"
@@ -638,6 +660,22 @@
     </section>
 
     <!-- 6 · Тексти -->
+    <!-- 4 · Що я вже знаю (plan §4) -->
+    <section id="tab-known-check" class="tab" data-tab="known-check" hidden>
+      <p class="hint known-check__note">Познач слова, які ти вже знаєш. Вони не прийдуть як нові, а одразу стануть на повторення через 2–4 тижні.</p>
+      <p id="known-check-message" class="muted" role="status" aria-live="polite"></p>
+      <div id="known-check-chips" class="known-check__chips"></div>
+      <div id="known-check-actions" class="known-check__actions">
+        <button id="known-check-all" class="ghost" type="button">Знаю всі</button>
+        <button id="known-check-done" class="primary" type="button">Готово</button>
+      </div>
+      <div id="known-check-result" class="known-check__result" hidden>
+        <p id="known-check-result-line" class="known-check__line" role="status"></p>
+        <button id="known-check-next" class="primary" type="button" hidden>Далі</button>
+        <p id="known-check-end" class="muted" hidden></p>
+      </div>
+    </section>
+
     <section id="tab-texts" class="tab" data-tab="texts" hidden>
       <div id="texts-list"></div>
     </section>
