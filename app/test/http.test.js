@@ -187,6 +187,10 @@ test('export is served as an attachment with the handoff shape', async () => {
 });
 
 test('GET /api/words takes the priority, state, due and sort filters and returns the schedule', async () => {
+  // tafel is ranked (1000, halved in chapter 6 to 500): P1. An unranked word of chapter 6 is P3.
+  context.priorityService.importFrequencyList([{ wordForm: 'tafel', frequencyRank: 1000 }], {
+    shouldReplaceExisting: false,
+  });
   const created = await fetch(`${base}/api/words`, {
     method: 'POST',
     headers: { ...BEARER, 'Content-Type': 'application/json' },
@@ -282,7 +286,7 @@ test('practice REST after the migration: batch, grade, repeat, unknown field, st
   assert.equal(preview.status, 200);
   assert.equal((await preview.json()).chapter, 5);
 
-  const [listedWord] = await (await fetch(`${base}/api/words?priority=1`, { headers: BEARER })).json();
+  const [listedWord] = await (await fetch(`${base}/api/words?state=new&limit=1`, { headers: BEARER })).json();
   assert.equal(Object.hasOwn(listedWord, 'fsrs_card'), false, 'the card JSON is internal');
   assert.equal(typeof listedWord.state, 'string');
 });
@@ -445,4 +449,67 @@ test('GET /api/practice/struggling-words: 409 before the migration, then the wor
     drillServer.closeAllConnections();
     await new Promise(resolve => drillServer.close(resolve));
   }
+});
+
+// Chapter and manual priority tags over REST (WORD_PRIORITY_AND_DICTIONARY §1.4–1.5). Last in the file: the chapter
+// changes here are seen by nothing above.
+test('GET and PUT /api/practice/chapter: the chapter is saved and checked; a word from a later chapter makes it current', async () => {
+  const chapterUrl = `${base}/api/practice/chapter`;
+  assert.deepEqual(await (await fetch(chapterUrl, { headers: BEARER })).json(), { chapter: 6 });
+
+  const saved = await fetch(chapterUrl, { method: 'PUT', headers: JSON_BEARER, body: JSON.stringify({ chapter: 7 }) });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(await saved.json(), { chapter: 7 });
+  assert.deepEqual(await (await fetch(chapterUrl, { headers: BEARER })).json(), { chapter: 7 });
+
+  const outOfRange = await fetch(chapterUrl, { method: 'PUT', headers: JSON_BEARER, body: JSON.stringify({ chapter: 100 }) });
+  assert.equal(outOfRange.status, 400);
+  const unknownField = await fetch(chapterUrl, {
+    method: 'PUT',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ chapter: 7, extra: true }),
+  });
+  assert.equal(unknownField.status, 400);
+
+  const added = await fetch(`${base}/api/words`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ nl: 'hoofdstuk', uk: 'розділ', section: '8.1' }),
+  });
+  assert.equal(added.status, 201);
+  assert.deepEqual(await (await fetch(chapterUrl, { headers: BEARER })).json(), { chapter: 8 });
+});
+
+test('PUT /api/words/:id/priority: first and later set the tag, null clears it; a bad tag is refused', async () => {
+  const created = await fetch(`${base}/api/words`, {
+    method: 'POST',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ nl: 'bakker', uk: 'пекар', section: '3.2' }),
+  });
+  const bakker = await created.json();
+  assert.equal(bakker.priority_tag, null);
+  const priorityUrl = `${base}/api/words/${bakker.id}/priority`;
+  const put = tag => fetch(priorityUrl, { method: 'PUT', headers: JSON_BEARER, body: JSON.stringify({ tag }) });
+
+  const first = await put('first');
+  assert.equal(first.status, 200);
+  const firstBody = await first.json();
+  assert.equal(firstBody.priority_override, 1);
+  assert.equal(firstBody.priority_tag, 'first');
+  assert.equal(firstBody.priority, 1);
+
+  const later = await (await put('later')).json();
+  assert.equal(later.priority_override, 3);
+  assert.equal(later.priority_tag, 'later');
+
+  assert.equal((await put('soon')).status, 400);
+  assert.equal((await put(undefined)).status, 400, 'tag is required; null is the clearing value');
+  const cleared = await (await put(null)).json();
+  assert.equal(cleared.priority_override, null);
+  assert.equal(cleared.priority_tag, null);
+  assert.equal((await fetch(`${base}/api/words/999999/priority`, {
+    method: 'PUT',
+    headers: JSON_BEARER,
+    body: JSON.stringify({ tag: 'first' }),
+  })).status, 404);
 });

@@ -7,7 +7,7 @@ import { PRACTICE_DIRECTIONS } from './practice-direction.js';
 import { findOpenSet, planSetRoom } from './practice-set.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
 import { addDaysToCalendarDate, findStartOfDay } from './practice-calendar.js';
-import { compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
+import { calculateEffectiveRank, compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
 import { readDeckPositions } from './learning-deck.js';
 
 const NO_INTRODUCTIONS_BY_PRIORITY = Object.freeze({ 1: 0, 2: 0, 3: 0 });
@@ -37,7 +37,11 @@ export function createWordSetPlanner({ practiceRepository }) {
       setSize: settings.newPerDay,
     });
     const newCandidates = room > 0
-      ? allocateSetCandidates({ settings, candidatesByPriority: groupCandidatesByPriority(listNewWordRows()), room })
+      ? allocateSetCandidates({
+        settings,
+        candidatesByPriority: groupCandidatesByPriority(listNewWordRows(), settings.currentChapter),
+        room,
+      })
       : [];
     return Object.freeze({
       isOpen: false,
@@ -82,7 +86,11 @@ export function createWordSetPlanner({ practiceRepository }) {
     const { oldIds, room } = planSetRoom({ oldIds: oldCandidateIds, setSize: count });
     const newRows = listNewWordRows().filter(wordRow => !excludedIdSet.has(wordRow.id));
     const newCandidates = room > 0
-      ? allocateSetCandidates({ settings, candidatesByPriority: groupCandidatesByPriority(newRows), room })
+      ? allocateSetCandidates({
+        settings,
+        candidatesByPriority: groupCandidatesByPriority(newRows, settings.currentChapter),
+        room,
+      })
       : [];
     return Object.freeze([...oldIds, ...newCandidates.map(candidate => candidate.id)]);
   }
@@ -117,9 +125,10 @@ export function mapAnsweredDirections(answerRows) {
 }
 
 // Words in queue order, grouped by priority.
-function groupCandidatesByPriority(newWordRows) {
+function groupCandidatesByPriority(newWordRows, currentChapter) {
   const candidatesByPriority = { 1: [], 2: [], 3: [] };
-  for (const candidate of newWordRows.map(mapToQueueCandidate).sort(compareQueueOrder)) {
+  const queueCandidates = newWordRows.map(wordRow => mapToQueueCandidate(wordRow, currentChapter));
+  for (const candidate of queueCandidates.sort(compareQueueOrder)) {
     candidatesByPriority[candidate.priority].push(candidate);
   }
   return candidatesByPriority;
@@ -140,11 +149,17 @@ function allocateSetCandidates({ settings, candidatesByPriority, room }) {
   });
 }
 
-export function mapToQueueCandidate(wordRow) {
+export function mapToQueueCandidate(wordRow, currentChapter) {
   return {
     id: wordRow.id,
     priority: wordRow.priority,
-    chapterNumber: parseChapterNumber(wordRow.section_code),
-    frequencyRank: wordRow.frequency_rank,
+    priorityOverride: wordRow.priority_override,
+    effectiveRank: calculateEffectiveRank({
+      frequencyRank: wordRow.frequency_rank,
+      chapterNumber: parseChapterNumber(wordRow.section_code),
+      currentChapter,
+    }),
+    category: wordRow.category ?? null,
+    kind: wordRow.kind,
   };
 }

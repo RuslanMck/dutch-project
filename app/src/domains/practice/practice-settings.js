@@ -9,6 +9,7 @@ const WORD_SET_SETTING_NAME = 'word_set';
 const PHRASE_SET_SETTING_NAME = 'phrase_set';
 const DAILY_GOAL_SETTING_NAME = 'daily_goal';
 const KNOWN_CHECK_SEEN_SETTING_NAME = 'known_check_seen';
+const PRIORITY_RULES_VERSION_SETTING_NAME = 'priority_rules_version';
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
 
 export function createPracticeSettings({ practiceRepository }) {
@@ -16,6 +17,7 @@ export function createPracticeSettings({ practiceRepository }) {
   // dailyGoal is the answers per day the learner aims for (DAILY_GOAL_DEFAULT until it is saved).
   // wordSet and phraseSet are the pinned sets ({ openedOn, openedAt, itemIds }), null when none is stored.
   // knownCheckSeen: the ids of the words the learner marked unknown in the quick known check (none when not stored).
+  // priorityRulesVersion is 1 until the priorities were recalculated with the current rules (priority-service).
   function readSettings() {
     const settingByName = practiceRepository.listSettings();
     return Object.freeze({
@@ -30,6 +32,7 @@ export function createPracticeSettings({ practiceRepository }) {
       wordSet: mapFromStoredSet(settingByName[WORD_SET_SETTING_NAME]),
       phraseSet: mapFromStoredSet(settingByName[PHRASE_SET_SETTING_NAME]),
       knownCheckSeen: settingByName[KNOWN_CHECK_SEEN_SETTING_NAME] ?? [],
+      priorityRulesVersion: settingByName[PRIORITY_RULES_VERSION_SETTING_NAME] ?? 1,
     });
   }
 
@@ -42,6 +45,10 @@ export function createPracticeSettings({ practiceRepository }) {
 
   function saveCurrentChapter(chapter) {
     practiceRepository.saveSetting('current_chapter', chapter);
+  }
+
+  function savePriorityRulesVersion(version) {
+    practiceRepository.saveSetting(PRIORITY_RULES_VERSION_SETTING_NAME, version);
   }
 
   // storedSet: { opened_on, opened_at, item_ids } (see mapToStoredSet in practice-set.js), or null to clear it.
@@ -76,6 +83,7 @@ export function createPracticeSettings({ practiceRepository }) {
     readSettings,
     readActiveSettings,
     saveCurrentChapter,
+    savePriorityRulesVersion,
     saveWordSet,
     savePhraseSet,
     saveDailyGoal,

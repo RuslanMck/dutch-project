@@ -70,7 +70,8 @@ test('the struggling words are the latest answers again or hard, most errors fir
   assert.deepEqual(drill.words.map(word => word.last_grade), ['again', 'hard', 'again', 'hard']);
   assert.deepEqual(drill.words.map(word => word.last_reviewed_on), ['2026-10-25', '2026-10-25', '2026-10-24', '2026-10-24']);
   assert.deepEqual(Object.keys(drill.words[0]).sort(), [
-    'article', 'deck', 'error_count', 'id', 'kind', 'last_grade', 'last_reviewed_on', 'nl', 'priority', 'state', 'uk',
+    'article', 'deck', 'error_count', 'id', 'kind', 'last_grade', 'last_reviewed_on', 'nl', 'priority', 'priority_tag',
+    'state', 'uk',
   ]);
 });
 

@@ -11,6 +11,7 @@ import {
   previewPrioritiesQuerySchema,
   knownCheckInputSchema,
   knownCheckQuerySchema,
+  setCurrentChapterInputSchema,
   spareWordsQuerySchema,
 } from '../../contracts/practice-contracts.js';
 import { readRequestBody, removeBlankQueryValues } from '../../http/request-input.js';
@@ -116,6 +117,17 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
   practiceRouter.get('/practice/priorities/preview', (request, response) => {
     const previewInput = previewPrioritiesQuerySchema.parse(removeBlankQueryValues(request.query));
     response.json(priorityService.previewPriorities({ chapter: previewInput.chapter }));
+  });
+
+  // The textbook chapter the learner is on. PUT saves it and recalculates every word's priority.
+  practiceRouter.get('/practice/chapter', (request, response) => {
+    response.json({ chapter: priorityService.readCurrentChapter() });
+  });
+
+  practiceRouter.put('/practice/chapter', (request, response) => {
+    const { chapter } = setCurrentChapterInputSchema.parse(readRequestBody(request));
+    priorityService.setCurrentChapter(chapter);
+    response.json({ chapter });
   });
 
   return practiceRouter;

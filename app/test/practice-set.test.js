@@ -42,16 +42,18 @@ function addWords(context, sectionCode, dutchTexts) {
   }))).added.map(word => word.id);
 }
 
-// P1: p1Count words in chapter 6. P2: p2Count words in chapter 3, ranked 3000 and up. P3: p3Count unranked words.
+// P1: p1Count words in chapter 6, ranked 500 and up (halved for the current chapter). P2: p2Count words in chapter 3,
+// ranked 3000 and up. P3: p3Count unranked words.
 function addPriorityMix(context, { p1Count, p2Count, p3Count }) {
+  const p1Names = makeNames('p1', p1Count);
   const p2Names = makeNames('p2', p2Count);
-  addWords(context, '6.1', makeNames('p1', p1Count));
+  addWords(context, '6.1', p1Names);
   addWords(context, '3.2', p2Names);
   addWords(context, '3.2', makeNames('p3', p3Count));
-  context.priorityService.importFrequencyList(
-    p2Names.map((dutchText, index) => ({ wordForm: dutchText, frequencyRank: 3000 + index })),
-    { shouldReplaceExisting: true },
-  );
+  context.priorityService.importFrequencyList([
+    ...p1Names.map((dutchText, index) => ({ wordForm: dutchText, frequencyRank: 500 + index })),
+    ...p2Names.map((dutchText, index) => ({ wordForm: dutchText, frequencyRank: 3000 + index })),
+  ], { shouldReplaceExisting: true });
 }
 
 function migrate(context) {

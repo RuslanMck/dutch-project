@@ -104,9 +104,10 @@ export function registerPracticeTools({
 
   registerJsonTool(mcpServer, 'set_current_chapter', {
     title: 'Set current chapter',
-    description: 'Set the textbook chapter the learner is on. Words of this chapter and the one before become '
-      + 'priority 1; other New words are prioritised by frequency. Manual priorities stay. Returns the preview for the '
-      + 'new chapter: {chapter, counts, unranked_count, examples}.',
+    description: 'Set the textbook chapter the learner is on. Words of this chapter and the one before count as twice '
+      + 'as common (their frequency rank is halved); New words are prioritised by that rank, unranked words are '
+      + 'priority 3. A word added from a later chapter sets this chapter. Manual priorities stay. Returns the preview '
+      + 'for the new chapter: {chapter, counts, unranked_count, examples}.',
     inputSchema: setCurrentChapterInputSchema.shape,
   }, ({ chapter }) => priorityService.setCurrentChapter(chapter));
 
@@ -114,7 +115,7 @@ export function registerPracticeTools({
     title: 'Set word priority',
     description: 'Set one word to priority 1, 2 or 3 by hand; the setting survives chapter changes. Pass null to clear '
       + 'the manual priority and go back to the computed one. Returns the word as the word tools return it, with '
-      + 'priority_override (null when none).',
+      + 'priority_override (null when none) and priority_tag (first, later or null; 2 has no tag).',
     inputSchema: setWordPriorityInputSchema.shape,
   }, ({ id, priority }) => {
     priorityService.setWordPriority(id, priority);

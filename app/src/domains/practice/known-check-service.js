@@ -20,6 +20,7 @@ export function createKnownCheckService({
     const today = formatCalendarDateInTimeZone(clock.now(), settings.timeZone);
     const candidates = listKnownCheckCandidates({
       wordRows: practiceRepository.listPracticeWords(),
+      currentChapter: settings.currentChapter,
       seenWordIds: settings.knownCheckSeen,
       openSetWordIds: openSetWordIdsOf(settings, today),
     });
@@ -39,6 +40,7 @@ export function createKnownCheckService({
       const openSetWordIds = openSetWordIdsOf(settings, today);
       const newWordRows = listKnownCheckCandidates({
         wordRows: practiceRepository.listPracticeWords(),
+      currentChapter: settings.currentChapter,
         seenWordIds: [],
         openSetWordIds,
         includeSeen: true,
@@ -61,6 +63,7 @@ export function createKnownCheckService({
       if (unknownWordIds.length) practiceSettings.saveKnownCheckSeen(seenWordIds);
       const remaining = listKnownCheckCandidates({
         wordRows: practiceRepository.listPracticeWords(),
+      currentChapter: settings.currentChapter,
         seenWordIds,
         openSetWordIds,
       }).length;

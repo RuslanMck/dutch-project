@@ -213,8 +213,11 @@ test('add_words gives a new word its priority from the frequency list', () => {
 
 test('changing a word section re-ranks it and recalculates its priority', () => {
   const wordContext = createTestContext();
+  wordContext.priorityService.importFrequencyList([{ wordForm: 'raam', frequencyRank: 3000 }], {
+    shouldReplaceExisting: true,
+  });
   const [wordId] = createWordIds(wordContext, [{ nl: 'raam', uk: 'вікно', section: '3.2' }]);
-  assert.equal(wordContext.wordService.getWord(wordId).priority, 3);
+  assert.equal(wordContext.wordService.getWord(wordId).priority, 2);
   assert.equal(wordContext.wordService.updateWord(wordId, { section: '6.1' }).priority, 1);
 });
 
@@ -294,6 +297,10 @@ test('list_words filters by state, priority and due day, and sorts by due and by
     { nl: 'stoel', uk: 'стілець', section: '3.2' },
     { nl: 'raam', uk: 'вікно', section: '3.2' },
   ]);
+  wordContext.priorityService.importFrequencyList([
+    { wordForm: 'huis', frequencyRank: 1000 },
+    { wordForm: 'tafel', frequencyRank: 1000 },
+  ], { shouldReplaceExisting: true });
   wordContext.practiceService.migrateToFsrs({ isDryRun: false });
   wordContext.practiceService.gradeWord({ wordId: huisId, grade: 'good', sessionId: 'session-1' });
   wordContext.practiceService.gradeWord({ wordId: stoelId, grade: 'good', sessionId: 'session-1' });

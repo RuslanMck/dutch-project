@@ -217,10 +217,14 @@ test('calculatePriority: a manual override wins over every other rule', () => {
   );
 });
 
-test('calculatePriority: the current chapter and the one before are P1', () => {
+test('calculatePriority: the current and the previous chapter halve the rank; an unranked word is P3 in any chapter', () => {
   const unrankedWord = { priorityOverride: null, frequencyRank: null, currentChapter: 6 };
-  assert.equal(calculatePriority({ ...unrankedWord, chapterNumber: 6 }), 1);
-  assert.equal(calculatePriority({ ...unrankedWord, chapterNumber: 5 }), 1);
+  assert.equal(calculatePriority({ ...unrankedWord, chapterNumber: 6 }), 3);
+  assert.equal(calculatePriority({ ...unrankedWord, chapterNumber: 5 }), 3);
+  const rankedWord = { priorityOverride: null, frequencyRank: 3000, currentChapter: 6 };
+  assert.equal(calculatePriority({ ...rankedWord, chapterNumber: 6 }), 1, '3000 halved is 1500');
+  assert.equal(calculatePriority({ ...rankedWord, chapterNumber: 5 }), 1);
+  assert.equal(calculatePriority({ ...rankedWord, chapterNumber: 4 }), 2);
 });
 
 test('calculatePriority: frequency rank limits 2000 (P1) and 5000 (P2), unranked is P3', () => {
@@ -231,18 +235,19 @@ test('calculatePriority: frequency rank limits 2000 (P1) and 5000 (P2), unranked
   assert.equal(calculatePriority({ ...chapterNotNear, frequencyRank: 9000 }), 3);
 });
 
-test('compareQueueOrder: priority, then chapter, then rank (both unknown last), then id', () => {
+test('compareQueueOrder: priority, then the tagged «Вчити першим», then effective rank (unranked last), then id', () => {
   const candidates = [
-    { id: 7, priority: 1, chapterNumber: null, frequencyRank: null },
-    { id: 3, priority: 1, chapterNumber: null, frequencyRank: 5 },
-    { id: 6, priority: 1, chapterNumber: 6, frequencyRank: null },
-    { id: 2, priority: 1, chapterNumber: 6, frequencyRank: null },
-    { id: 4, priority: 1, chapterNumber: 6, frequencyRank: 900 },
-    { id: 1, priority: 1, chapterNumber: 5, frequencyRank: 10 },
-    { id: 8, priority: 2, chapterNumber: 1, frequencyRank: 1 },
+    { id: 7, priority: 1, priorityOverride: null, effectiveRank: null },
+    { id: 3, priority: 1, priorityOverride: null, effectiveRank: 5 },
+    { id: 6, priority: 1, priorityOverride: null, effectiveRank: null },
+    { id: 2, priority: 1, priorityOverride: null, effectiveRank: null },
+    { id: 4, priority: 1, priorityOverride: null, effectiveRank: 900 },
+    { id: 1, priority: 1, priorityOverride: null, effectiveRank: 10 },
+    { id: 8, priority: 2, priorityOverride: null, effectiveRank: 1 },
+    { id: 9, priority: 1, priorityOverride: 1, effectiveRank: 1500 },
   ];
   const sortedIds = [...candidates].sort(compareQueueOrder).map(candidate => candidate.id);
-  assert.deepEqual(sortedIds, [1, 4, 2, 6, 3, 7, 8]);
+  assert.deepEqual(sortedIds, [9, 3, 1, 4, 2, 6, 7, 8]);
 });
 
 test('calculateFrequencyRank: a leading article is ignored and the word is looked up', () => {

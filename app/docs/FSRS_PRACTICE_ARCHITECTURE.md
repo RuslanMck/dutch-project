@@ -711,3 +711,44 @@ Example: `POST /api/words/suggestions {"limit":2}` gives
 answers written, the refusal before the migration, the REST routes) and `test/word-suggestions.test.js` (the groups, the
 checked answer, the prompt, the service with a fake OpenRouter call, the category on add, the REST route). No real
 OpenRouter request is made.
+## 13. Word priority, queue order and topic caps (14.11.2026)
+
+The learner saw rare words (hoofdgerecht, mosselen) before everyday ones (lezen, boek): the current and previous
+chapter made every word priority 1, and the queue sorted by chapter first. The rules are now these.
+
+### 13.1 Priority (`priority-calculation.js`)
+
+- Manual tag (`priority_override`): 1 = «Вчити першим» (`priority_tag` 'first'), 3 = «Пізніше» ('later'), null = auto.
+  The override 2 is valid for MCP only and has no tag.
+- Auto: the effective rank is the frequency rank, halved for a word of the current or the previous chapter (such a word
+  counts as twice as common). Effective rank ≤ 2000 → P1, ≤ 5000 → P2, otherwise or unranked → P3. A chapter no longer
+  makes a word P1 by itself. Examples: trui (chapter 7, rank 3231, current 7) → 1615.5 → P1; hoofdgerecht (chapter 6,
+  rank 14309, current 7) → 7154.5 → P3; boek (no chapter, 399) → P1; paella (chapter 6, unranked) → P3.
+
+### 13.2 Queue order (`compareQueueOrder`)
+
+Priority; then the words tagged «Вчити першим»; then the effective rank ascending (unranked last); then id. The preview
+(`previewPriorities`) uses the same order.
+
+### 13.3 Topic balance in a new set (`new-word-allocation.js`)
+
+When the New words of a set are picked, in queue order inside each tier: at most `SET_CATEGORY_CAP` (3) words of one
+category and at most `SET_EXPRESSION_CAP` (2) expressions (`kind = 'expression'`) per set. A word without a category has
+no category cap. A candidate over a cap is set aside; once every tier has been passed, the set-aside candidates fill
+the set in queue order, so the caps never leave a set short. Words tagged «Вчити першим» ignore the caps and do not
+count toward them.
+
+### 13.4 Current chapter
+
+- REST: `GET /api/practice/chapter` → `{ chapter }`; `PUT /api/practice/chapter { chapter }` (integer 1–99) saves it,
+  recalculates every word and returns `{ chapter }`. MCP `set_current_chapter` is unchanged and returns the preview.
+- Automatic: when words are added (REST, MCP, bulk) and one of them is from a chapter above the current one, that
+  chapter becomes current and every priority is recalculated (`followChapterOfAddedWords`, in the add transaction).
+- One-off: at start-up `upgradePriorityRules` recalculates every word when the settings marker
+  `priority_rules_version` is below 2, then saves 2.
+
+### 13.5 Manual tag and word answers
+
+`PUT /api/words/:id/priority { tag: 'first' | 'later' | null }` sets the override (first → 1, later → 3, null → auto)
+and returns the word. Every word shape (REST words, grade answers, the MCP compact word) carries `priority_tag`:
+'first', 'later' or null (override 2 gives null, and `priority_override` keeps the 2).

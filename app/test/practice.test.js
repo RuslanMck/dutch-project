@@ -44,16 +44,18 @@ function makeNames(prefix, count) {
   return Array.from({ length: count }, (_, index) => `${prefix}-woord-${index + 1}`);
 }
 
-// P1: 9 words in chapter 6. P2: 4 words in chapter 3, ranked 3000 and up. P3: 3 unranked words in chapter 3.
+// P1: p1Count words in chapter 6, ranked 500 and up (halved for the current chapter). P2: p2Count words in chapter 3,
+// ranked 3000 and up. P3: p3Count unranked words.
 function addPriorityMix(context, { p1Count, p2Count, p3Count }) {
+  const p1Names = makeNames('p1', p1Count);
   const p2Names = makeNames('p2', p2Count);
-  addWords(context, '6.1', makeNames('p1', p1Count));
+  addWords(context, '6.1', p1Names);
   addWords(context, '3.2', p2Names);
   addWords(context, '3.2', makeNames('p3', p3Count));
-  context.priorityService.importFrequencyList(
-    p2Names.map((dutchText, index) => ({ wordForm: dutchText, frequencyRank: 3000 + index })),
-    { shouldReplaceExisting: true },
-  );
+  context.priorityService.importFrequencyList([
+    ...p1Names.map((dutchText, index) => ({ wordForm: dutchText, frequencyRank: 500 + index })),
+    ...p2Names.map((dutchText, index) => ({ wordForm: dutchText, frequencyRank: 3000 + index })),
+  ], { shouldReplaceExisting: true });
 }
 
 function migrate(context) {
@@ -389,45 +391,57 @@ test('grading rejects an unknown grade and an unknown word', () => {
     NotFoundError);
 });
 
-test('set_current_chapter moves chapter 5 out of priority 1 when the chapter becomes 7, and chapter 7 into it', () => {
-  const context = createPracticeContext();
-  const [fiveId] = addWords(context, '5.1', ['vijf']);
-  const [sixId] = addWords(context, '6.1', ['zes']);
-  const [sevenId] = addWords(context, '7.1', ['zeven']);
-  context.priorityService.recalculatePriorities();
-  assert.deepEqual([fiveId, sixId, sevenId].map(wordId => readWordRow(context, wordId).priority), [1, 1, 3]);
+// Ranks the given Dutch texts (the rest of the list is replaced).
+function rankWords(context, rankByDutchText) {
+  context.priorityService.importFrequencyList(
+    Object.entries(rankByDutchText).map(([wordForm, frequencyRank]) => ({ wordForm, frequencyRank })),
+    { shouldReplaceExisting: true },
+  );
+}
 
-  const preview = context.priorityService.setCurrentChapter(7);
+test('set_current_chapter moves chapter 5 out of priority 1 when the chapter becomes 7, and chapter 6 stays by its rank',
+  () => {
+    const context = createPracticeContext();
+    const [fiveId] = addWords(context, '5.1', ['vijf']);
+    const [sixId] = addWords(context, '6.1', ['zes']);
+    const [threeId] = addWords(context, '3.1', ['drie']);
+    rankWords(context, { vijf: 3000, zes: 3000, drie: 3000 });
+    const ids = [fiveId, sixId, threeId];
+    assert.deepEqual(ids.map(wordId => readWordRow(context, wordId).priority), [1, 1, 2]);
 
-  assert.deepEqual([fiveId, sixId, sevenId].map(wordId => readWordRow(context, wordId).priority), [3, 1, 1]);
-  assert.equal(preview.chapter, 7);
-  assert.deepEqual(preview.counts, { 1: 2, 2: 0, 3: 1 });
-  assert.equal(preview.unranked_count, 3);
-});
+    const preview = context.priorityService.setCurrentChapter(7);
+
+    assert.deepEqual(ids.map(wordId => readWordRow(context, wordId).priority), [2, 1, 2]);
+    assert.equal(preview.chapter, 7);
+    assert.deepEqual(preview.counts, { 1: 1, 2: 2, 3: 0 });
+    assert.equal(preview.unranked_count, 0);
+  });
 
 test('preview_priorities changes nothing', () => {
   const context = createPracticeContext();
   const [fiveId] = addWords(context, '5.1', ['vijf']);
+  rankWords(context, { vijf: 3000 });
   context.priorityService.recalculatePriorities();
   const preview = context.priorityService.previewPriorities({ chapter: 9 });
   assert.equal(preview.chapter, 9);
-  assert.deepEqual(preview.examples[3].map(example => example.id), [fiveId]);
+  assert.deepEqual(preview.examples[2].map(example => example.id), [fiveId]);
   assert.equal(readWordRow(context, fiveId).priority, 1);
 });
 
 test('a manual priority survives a chapter change, and clearing it returns to the computed priority', () => {
   const context = createPracticeContext();
   const [fiveId] = addWords(context, '5.1', ['vijf']);
+  rankWords(context, { vijf: 3000 });
   context.priorityService.recalculatePriorities();
 
-  context.priorityService.setWordPriority(fiveId, 2);
-  assert.equal(context.wordService.getWord(fiveId).priority, 2);
+  context.priorityService.setWordPriority(fiveId, 3);
+  assert.equal(context.wordService.getWord(fiveId).priority, 3);
   context.priorityService.setCurrentChapter(7);
-  assert.equal(readWordRow(context, fiveId).priority, 2);
-  assert.equal(readWordRow(context, fiveId).priority_override, 2);
+  assert.equal(readWordRow(context, fiveId).priority, 3);
+  assert.equal(readWordRow(context, fiveId).priority_override, 3);
 
   context.priorityService.setWordPriority(fiveId, null);
-  assert.equal(readWordRow(context, fiveId).priority, 3);
+  assert.equal(readWordRow(context, fiveId).priority, 2);
   context.priorityService.setCurrentChapter(6);
   assert.equal(readWordRow(context, fiveId).priority, 1);
   assert.throws(() => context.priorityService.setWordPriority(999999, 1), NotFoundError);
@@ -530,7 +544,10 @@ test('practice_stats before any grade has no good share', () => {
   const stats = context.practiceService.calculatePracticeStatistics();
   assert.equal(stats.good_share_7_days, null);
   assert.equal(stats.good_share_30_days, null);
-  assert.deepEqual(stats.new_remaining_by_priority, { 1: 1, 2: 0, 3: 0 }, 'a chapter-6 word gets P1 when added');
+  assert.deepEqual(stats.new_remaining_by_priority, { 1: 0, 2: 0, 3: 1 }, 'an unranked word is P3, whatever its chapter');
+  context.priorityService.importFrequencyList([{ wordForm: 'nieuw1', frequencyRank: 1000 }], { shouldReplaceExisting: true });
+  assert.deepEqual(context.practiceService.calculatePracticeStatistics().new_remaining_by_priority, { 1: 1, 2: 0, 3: 0 },
+    'a chapter-6 word ranked 1000 is P1 (its rank is halved to 500)');
   assert.equal(stats.states.new, 1);
 });
 

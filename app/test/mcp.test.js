@@ -144,7 +144,8 @@ test('list_words filters by section and returns compact rows', SKIP, async () =>
   assert.ok(rows.every(r => r.section === '6.1'));
   assert.deepEqual(Object.keys(rows[0]).sort(), [
     'article', 'category', 'error_count', 'example_nl', 'example_uk', 'frequency_rank', 'id', 'in_deck', 'kind',
-    'next_due_on', 'nl', 'priority', 'priority_override', 'section', 'state', 'status', 'times_left', 'topic', 'uk',
+    'next_due_on', 'nl', 'priority', 'priority_override', 'priority_tag', 'section', 'state', 'status', 'times_left',
+    'topic', 'uk',
   ]);
 });
 
@@ -412,6 +413,10 @@ test('add_words gives priorities; list_words filters by state, priority and due 
   try {
     const filterBase = `http://127.0.0.1:${filterServer.address().port}`;
     const filterClient = await connect(new StreamableHTTPClientTransport(new URL(`${filterBase}/mcp/${SECRET}`)));
+    // huis is ranked 1000 (halved in chapter 6 to 500): P1. raam is unranked: P3.
+    filterContext.priorityService.importFrequencyList([{ wordForm: 'huis', frequencyRank: 1000 }], {
+      shouldReplaceExisting: false,
+    });
     const added = await call(filterClient, 'add_words', { words: [
       { nl: 'huis', uk: 'дім', section: '6.1' },
       { nl: 'raam', uk: 'вікно', section: '3.2' },

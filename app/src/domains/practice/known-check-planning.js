@@ -7,15 +7,16 @@ export const KNOWN_CHECK_MINIMUM_DAYS = 14;
 export const KNOWN_CHECK_MAXIMUM_DAYS = 28;
 
 // The New words (no FSRS card) the check may ask about, in queue order (the same order as the practice queue): not in
-// the open set of today and, unless includeSeen, not shown in a check before. wordRows are practice word rows.
-export function listKnownCheckCandidates({ wordRows, seenWordIds, openSetWordIds, includeSeen = false }) {
+// the open set of today and, unless includeSeen, not shown in a check before. wordRows are practice word rows;
+// currentChapter makes the lesson words count as more common, as in the queue.
+export function listKnownCheckCandidates({ wordRows, seenWordIds, openSetWordIds, currentChapter, includeSeen = false }) {
   const seenIdSet = new Set(seenWordIds);
   const openSetIdSet = new Set(openSetWordIds);
   return wordRows
     .filter(wordRow => wordRow.fsrs_card === null)
     .filter(wordRow => !openSetIdSet.has(wordRow.id))
     .filter(wordRow => includeSeen || !seenIdSet.has(wordRow.id))
-    .map(wordRow => ({ wordRow, candidate: mapToQueueCandidate(wordRow) }))
+    .map(wordRow => ({ wordRow, candidate: mapToQueueCandidate(wordRow, currentChapter) }))
     .sort((first, second) => compareQueueOrder(first.candidate, second.candidate))
     .map(entry => entry.wordRow);
 }
