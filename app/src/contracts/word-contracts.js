@@ -1,6 +1,7 @@
 // Contracts for dictionary words: creating, changing, listing, searching, practice results and word errors.
 import { z } from 'zod';
 
+import { wordCategorySchema } from './category-contracts.js';
 import {
   articleSchema,
   calendarDateSchema,
@@ -52,7 +53,16 @@ export const updateWordInputSchema = createWordInputSchema
   .extend({
     kind: wordKindSchema.optional(),
     status: learningStatusSchema.optional(),
+    category: wordCategorySchema.optional().describe(
+      'category id: food, home, clothes, colours, numbers, people, body, city, work, nature, leisure, feelings, '
+      + 'actions, talk or other; null clears it',
+    ),
   });
+
+export const categorizeWordsInputSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(MAXIMUM_WORDS_PER_CALL).optional()
+    .describe('how many uncategorized words to sort (default 300)'),
+});
 
 export const setWordStatusInputSchema = z.object({ status: learningStatusSchema });
 

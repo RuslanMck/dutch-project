@@ -27,6 +27,7 @@ const EXPECTED_TOOLS = [
   'add_sentences', 'list_sentences', 'update_sentence', 'delete_sentence', 'get_word_order_set', 'check_word_order',
   'generate_sentences',
   'list_decks', 'get_deck', 'create_deck', 'update_deck', 'delete_deck',
+  'list_achievements',
 ];
 
 const application = createApplication({
@@ -142,8 +143,8 @@ test('list_words filters by section and returns compact rows', SKIP, async () =>
   assert.ok(rows.length >= 1 && rows.length <= 5);
   assert.ok(rows.every(r => r.section === '6.1'));
   assert.deepEqual(Object.keys(rows[0]).sort(), [
-    'article', 'error_count', 'example_nl', 'example_uk', 'frequency_rank', 'id', 'in_deck', 'kind', 'next_due_on',
-    'nl', 'priority', 'priority_override', 'section', 'state', 'status', 'times_left', 'topic', 'uk',
+    'article', 'category', 'error_count', 'example_nl', 'example_uk', 'frequency_rank', 'id', 'in_deck', 'kind',
+    'next_due_on', 'nl', 'priority', 'priority_override', 'section', 'state', 'status', 'times_left', 'topic', 'uk',
   ]);
 });
 

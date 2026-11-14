@@ -2,6 +2,7 @@
 import express from 'express';
 
 import { createServerSentEventsRoutes } from '../change-events/server-sent-events-routes.js';
+import { createAchievementRoutes } from '../domains/achievements/achievement-routes.js';
 import { createArtifactExportRoutes } from '../domains/artifact-export/artifact-export-routes.js';
 import { createDeckRoutes } from '../domains/decks/deck-routes.js';
 import { createMistakeRoutes } from '../domains/mistakes/mistake-routes.js';
@@ -29,6 +30,7 @@ export function createApiRouter({
   artifactExportService,
   deckService,
   ruleExerciseService,
+  achievementService,
   changeEventBus,
   logger = console,
 }) {
@@ -44,6 +46,7 @@ export function createApiRouter({
   apiRouter.use(createArtifactExportRoutes({ artifactExportService }));
   apiRouter.use(createDeckRoutes({ deckService }));
   apiRouter.use(createRuleExerciseRoutes({ ruleExerciseService }));
+  apiRouter.use(createAchievementRoutes({ achievementService }));
   apiRouter.use(createServerSentEventsRoutes({ changeEventBus }));
   apiRouter.use((request, response) => response.status(404).json({ error: 'not found' }));
   apiRouter.use(createRestErrorHandler({ logger }));

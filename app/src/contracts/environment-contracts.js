@@ -4,6 +4,8 @@ import { z } from 'zod';
 const DEFAULT_OPENROUTER_MODEL = 'anthropic/claude-sonnet-4.5';
 // Rule exercises are many short, cheap requests: a low-cost model by default.
 const DEFAULT_RULE_EXERCISE_MODEL = 'google/gemini-3.7-flash';
+// Word categories are one short request per 60 words: the same low-cost model by default.
+const DEFAULT_WORD_CATEGORY_MODEL = 'google/gemini-3.7-flash';
 
 export const environmentSchema = z.object({
   NODE_ENV: z.string().optional(),
@@ -19,4 +21,5 @@ export const environmentSchema = z.object({
   OPENROUTER_API_KEY: z.string().trim().default(''),
   OPENROUTER_MODEL: z.string().trim().default('').transform(model => model || DEFAULT_OPENROUTER_MODEL),
   RULE_EXERCISE_MODEL: z.string().trim().default('').transform(model => model || DEFAULT_RULE_EXERCISE_MODEL),
+  WORD_CATEGORY_MODEL: z.string().trim().default('').transform(model => model || DEFAULT_WORD_CATEGORY_MODEL),
 });
