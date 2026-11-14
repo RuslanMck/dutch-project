@@ -21,6 +21,7 @@ export function createWordService({
   changeEventBus,
   clock,
   wordCategorizer,
+  wordSuggester,
 }) {
   function getWord(wordId) {
     const word = wordRepository.findWordById(wordId);
@@ -202,6 +203,11 @@ export function createWordService({
     return wordCategorizer.categorizeUncategorizedWords({ limit });
   }
 
+  // Common Dutch words the dictionary lacks, from the frequency list (POST /api/words/suggestions). Nothing is saved.
+  function suggestWords({ limit } = {}) {
+    return wordSuggester.suggestWords({ limit });
+  }
+
   function listTopics() {
     return topicRepository.listTopicsWithWordCounts();
   }
@@ -244,6 +250,7 @@ export function createWordService({
       topicId: ensureTopic(newWord.topicName),
       sectionCode: sectionService.ensureSection(newWord.sectionCode),
       learningStatus: resolveNewWordStatus(newWord.learningStatus),
+      category: newWord.category,
       addedAt: timestamp,
     });
     for (let errorIndex = 0; errorIndex < newWord.lessonErrorCount; errorIndex += 1) {
@@ -313,6 +320,7 @@ export function createWordService({
     logWordError,
     logWordErrorByLookup,
     categorizeWords,
+    suggestWords,
     listTopics,
     ensureTopic,
   });
@@ -329,6 +337,7 @@ function mapWordInputToNewWord(wordInput) {
     sectionCode: mapBlankTextToNull(wordInput.section),
     topicName: mapBlankTextToNull(wordInput.topic),
     learningStatus: wordInput.status ?? 'new',
+    category: wordInput.category ?? null,
     lessonErrorCount: wordInput.err ?? 0,
   };
 }

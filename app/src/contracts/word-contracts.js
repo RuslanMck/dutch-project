@@ -23,6 +23,7 @@ export const wordSortOrderSchema = z.enum(WORD_SORT_ORDER_VALUES);
 
 const MAXIMUM_WORDS_PER_CALL = 1000;
 const MAXIMUM_WORD_LIST_LIMIT = 5000;
+const MAXIMUM_SUGGESTIONS = 120;
 
 export const wordPathParametersSchema = z.object({ id: identifierParameterSchema });
 
@@ -37,6 +38,10 @@ export const createWordInputSchema = z.object({
   status: learningStatusSchema.nullish(),
   kind: wordKindSchema.nullish().describe('auto-detected when omitted'),
   err: z.number().int().min(0).max(100).nullish().describe('lesson errors to record on the new word'),
+  category: wordCategorySchema.nullish().describe(
+    'category id (food, home, clothes, colours, numbers, people, body, city, work, nature, leisure, feelings, actions, '
+    + 'talk or other); left out, the categorizer sorts the word later',
+  ),
 });
 
 // Bulk add from MCP: lesson errors are logged separately there, so `err` is not accepted.
@@ -58,6 +63,11 @@ export const updateWordInputSchema = createWordInputSchema
       + 'actions, talk or other; null clears it',
     ),
   });
+
+export const suggestWordsInputSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(MAXIMUM_SUGGESTIONS).optional()
+    .describe('how many suggestions to return (default 30)'),
+});
 
 export const categorizeWordsInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(MAXIMUM_WORDS_PER_CALL).optional()

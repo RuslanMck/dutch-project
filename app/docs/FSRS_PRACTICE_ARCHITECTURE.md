@@ -658,3 +658,56 @@ Once an answer is checked, right or wrong, the word's example (Приклад NL
 shows under the result message, in the FSRS practice, the article practice and the custom drills. The practice words
 carry no example, so it is read from the word list (`renderPracticeExample` in app.js). No example, no line; a form
 deck card has none.
+
+## 20. Quick known check and missing words (14.11.2026)
+
+### 20.1 «Я це вже знаю» (`known-check-service.js`, `known-check-planning.js`)
+
+`GET /api/practice/known-check?limit=20` (1 to 50) lists the next New words (no FSRS card) in queue order: the order of
+`compareQueueOrder` on `mapToQueueCandidate` from `word-set-planning.js`, so the check follows the queue as it is. Words
+already shown in a check are left out (`known_check_seen`, a settings JSON array of ids), and so are the words of today's
+open set. The answer is `{ words: [{ id, nl, article, uk, kind }], remaining }`, `remaining` being the New words after
+these.
+
+`POST /api/practice/known-check { known_ids, unknown_ids }` answers the check:
+
+- a known word gets a learned review card (`buildMigrationCard({ group: 'learned' })`) due 14 to 28 days out, spread
+  evenly over the words of the request in queue order, status `learned`, `introduced_on` today, and no learning deck
+  places; it is not in today's set;
+- an unknown word stays New and is added to `known_check_seen`;
+- ids that are not New words, or are in today's open set, are ignored; one id in both lists is refused (400);
+- nothing of the answers, review logs, deck answers, statistics or achievements is written; `words` is published.
+
+Response: `{ known, unknown, remaining }`, `remaining` the New words still to ask about. Before the FSRS migration the
+check refuses like the other practice reads (409).
+
+Example: `GET /api/practice/known-check?limit=2` gives
+`{"words":[{"id":12,"nl":"boek","article":"het","uk":"книга","kind":"word"},{"id":31,"nl":"lezen","article":"","uk":"читати","kind":"word"}],"remaining":3}`
+and `POST` with `{"known_ids":[12],"unknown_ids":[31]}` gives `{"known":1,"unknown":1,"remaining":3}`.
+
+### 20.2 Missing common words (`word-suggester.js`, `word-suggestion-planning.js`, `word-suggestion-prompt.js`)
+
+`POST /api/words/suggestions { limit }` (1 to 120, default 30) returns
+`{ suggestions: [{ nl, article, uk, category, frequency_rank }] }` and saves nothing.
+
+- Candidates: the forms of `word_frequencies` with a rank up to 4000, grouped by rank (one lemma per group). A group is
+  covered when one of its forms is a token of a dictionary word (de/het and punctuation ignored). The 120 most frequent
+  uncovered groups go to OpenRouter (`WORD_CATEGORY_MODEL`) through the injected client, one request.
+- The prompt (English) asks for the dictionary form, the article of a noun, a Ukrainian translation that must be correct
+  literary Ukrainian (no russianisms, no surzhyk, no Russian words), one category id, and it skips pronouns, articles,
+  names, numbers written as words and words the forms do not identify. The answer is a JSON object `{ "suggestions": [...] }`.
+- The answer is checked: a suggestion needs a rank of a group sent, a valid article and category, a Ukrainian text, a
+  new nl (the article is ignored in the comparison) and no repeat; at most `limit` remain, in the model's order.
+- Without a key: 400 «Модель не налаштована», no request.
+- Adding the chosen words uses the usual add (`POST /api/words`, the bulk add, MCP `add_words`), which now takes
+  `category` (a category id, optional). A word added with a category keeps it: the categorizer only fills words without one.
+
+Example: `POST /api/words/suggestions {"limit":2}` gives
+`{"suggestions":[{"nl":"boek","article":"het","uk":"книга","category":"leisure","frequency_rank":399}]}`.
+
+### 20.3 Tests
+
+`test/known-check.test.js` (the order, the learned cards and their spread, unknown words, ignored ids, open set, no
+answers written, the refusal before the migration, the REST routes) and `test/word-suggestions.test.js` (the groups, the
+checked answer, the prompt, the service with a fake OpenRouter call, the category on add, the REST route). No real
+OpenRouter request is made.

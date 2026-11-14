@@ -122,6 +122,22 @@ export const spareWordsQuerySchema = z.object({
   session_id: practiceSessionIdSchema,
 }).strict();
 
+// The quick known check: how many New words to list (REST query, 1 to 50, default 20), and the answers posted back: the
+// ids the learner knows and the ids he does not (at most 100 each).
+const MAXIMUM_KNOWN_CHECK_LIMIT = 50;
+const MAXIMUM_KNOWN_CHECK_WORDS_PER_CALL = 100;
+export const knownCheckQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(MAXIMUM_KNOWN_CHECK_LIMIT).optional()
+    .describe('how many words to list, 1 to 50; default 20'),
+}).strict();
+
+export const knownCheckInputSchema = z.object({
+  known_ids: z.array(identifierSchema).max(MAXIMUM_KNOWN_CHECK_WORDS_PER_CALL).default([])
+    .describe('ids of the words the learner knows'),
+  unknown_ids: z.array(identifierSchema).max(MAXIMUM_KNOWN_CHECK_WORDS_PER_CALL).default([])
+    .describe('ids of the words the learner does not know; they stay new'),
+}).strict();
+
 export const setCurrentChapterInputSchema = z.object({
   chapter: chapterNumberSchema.describe('textbook chapter the learner is on now, e.g. 7 for chapter 7'),
 }).strict();

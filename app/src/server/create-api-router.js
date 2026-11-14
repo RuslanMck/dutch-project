@@ -31,12 +31,13 @@ export function createApiRouter({
   deckService,
   ruleExerciseService,
   achievementService,
+  knownCheckService,
   changeEventBus,
   logger = console,
 }) {
   const apiRouter = express.Router();
   apiRouter.use(createWordRoutes({ wordService }));
-  apiRouter.use(createPracticeRoutes({ practiceService, priorityService, phrasePracticeService }));
+  apiRouter.use(createPracticeRoutes({ practiceService, priorityService, phrasePracticeService, knownCheckService }));
   apiRouter.use(createRuleRoutes({ ruleService }));
   apiRouter.use(createMistakeRoutes({ mistakeService }));
   apiRouter.use(createPhraseRoutes({ phraseService }));

@@ -9,11 +9,13 @@ import {
   gradeWordInputSchema,
   practiceBatchQuerySchema,
   previewPrioritiesQuerySchema,
+  knownCheckInputSchema,
+  knownCheckQuerySchema,
   spareWordsQuerySchema,
 } from '../../contracts/practice-contracts.js';
 import { readRequestBody, removeBlankQueryValues } from '../../http/request-input.js';
 
-export function createPracticeRoutes({ practiceService, priorityService, phrasePracticeService }) {
+export function createPracticeRoutes({ practiceService, priorityService, phrasePracticeService, knownCheckService }) {
   const practiceRouter = express.Router();
 
   practiceRouter.get('/practice/batch', (request, response) => {
@@ -94,6 +96,20 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
       source: drillInput.source,
       answeredAt: drillInput.answered_at,
       clientAnswerId: drillInput.client_answer_id,
+    }));
+  });
+
+  // The quick known check: the next New words to ask about, then the answers (known words get a learned card).
+  practiceRouter.get('/practice/known-check', (request, response) => {
+    const checkInput = knownCheckQuerySchema.parse(removeBlankQueryValues(request.query));
+    response.json(knownCheckService.getKnownCheck({ limit: checkInput.limit }));
+  });
+
+  practiceRouter.post('/practice/known-check', (request, response) => {
+    const checkInput = knownCheckInputSchema.parse(readRequestBody(request));
+    response.json(knownCheckService.recordKnownCheck({
+      knownIds: checkInput.known_ids,
+      unknownIds: checkInput.unknown_ids,
     }));
   });
 

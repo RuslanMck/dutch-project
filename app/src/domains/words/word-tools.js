@@ -59,6 +59,7 @@ export function registerWordTools({ mcpServer, wordService }) {
       + 'with status "new" (status is not taken from the input) and enters practice through the daily quota of new '
       + 'words, by priority. Before that, status is taken from the input, or "new". '
       + 'Priority comes from the textbook chapter and the frequency list. '
+      + 'category (optional) is a category id; without it the categorizer sorts the word later. '
       + 'An entry whose nl and article match an existing word is skipped (reported in "skipped") '
       + 'unless skip_existing is false. '
       + 'Returns {added, skipped}.',

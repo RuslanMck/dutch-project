@@ -8,6 +8,7 @@ import {
   listWordsQuerySchema,
   logWordErrorInputSchema,
   recordPracticeResultInputSchema,
+  suggestWordsInputSchema,
   updateWordInputSchema,
   wordPathParametersSchema,
 } from '../../contracts/word-contracts.js';
@@ -34,6 +35,11 @@ export function createWordRoutes({ wordService }) {
   wordRouter.post('/words/categorize', async (request, response) => {
     const { limit } = categorizeWordsInputSchema.parse(readRequestBody(request));
     response.json(await wordService.categorizeWords({ limit }));
+  });
+
+  wordRouter.post('/words/suggestions', async (request, response) => {
+    const { limit } = suggestWordsInputSchema.parse(readRequestBody(request));
+    response.json(await wordService.suggestWords({ limit }));
   });
 
   wordRouter.delete('/words/:id', (request, response) => {

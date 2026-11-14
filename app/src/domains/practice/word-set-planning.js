@@ -140,7 +140,7 @@ function allocateSetCandidates({ settings, candidatesByPriority, room }) {
   });
 }
 
-function mapToQueueCandidate(wordRow) {
+export function mapToQueueCandidate(wordRow) {
   return {
     id: wordRow.id,
     priority: wordRow.priority,

@@ -16,6 +16,12 @@ export function createFrequencyRepository({ database }) {
     WHERE word_frequencies.word_form = @wordForm
   `).pluck();
   const countFrequenciesStatement = database.prepare('SELECT COUNT(*) FROM word_frequencies').pluck();
+  const selectFrequencyRowsUpToRankStatement = database.prepare(`
+    SELECT word_frequencies.word_form, word_frequencies.frequency_rank
+    FROM word_frequencies
+    WHERE word_frequencies.frequency_rank <= @maximumRank
+    ORDER BY word_frequencies.frequency_rank ASC, word_frequencies.word_form ASC
+  `);
 
   // entries: [{ wordForm, frequencyRank }]. Deletes every existing row first.
   function replaceAllFrequencies(entries) {
@@ -37,7 +43,17 @@ export function createFrequencyRepository({ database }) {
     return countFrequenciesStatement.get();
   }
 
-  return Object.freeze({ replaceAllFrequencies, upsertFrequencies, findRankByForm, countFrequencies });
+  // Every form with a rank up to maximumRank, most frequent first: [{ wordForm, frequencyRank }].
+  function listFrequencyRowsUpToRank(maximumRank) {
+    return selectFrequencyRowsUpToRankStatement.all({ maximumRank }).map(row => ({
+      wordForm: row.word_form,
+      frequencyRank: row.frequency_rank,
+    }));
+  }
+
+  return Object.freeze({
+    replaceAllFrequencies, upsertFrequencies, findRankByForm, countFrequencies, listFrequencyRowsUpToRank,
+  });
 }
 
 function addFrequencyEntries(statement, entries) {

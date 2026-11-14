@@ -17,6 +17,7 @@ import { createPhraseService } from '../domains/phrases/phrase-service.js';
 import { createClientAnswerReceiptRepository } from '../domains/practice/client-answer-receipts.js';
 import { createFrequencyRepository } from '../domains/practice/frequency-repository.js';
 import { createFsrsScheduler } from '../domains/practice/fsrs-scheduling.js';
+import { createKnownCheckService } from '../domains/practice/known-check-service.js';
 import { createWordSetPlanner } from '../domains/practice/word-set-planning.js';
 import { createPhrasePracticeRepository } from '../domains/practice/phrase-practice-repository.js';
 import { createPhrasePracticeService } from '../domains/practice/phrase-practice-service.js';
@@ -41,6 +42,7 @@ import { createTopicRepository } from '../domains/words/topic-repository.js';
 import { createWordCategorizer } from '../domains/words/word-categorizer.js';
 import { createWordRepository } from '../domains/words/word-repository.js';
 import { createWordService } from '../domains/words/word-service.js';
+import { createWordSuggester } from '../domains/words/word-suggester.js';
 import { createOpenRouterClient } from '../integrations/openrouter-client.js';
 
 export function createDomainServices({
@@ -69,11 +71,18 @@ export function createDomainServices({
     clock,
     logger,
   });
+  const frequencyRepository = createFrequencyRepository({ database });
+  const wordSuggester = createWordSuggester({
+    wordRepository,
+    frequencyRepository,
+    openRouterClient,
+    model: configuration.wordCategoryModel,
+  });
   const practiceRepository = createPracticeRepository({ database });
   const practiceSettings = createPracticeSettings({ practiceRepository });
   const priorityService = createPriorityService({
     practiceRepository,
-    frequencyRepository: createFrequencyRepository({ database }),
+    frequencyRepository,
     practiceSettings,
     runInTransaction,
     changeEventBus,
@@ -85,6 +94,7 @@ export function createDomainServices({
     priorityService,
     practiceSettings,
     wordCategorizer,
+    wordSuggester,
     ...sharedDependencies,
   });
   const fsrsScheduler = createFsrsScheduler({
@@ -108,6 +118,11 @@ export function createDomainServices({
     wordService,
     fsrsScheduler,
     phrasePracticeService,
+    ...sharedDependencies,
+  });
+  const knownCheckService = createKnownCheckService({
+    practiceRepository,
+    practiceSettings,
     ...sharedDependencies,
   });
   const practiceResetService = createPracticeResetService({
@@ -201,5 +216,7 @@ export function createDomainServices({
     ruleExerciseService,
     achievementService,
     wordCategorizer,
+    wordSuggester,
+    knownCheckService,
   });
 }
