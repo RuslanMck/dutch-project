@@ -147,6 +147,13 @@ export const getWeek = week => request('GET', `/api/stats/week?week=${enc(week)}
 export const getCalendar = (days = 84) => request('GET', `/api/stats/calendar?days=${enc(days)}`);
 // Medals by group, with each achievement's unlock and progress (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §2.2).
 export const getAchievements = () => request('GET', '/api/achievements');
+// Що я вже знаю (plan §4): the next new words to mark as known, { words: [{ id, nl, article, uk, kind }], remaining }.
+export const getKnownCheck = (limit = 20) => request('GET', `/api/practice/known-check?limit=${enc(limit)}`, undefined, { rejectOfflineCache: true });
+// Готово: known_ids → review in 2–4 weeks; unknown_ids stay new. Answers { known, unknown, remaining }.
+export const postKnownCheck = (knownIds, unknownIds) => request('POST', '/api/practice/known-check', { known_ids: knownIds, unknown_ids: unknownIds });
+// Поточна глава (Профіль): { chapter } 1–99.
+export const getChapter = () => request('GET', '/api/practice/chapter', undefined, { rejectOfflineCache: true });
+export const saveChapter = chapter => request('PUT', '/api/practice/chapter', { chapter });
 
 // Calls onChange(collection) for every live change. 'all' means refetch everything.
 // Uses SSE; while the stream is down (error or not yet open) it polls every 5 s.

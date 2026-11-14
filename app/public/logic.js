@@ -616,6 +616,7 @@ export const TAB_TITLES = Object.freeze({
   stats: 'Статистика',
   week: 'Тиждень у підсумку',
   achievements: 'Досягнення',
+  'known-check': 'Що я вже знаю',
 });
 
 // The line under the page title in the gold header (Головна has its own greeting).
@@ -634,6 +635,7 @@ export const TAB_SUBTITLES = Object.freeze({
   stats: 'Як іде навчання',
   week: 'Твій тиждень коротко',
   achievements: 'Твої відзнаки',
+  'known-check': 'Швидка перевірка слів',
 });
 
 const PERIOD_RANGE_PREFIX = Object.freeze({
@@ -1176,6 +1178,7 @@ export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
   rules: 'profile',
   texts: 'profile',
   week: 'home',
+  'known-check': 'home',
 });
 
 export function findNavigationSection(tab) {
@@ -1713,4 +1716,41 @@ export function markUnlockedSeen(achievements = [], seenIds = []) {
 
 export function formatAchievementToast(achievement) {
   return `Нове досягнення: ${achievement.title}`;
+}
+
+// ---------- Що я вже знаю (plan §4) ----------
+
+// One chip of the known check: «de huis · будинок».
+export function formatKnownCheckChip(word) {
+  return `${formatDutchWithArticle(word)} · ${word.uk}`;
+}
+
+// A tap on a chip: the word joins or leaves the chosen («знаю») words; a new array, the order kept.
+export function toggleKnownCheckChoice(knownIds, wordId) {
+  return knownIds.includes(wordId) ? knownIds.filter(id => id !== wordId) : [...knownIds, wordId];
+}
+
+// «Готово»: the chosen words of the batch are known, the rest of the batch are unknown.
+export function buildKnownCheckPayload(batchIds, knownIds) {
+  return {
+    known_ids: batchIds.filter(id => knownIds.includes(id)),
+    unknown_ids: batchIds.filter(id => !knownIds.includes(id)),
+  };
+}
+
+// The text after «Готово»: the count of known words, the next batch's button («Далі (ще N)») or the end line.
+// remaining: the new words still waiting after this batch (the POST answer).
+export function buildKnownCheckResult({ known, remaining }) {
+  const hasMore = remaining > 0;
+  return {
+    line: `Позначено як знайомі: ${known}. Ці слова прийдуть на повторення пізніше.`,
+    nextLabel: hasMore ? `Далі (ще ${remaining})` : '',
+    endLine: hasMore ? '' : 'Нових слів більше немає',
+  };
+}
+
+// The chapter field (Профіль): an integer from 1 to 99, or null when the text is not one.
+export function parseChapterInput(value) {
+  const chapter = Number(value);
+  return Number.isInteger(chapter) && chapter >= 1 && chapter <= 99 ? chapter : null;
 }
