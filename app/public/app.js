@@ -4,7 +4,7 @@ import * as api from './api.js';
 import { offlineStore, flushOutbox, getStore as getOfflineStore } from './offline-store.js';
 import {
   replayClass, makeSprout, makeGrowingPot, makeFlame, showInputResult, snapshotTiles, playTileMoves, waveTiles,
-  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill,
+  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill, isMotionReduced,
 } from './motion.js';
 import {
   buildHomeSummary,
@@ -107,6 +107,9 @@ import {
   formatDroppedNotice,
   formatUnsentLogoutText,
   buildLocalRoundSummary,
+  buildAnswerLetterDiff,
+  findBasketAt,
+  pluralize,
 } from './logic.js';
 
 const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
@@ -189,7 +192,11 @@ const ui = {
       message: '',
     },
   },
-  practice: { mode: 'fsrs', current: null, lastWordId: null, feedback: null, score: { correct: 0, total: 0 } },
+  practice: {
+    mode: 'fsrs', current: null, lastWordId: null, feedback: null, score: { correct: 0, total: 0 },
+    // Article practice: the words put into each basket (right answers) in this visit.
+    baskets: { de: 0, het: 0 },
+  },
   // FSRS translation practice. status: idle | loading | ready | done | unconfigured | failed.
   // direction: the round on screen (uk_nl, then nl_uk). queue: the words of that round still to answer (reviews, then
   // new words; again/hard words go to the end). waiting: the words of each round not started yet (19.6).
@@ -1536,36 +1543,8 @@ async function advanceFsrsWord() {
 }
 
 function submitArticleAnswer() {
-  const practice = ui.practice;
-  const input = $('practice-input');
-  if (practice.current?.checked) {
-    pickArticleQuestion();
-    input.value = '';
-    renderPractice();
-    input.focus();
-    return;
-  }
-  if (!practice.current || !input.value.trim()) {
-    input.focus();
-    return;
-  }
-  const { word } = practice.current;
-  const result = checkAnswer(word, input.value, 'art');
-  if (!result.counted) {
-    practice.feedback = { text: result.message, ok: false };
-    renderPractice();
-    return;
-  }
-  practice.current.checked = true;
-  practice.feedback = { text: result.message, ok: result.correct };
-  practice.score.total += 1;
-  if (result.correct) practice.score.correct += 1;
-  renderPractice();
-  act(() => api.recordResult(word.id, {
-    correct: result.correct,
-    mode: 'article',
-    answer: normalise(input.value),
-  }), ['words']);
+  if (ui.practice.current?.checked) advanceArticlePractice();
+  else $('article-chip').focus();
 }
 
 function renderPractice() {
@@ -1582,6 +1561,10 @@ function renderPractice() {
   $('practice-drill-summary').hidden = true;
   $('practice-custom-note').hidden = true;
   $('practice-progress-bar').hidden = true;      // the FSRS practice and the custom drill show it again
+  // The article board replaces the answer field; the other modes show the field and the question again.
+  $('practice-input').hidden = mode === 'art';
+  $('practice-board').hidden = true;
+  $('practice-q').hidden = false;
   if (isFsrs) renderFsrsPractice();
   else if (mode === 'art') renderArticlePractice();
   else renderCustomPractice();
@@ -1602,7 +1585,8 @@ function renderPracticeExample(current) {
 // isChecked: the feedback is the result of a checked answer, so the input shows it too (green, or red with a shake).
 // A new feedback rises in, and «✓ …» grows a sprout; a re-render of the same feedback leaves it as it is.
 let shownPracticeFeedback = null;
-function setPracticeMessage(feedback, isChecked = false) {
+// diff: the letter diff of a wrong typed word (plan 3.1), shown with the message when the message is new.
+function setPracticeMessage(feedback, isChecked = false, diff = null) {
   const messageElement = $('practice-msg');
   const isNew = feedback !== shownPracticeFeedback;
   shownPracticeFeedback = feedback;
@@ -1610,6 +1594,7 @@ function setPracticeMessage(feedback, isChecked = false) {
   if (!isNew) return;
   messageElement.textContent = feedback ? feedback.text : '';
   messageElement.className = 'msg' + (feedback ? (feedback.ok ? ' ok' : ' bad') : '');
+  renderPracticeDiff(feedback ? diff : null);
   if (!feedback) return;
   if (feedback.ok && feedback.text.startsWith('✓')) messageElement.prepend(makeSprout());
   replayClass(messageElement, 'msg-enter');
@@ -1651,25 +1636,227 @@ function celebratePracticeSummaries() {
 function renderArticlePractice() {
   const practice = ui.practice;
   if (!practice.current || !state.words.some(word => word.id === practice.current.word.id)) pickArticleQuestion();
-
-  const hasQuestion = !!practice.current;
-  $('practice-q').textContent = hasQuestion ? practice.current.word.nl : 'Немає слів для цього режиму';
-  $('practice-form').hidden = !hasQuestion;
+  const current = practice.current;
+  const hasQuestion = !!current;
+  $('practice-q').textContent = hasQuestion ? '' : 'Немає слів для цього режиму';
+  $('practice-q').hidden = hasQuestion;
+  $('practice-board').hidden = !hasQuestion;
+  $('practice-form').hidden = !hasQuestion || !current.checked;
   if (hasQuestion) {
-    $('practice-btn').textContent = practice.current.checked ? 'Далі' : 'Перевірити';
-    $('practice-input').placeholder = 'de або het';
+    renderArticleBoard(current);
+    $('practice-btn').textContent = 'Далі';
   }
   $('practice-skip-button').hidden = true;
   $('practice-schedule').textContent = '';
   $('practice-progress').textContent = '';
   $('practice-summary').hidden = true;
   $('practice-round').hidden = true;
-  $('practice-q').hidden = false;
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
-  setPracticeMessage(practice.feedback, !!practice.current?.checked);
-  renderPracticeExample(practice.current);
-  $('practice-score').textContent = `Вірно: ${practice.score.correct} з ${practice.score.total}`;
+  setPracticeMessage(practice.feedback, !!current?.checked);
+  renderPracticeExample(current);
+  $('practice-score').textContent = `Правильно: ${practice.score.correct} з ${practice.score.total}`;
+}
+
+// ---------- Артикль: два кошики (plan 3.2) ----------
+// A word is put into the «de» or «het» basket by a drop of the chip, by a tap on a basket, or with the arrow keys. All
+// three play the same animation.
+const ARTICLE_BASKETS = ['de', 'het'];
+const SPRING_EASING = 'cubic-bezier(.34, 1.56, .64, 1)';   // the motion spring of motion.js and garden.css
+const ARTICLE_NEXT_DELAY_MS = 900;   // a right answer moves on by itself after this; «Далі» moves on at once
+let articleNextTimer = null;
+let articleDrag = null;                          // { pointerId, startX, startY } while the chip is dragged
+let articleChipOffset = { x: 0, y: 0 };          // the chip's drag offset from its place
+let shownArticleQuestion = null;                 // the question the board shows (an object of ui.practice.current)
+
+function articleBasket(article) {
+  return $(`article-basket-${article}`);
+}
+
+function articleBasketRects() {
+  return Object.fromEntries(ARTICLE_BASKETS.map(article => [article, articleBasket(article).getBoundingClientRect()]));
+}
+
+function formatBasketCount(count) {
+  return `${count} ${pluralize(count, ['слово', 'слова', 'слів'])}`;
+}
+
+// The chip shows the word; the baskets show their counts and the green glow of the right basket once answered.
+function renderArticleBoard(current) {
+  const chip = $('article-chip');
+  if (shownArticleQuestion !== current) {
+    shownArticleQuestion = current;
+    chip.getAnimations?.().forEach(animation => animation.cancel());
+    chip.style.transform = '';
+    articleChipOffset = { x: 0, y: 0 };
+    chip.textContent = current.word.nl;
+    replayClass(chip, 'article-chip--pop');
+  }
+  // A right answer has flown the chip into its basket; it stays hidden until the next word.
+  chip.classList.toggle('article-chip--gone', !!current.checked && current.choice === current.word.article);
+  for (const article of ARTICLE_BASKETS) {
+    const basket = articleBasket(article);
+    basket.classList.toggle('article-basket--right', !!current.checked && current.word.article === article);
+    basket.querySelector('.article-basket__count').textContent = formatBasketCount(ui.practice.baskets[article]);
+  }
+}
+
+function highlightArticleBasket(article) {
+  for (const name of ARTICLE_BASKETS) articleBasket(name).classList.toggle('article-basket--over', name === article);
+}
+
+// The chip flies into the basket: a right word fades into it; a wrong one goes in and comes back to its place.
+function flyChipInto(article, isRight) {
+  const chip = $('article-chip');
+  const from = articleChipOffset;
+  articleChipOffset = { x: 0, y: 0 };
+  chip.style.transform = '';
+  if (isMotionReduced() || !chip.animate) return;
+  const chipRect = chip.getBoundingClientRect();
+  const basketRect = articleBasket(article).getBoundingClientRect();
+  const dx = (basketRect.left + basketRect.width / 2) - (chipRect.left + chipRect.width / 2);
+  const dy = (basketRect.top + basketRect.height / 2) - (chipRect.top + chipRect.height / 2);
+  const start = `translate(${from.x}px, ${from.y}px)`;
+  if (isRight) {
+    chip.animate([{ transform: start, opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(.4)`, opacity: 0 }],
+      { duration: 420, easing: 'ease-in', fill: 'forwards' });
+  } else {
+    chip.animate([
+      { transform: start },
+      { transform: `translate(${dx * 0.6}px, ${dy * 0.6}px)`, offset: 0.45 },
+      { transform: 'translate(0px, 0px)' },
+    ], { duration: 520, easing: SPRING_EASING });
+  }
+}
+
+// Released outside the baskets: the chip springs back to its place.
+function springBackArticleChip() {
+  const chip = $('article-chip');
+  const from = articleChipOffset;
+  articleChipOffset = { x: 0, y: 0 };
+  chip.style.transform = '';
+  if ((!from.x && !from.y) || isMotionReduced() || !chip.animate) return;
+  chip.animate([{ transform: `translate(${from.x}px, ${from.y}px)` }, { transform: 'translate(0px, 0px)' }],
+    { duration: 420, easing: SPRING_EASING });
+}
+
+// The one answer to the word on the board: article is 'de' or 'het'.
+function answerArticle(article) {
+  const practice = ui.practice;
+  const current = practice.current;
+  if (!current || current.checked) return;
+  const { word } = current;
+  const result = checkAnswer(word, article, 'art');
+  current.checked = true;
+  current.choice = article;
+  practice.feedback = { text: result.message, ok: result.correct };
+  practice.score.total += 1;
+  if (result.correct) {
+    practice.score.correct += 1;
+    practice.baskets[article] += 1;
+  }
+  flyChipInto(article, result.correct);
+  renderPractice();
+  const basket = articleBasket(article);
+  if (result.correct) {
+    replayClass(basket, 'article-basket--pulse');
+    replayClass(basket.querySelector('.article-basket__count'), 'article-basket__count--bump');
+  } else {
+    replayClass(basket, 'article-basket--shake');
+    $('practice-btn').focus();
+  }
+  act(() => api.recordResult(word.id, { correct: result.correct, mode: 'article', answer: article }), ['words']);
+  clearTimeout(articleNextTimer);
+  articleNextTimer = null;
+  if (result.correct) {
+    articleNextTimer = setTimeout(() => {
+      if (ui.practice.mode === 'art' && ui.practice.current === current) advanceArticlePractice();
+    }, ARTICLE_NEXT_DELAY_MS);
+  }
+}
+
+// «Далі», or the automatic move after a right answer: the next word pops in.
+function advanceArticlePractice() {
+  clearTimeout(articleNextTimer);
+  articleNextTimer = null;
+  pickArticleQuestion();
+  renderPractice();
+  if (ui.tab === 'practice') $('article-chip').focus();
+}
+
+function bindArticleBoard() {
+  const chip = $('article-chip');
+  chip.addEventListener('pointerdown', event => {
+    const current = ui.practice.current;
+    if (event.button > 0 || !current || current.checked) return;
+    articleDrag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY };
+    chip.setPointerCapture?.(event.pointerId);
+    chip.classList.add('article-chip--dragging');
+    chip.getAnimations?.().forEach(animation => animation.cancel());
+  });
+  chip.addEventListener('pointermove', event => {
+    if (!articleDrag || event.pointerId !== articleDrag.pointerId) return;
+    articleChipOffset = { x: event.clientX - articleDrag.startX, y: event.clientY - articleDrag.startY };
+    chip.style.transform = `translate(${articleChipOffset.x}px, ${articleChipOffset.y}px)`;
+    highlightArticleBasket(findBasketAt({ x: event.clientX, y: event.clientY }, articleBasketRects()));
+  });
+  const endDrag = (event, isCancelled) => {
+    if (!articleDrag || event.pointerId !== articleDrag.pointerId) return;
+    articleDrag = null;
+    chip.classList.remove('article-chip--dragging');
+    highlightArticleBasket(null);
+    const target = isCancelled ? null : findBasketAt({ x: event.clientX, y: event.clientY }, articleBasketRects());
+    if (target) answerArticle(target);
+    else springBackArticleChip();
+  };
+  chip.addEventListener('pointerup', event => endDrag(event, false));
+  chip.addEventListener('pointercancel', event => endDrag(event, true));
+  chip.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    answerArticle(event.key === 'ArrowLeft' ? 'de' : 'het');
+  });
+  for (const article of ARTICLE_BASKETS) {
+    articleBasket(article).addEventListener('click', () => answerArticle(article));
+  }
+}
+
+// ---------- Де саме помилка (plan 3.1) ----------
+function buildLetterRow(label, letters) {
+  const row = document.createElement('div');
+  row.className = 'letter-diff__row';
+  const name = document.createElement('span');
+  name.className = 'letter-diff__label muted';
+  name.textContent = label;
+  const holder = document.createElement('span');
+  holder.className = 'letter-diff__letters';
+  letters.forEach((letter, index) => {
+    const span = document.createElement('span');
+    span.className = letter.className ? `letter ${letter.className}` : 'letter';
+    span.style.setProperty('--delay', `${index * 70}ms`);
+    span.textContent = letter.char;
+    holder.append(span);
+  });
+  row.append(name, holder);
+  return row;
+}
+
+// Two rows: «Ти написав» (wrong and extra letters struck through) and «Правильно» (wrong and missing letters drop in).
+function renderPracticeDiff(diff) {
+  const holder = $('practice-diff');
+  holder.replaceChildren();
+  holder.hidden = !diff;
+  if (!diff) return;
+  const typed = diff.filter(entry => entry.typed !== undefined).map(entry => ({
+    char: entry.typed,
+    className: entry.kind === 'wrong' || entry.kind === 'extra' ? 'letter--bad' : '',
+  }));
+  const right = diff.filter(entry => entry.right !== undefined).map(entry => ({
+    char: entry.right,
+    className: entry.kind === 'wrong' || entry.kind === 'missing' ? 'letter--fix' : '',
+  }));
+  holder.append(buildLetterRow('Ти написав', typed), buildLetterRow('Правильно', right));
+  replayClass(holder, 'diff-enter');
 }
 
 // The line under the practice message, from the grade response: the right answers still needed in the session, a
@@ -1723,7 +1910,9 @@ function renderFsrsPractice() {
   const strugglingButton = $('practice-struggling-button');
   strugglingButton.hidden = session.status !== 'done' || !session.strugglingCount;
   if (session.strugglingCount) strugglingButton.textContent = formatStrugglingDrillButton(session.strugglingCount);
-  setPracticeMessage(session.feedback, isReady && current.checked);
+  const fsrsDiff = isReady && current.checked && current.direction === 'uk_nl' && current.grade !== 'good'
+    ? buildAnswerLetterDiff(current.word, current.answer ?? '') : null;
+  setPracticeMessage(session.feedback, isReady && current.checked, fsrsDiff);
   renderPracticeExample(isReady ? current : null);
   if (session.status === 'done') renderPracticeSummary();
   const isRoundDone = session.status === 'round-done';
@@ -2068,6 +2257,7 @@ function submitCustomAnswer() {
     input.focus();
     return;
   }
+  drill.current.typed = input.value;
   answerCustomWord(result);
 }
 
@@ -2185,7 +2375,9 @@ function renderCustomPractice() {
   $('practice-q').hidden = false;
   $('practice-meta').hidden = false;
   $('practice-restart-button').hidden = true;
-  setPracticeMessage(drill.feedback, isReady && current.checked);
+  const drillDiff = isReady && current.checked && !drill.formDeck && current.direction === 'uk_nl' && current.grade !== 'good'
+    ? buildAnswerLetterDiff(current.word, current.typed ?? '') : null;
+  setPracticeMessage(drill.feedback, isReady && current.checked, drillDiff);
   renderPracticeExample(isReady && !drill.formDeck ? current : null);
   $('practice-drill-summary').hidden = drill.status !== 'done';
   if (drill.status === 'done') renderCustomEnd();
@@ -3363,6 +3555,7 @@ function bindEvents() {
     submitPractice();
   });
   $('practice-skip-button').addEventListener('click', handlePracticeSkipClick);
+  bindArticleBoard();
   $('practice-override-button').addEventListener('click', () => {
     if (isCustomPracticeMode()) overrideCustomAnswer();
     else handleOverrideClick();

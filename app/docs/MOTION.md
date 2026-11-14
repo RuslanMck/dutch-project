@@ -26,3 +26,16 @@ the rule exercise adds its pulse or shake only when the result first arrives. Su
 (`renderSummaryItems`), so a re-render does not cut a count-up short. The streak rolls only on the visible
 Статистика tab. A second tap on a card waits for the turn to finish. The menu pill is placed again when the menu
 resizes (ResizeObserver) and when the font has loaded.
+
+## Article baskets and the letter diff (plan §3)
+
+- Артикль: the word is a chip above the «de» and «het» baskets. A drop on a basket, a tap on a basket and the arrow
+  keys all answer the same way (`answerArticle`): the chip flies into the basket (`flyChipInto`). Right: the basket
+  glows green and pulses, its count goes up, and the next word pops in after 900 ms («Далі» moves on at once). Wrong:
+  the basket shakes, the chip goes in and back, the right basket glows, and «Далі» moves on. Released outside a
+  basket, the chip springs back (`springBackArticleChip`). The drag uses pointer events with pointer capture; the
+  hit test is `findBasketAt` in `logic.js`.
+- Де саме помилка: the letter diff appears with a new message only (`renderPracticeDiff`). The typed letters strike
+  through (the line draws in); the right letters drop in. Both use the `diff-enter` class, removed after 1.5 s.
+- Reduced motion: the flight and spring-back are skipped (`isMotionReduced`); the CSS switches off the rest. The
+  right answer still moves on after 900 ms, since that is a pause, not an animation.

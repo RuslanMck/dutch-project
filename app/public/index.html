@@ -279,6 +279,21 @@
       <div id="practice-progress-bar" class="progress-bar practice-progress-bar" role="progressbar" aria-label="Прогрес набору"
         aria-valuemin="0" aria-valuemax="100" hidden><span id="practice-progress-fill" class="progress-bar__fill"></span></div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
+      <section id="practice-board" class="article-board" aria-label="Артикль" hidden>
+        <div id="article-chip" class="article-chip" role="button" tabindex="0" aria-keyshortcuts="ArrowLeft ArrowRight"
+          aria-describedby="article-hint"></div>
+        <div class="article-baskets">
+          <button id="article-basket-de" class="article-basket" type="button" data-article="de">
+            <span class="article-basket__name">de</span>
+            <span class="article-basket__count muted">0 слів</span>
+          </button>
+          <button id="article-basket-het" class="article-basket" type="button" data-article="het">
+            <span class="article-basket__name">het</span>
+            <span class="article-basket__count muted">0 слів</span>
+          </button>
+        </div>
+        <p id="article-hint" class="muted article-hint">Натисни на кошик або перетягни в нього слово</p>
+      </section>
       <form id="practice-form" class="row-form" autocomplete="off">
         <input id="practice-input" type="text" autocomplete="off" autocapitalize="none" autocorrect="off"
           spellcheck="false" aria-label="Відповідь">
@@ -287,6 +302,7 @@
       <button id="practice-skip-button" class="practice-skip" type="button" hidden>Не знаю</button>
       <button id="practice-override-button" class="practice-skip" type="button" hidden>Я мав рацію</button>
       <p id="practice-msg" class="msg" aria-live="polite"></p>
+      <div id="practice-diff" class="letter-diff" hidden></div>
       <p id="practice-example" class="practice-example" hidden><span id="practice-example-nl"
         class="practice-example__nl"></span><span id="practice-example-uk" class="practice-example__uk muted"></span></p>
       <p id="practice-schedule" class="muted practice-schedule"></p>

@@ -1434,3 +1434,64 @@ export function chooseStreakRollStart(seenValue, currentValue) {
   const seen = Number.parseInt(seenValue, 10);
   return Number.isInteger(seen) && seen >= 0 && seen < currentValue ? seen : null;
 }
+
+// Where a typed word differs from the right one, letter by letter (plan 3.1). Levenshtein with a backtrace; letters
+// compare case-insensitively. Each entry: { kind: 'same' | 'wrong' | 'extra' | 'missing', typed?, right? }:
+// wrong = a substituted letter, extra = a typed letter the word does not have, missing = a letter the word has and
+// the answer leaves out. Null when either side is empty or the words are too far apart to be useful.
+export function buildLetterDiff(typed, right) {
+  const typedLetters = [...String(typed ?? '')];
+  const rightLetters = [...String(right ?? '')];
+  if (!typedLetters.length || !rightLetters.length) return null;
+  const n = typedLetters.length;
+  const m = rightLetters.length;
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+  const dist = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 0; i <= n; i++) dist[i][0] = i;
+  for (let j = 0; j <= m; j++) dist[0][j] = j;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const cost = same(typedLetters[i - 1], rightLetters[j - 1]) ? 0 : 1;
+      dist[i][j] = Math.min(dist[i - 1][j - 1] + cost, dist[i - 1][j] + 1, dist[i][j - 1] + 1);
+    }
+  }
+  if (dist[n][m] > Math.max(2, Math.floor(m / 3))) return null;
+  const diff = [];
+  let i = n;
+  let j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && dist[i][j] === dist[i - 1][j - 1] + (same(typedLetters[i - 1], rightLetters[j - 1]) ? 0 : 1)) {
+      const kind = same(typedLetters[i - 1], rightLetters[j - 1]) ? 'same' : 'wrong';
+      diff.push({ kind, typed: typedLetters[i - 1], right: rightLetters[j - 1] });
+      i -= 1;
+      j -= 1;
+    } else if (i > 0 && dist[i][j] === dist[i - 1][j] + 1) {
+      diff.push({ kind: 'extra', typed: typedLetters[i - 1] });
+      i -= 1;
+    } else {
+      diff.push({ kind: 'missing', right: rightLetters[j - 1] });
+      j -= 1;
+    }
+  }
+  return diff.reverse();
+}
+
+// The letter diff of a typed translation (UA → NL) for the practice message. The article is left out on both sides
+// (the article is compared on its own). Null for «dnk», for an empty answer, and when nothing differs in the letters
+// (only the article was wrong).
+export function buildAnswerLetterDiff(word, input) {
+  const typed = normalizeAnswerText(input);
+  if (!typed || typed === 'dnk') return null;
+  const typedWord = typed.replace(/^(de|het) (?=.)/, '');
+  const diff = buildLetterDiff(typedWord, normalizeAnswerText(word.nl));
+  return diff?.some(entry => entry.kind !== 'same') ? diff : null;
+}
+
+// The basket under a point (plan 3.2): rects is { de: DOMRect-like, het: … }; returns the key, or null.
+export function findBasketAt(point, rects) {
+  if (!point || !rects) return null;
+  for (const [id, rect] of Object.entries(rects)) {
+    if (rect && point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom) return id;
+  }
+  return null;
+}
