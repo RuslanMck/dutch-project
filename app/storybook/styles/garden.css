@@ -2340,3 +2340,147 @@ button.calendar__cell { cursor: pointer; }
   color: var(--garden-ink-soft);
 }
 .calendar__legend .calendar__cell { width: 14px; height: 14px; }
+/* ---------- Досягнення (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §5) ---------- */
+.achievements-card {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--garden-raised);
+  border: 1px solid var(--garden-line);
+  border-radius: var(--garden-radius);
+}
+.achievements-card .stats-card__title { margin: 0 0 4px; }
+.achievements-card > p { margin: 0 0 8px; }
+.achievements-card > button { width: 100%; min-height: 44px; }
+
+/* A medal: round, gold when unlocked, muted with the icon greyed when locked. */
+.medal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.medal--small { width: 44px; height: 44px; }
+.medal--large { width: 88px; height: 88px; margin: 0 auto 12px; }
+.achievement-icon { width: 50%; height: 50%; }
+.medal--unlocked {
+  background: linear-gradient(160deg, var(--garden-mustard) 0%, var(--garden-primary) 60%, var(--garden-sand) 100%);
+  color: var(--garden-ink);
+  box-shadow: inset 0 0 0 3px var(--garden-raised), inset 0 0 0 4px var(--garden-primary);
+}
+.medal--locked {
+  background: var(--garden-sand);
+  border: 1px solid var(--garden-line);
+  color: var(--garden-ink-soft);
+}
+.medal--locked .achievement-icon { opacity: .5; }
+.medal--shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, .75) 50%, transparent 60%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: motion-glint 1s ease .35s both;
+  pointer-events: none;
+}
+.medal--pop { animation: achievement-pop .6s var(--motion-spring) both; }
+@keyframes achievement-pop {
+  from { opacity: 0; transform: scale(.3) rotate(-25deg); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The thin progress bar of a locked medal. */
+.medal-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--garden-line);
+  overflow: hidden;
+}
+.medal-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--garden-primary);
+  transition: width .6s var(--motion-spring);
+}
+
+/* The grid of one group: 4 per row (at 360px the cells are about 78px wide). */
+.achievement-group { margin: 0 0 20px; }
+.medal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 6px;
+}
+.medal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 2px;
+  background: none;
+  border: 0;
+  border-radius: var(--garden-radius-sm);
+  color: var(--garden-ink);
+  font: inherit;
+  text-align: center;
+}
+.medal-cell__title {
+  font-size: 11.5px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.medal-cell .medal-bar { width: 100%; }
+.medal-cell__count { font-size: 11px; color: var(--garden-ink-soft); }
+
+/* The Profile card's row of the latest medals: each one is a 44px tap target. */
+.medal-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.medal-row__item {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+}
+
+.achievement-dialog__left { margin: 0 0 8px; font-weight: var(--garden-weight-strong); text-align: center; }
+.achievement-dialog .medal-bar { margin: 0 0 6px; }
+.achievement-dialog .dialog__text { text-align: center; }
+.achievement-dialog .dialog__actions { margin-top: 12px; }
+.achievement-dialog > .muted { margin: 0; text-align: center; }
+
+/* Unlock toasts: at the top, above the page, never blocking input. */
+.achievement-toasts {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.achievement-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--garden-raised);
+  border: 1px solid var(--garden-line);
+  border-radius: var(--garden-radius);
+  box-shadow: var(--garden-lift);
+  animation: motion-enter .35s var(--motion-out) both;
+  transition: opacity .3s, transform .3s;
+}
+.achievement-toast__text { font-weight: var(--garden-weight-strong); overflow-wrap: anywhere; }
+.achievement-toast--out { opacity: 0; transform: translateY(-8px); }

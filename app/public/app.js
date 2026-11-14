@@ -6,6 +6,7 @@ import {
   replayClass, makeSprout, makeGrowingPot, makeFlame, showInputResult, snapshotTiles, playTileMoves, waveTiles,
   celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill, isMotionReduced, countUpNumbers,
 } from './motion.js';
+import { drawAchievementIcon } from './achievement-icons.js';
 import {
   buildHomeSummary,
   computeQueueProgressPercent,
@@ -113,10 +114,19 @@ import {
   buildAnswerLetterDiff,
   findBasketAt,
   pluralize,
+  summarizeAchievements,
+  pickRecentAchievements,
+  groupAchievements,
+  achievementProgressPercent,
+  formatAchievementProgress,
+  formatAchievementLeft,
+  findNewUnlocks,
+  markUnlockedSeen,
+  formatAchievementToast,
 } from './logic.js';
 
 const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
-  'stats', 'week'];
+  'stats', 'week', 'achievements'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -161,6 +171,8 @@ const ui = {
   },
   tab: 'home',
   home: { strugglingCount: null },  // Головна: the Важкі слова tile's count, null while unknown
+  // Medals (Профіль card, Досягнення tab): status loading | ready | failed; data is the last answer of GET /api/achievements.
+  achievements: { status: 'loading', data: null },
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
   // Statistics page: the chosen period, its activity and the vocabulary counts, and the bar tapped in the chart.
   stats: { period: 'week', status: 'idle', activity: null, overview: null, selectedBarKey: null },
@@ -341,7 +353,8 @@ function setHintOpen(button, isOpen) {
 
 const RENDER = {
   home: renderHome,
-  profile: () => {},
+  profile: renderProfileAchievements,
+  achievements: renderAchievementsPage,
   table: renderTable,
   cards: renderCards,
   practice: renderPractice,
@@ -400,6 +413,7 @@ function showTab(name) {
   if (ui.tab === 'stats') { loadStats(); loadCalendar(); }
   if (ui.tab === 'week') loadWeek();
   else stopWeekTimer();
+  if (['home', 'profile', 'achievements'].includes(ui.tab)) loadAchievements();
   if (ui.tab === 'decks') loadDeckList();
   if (ui.tab === 'word-order') refreshWordOrderIfNeeded();
   if (ui.tab === 'rule-quiz') loadRuleQuizOverview();
@@ -3618,6 +3632,183 @@ function renderRuleQuizSummary() {
   }));
 }
 
+// ---------- achievements (Профіль card, the Досягнення tab, unlock toasts; docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §5) ----------
+
+const ACHIEVEMENTS_SEEN_KEY = 'achievementsSeen';
+const ACHIEVEMENT_TOAST_MS = 2600;
+const ACHIEVEMENT_TOAST_LEAVE_MS = 300;
+const achievementToastQueue = [];
+let isAchievementToastShowing = false;
+let achievementsRequest = 0;
+
+// The medals for Профіль and Досягнення. A request that a newer one overtook is dropped. A failed request keeps the
+// medals already shown.
+async function loadAchievements() {
+  const request = ++achievementsRequest;
+  let data = null;
+  try {
+    data = await api.getAchievements();
+  } catch {
+    data = null;
+  }
+  if (request !== achievementsRequest) return;
+  if (data) {
+    ui.achievements = { status: 'ready', data };
+    announceNewAchievements(data.achievements);
+  } else {
+    ui.achievements = { ...ui.achievements, status: 'failed' };
+  }
+  renderProfileAchievements();
+  renderAchievementsPage();
+}
+
+function readSeenAchievements() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ACHIEVEMENTS_SEEN_KEY) ?? 'null');
+    return Array.isArray(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+// Unlocks not seen yet get a toast, one after another; then every unlock counts as seen. The first load (nothing
+// saved yet) saves them silently, so the learner is not flooded. Without storage no toast ever shows.
+function announceNewAchievements(achievements) {
+  const seen = readSeenAchievements();
+  const seenIds = seen ?? [];
+  const fresh = findNewUnlocks(achievements, seenIds, seen === null);
+  try {
+    localStorage.setItem(ACHIEVEMENTS_SEEN_KEY, JSON.stringify(markUnlockedSeen(achievements, seenIds)));
+  } catch { /* storage unavailable: the toasts may come again */ }
+  if (fresh.length) {
+    achievementToastQueue.push(...fresh);
+    showNextAchievementToast();
+  }
+}
+
+// One toast at a time at the top: the medal pops and a shine passes over it, then the toast leaves. It never blocks input.
+function showNextAchievementToast() {
+  if (isAchievementToastShowing || !achievementToastQueue.length) return;
+  const achievement = achievementToastQueue.shift();
+  isAchievementToastShowing = true;
+  const toast = document.createElement('div');
+  toast.className = 'achievement-toast';
+  const medal = createMedal(achievement, 'medal--small medal--shine');
+  const text = document.createElement('span');
+  text.className = 'achievement-toast__text';
+  text.textContent = formatAchievementToast(achievement);
+  toast.append(medal, text);
+  $('achievement-toasts').append(toast);
+  replayClass(medal, 'medal--pop');
+  setTimeout(() => {
+    toast.classList.add('achievement-toast--out');
+    setTimeout(() => {
+      toast.remove();
+      isAchievementToastShowing = false;
+      showNextAchievementToast();
+    }, ACHIEVEMENT_TOAST_LEAVE_MS);
+  }, ACHIEVEMENT_TOAST_MS);
+}
+
+// A medal: a round badge, gold when unlocked, muted with the icon greyed when not.
+function createMedal(achievement, extraClass = '') {
+  const medal = document.createElement('span');
+  medal.className = ['medal', achievement.unlocked ? 'medal--unlocked' : 'medal--locked', extraClass].filter(Boolean).join(' ');
+  medal.append(drawAchievementIcon(achievement.icon));
+  return medal;
+}
+
+// The Профіль card: the count and the latest unlocked medals. Hidden until the first answer arrives.
+function renderProfileAchievements() {
+  const { data } = ui.achievements;
+  $('profile-achievements').hidden = !data;
+  if (!data) return;
+  $('profile-achievements-count').textContent = summarizeAchievements(data.achievements).text;
+  const recent = pickRecentAchievements(data.achievements);
+  $('profile-achievements-recent').hidden = !recent.length;
+  $('profile-achievements-recent').replaceChildren(...recent.map(achievement => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'medal-row__item';
+    item.dataset.achievement = achievement.id;
+    item.setAttribute('aria-label', achievement.title);
+    item.append(createMedal(achievement, 'medal--small'));
+    return item;
+  }));
+}
+
+// The Досягнення tab: one section per group, a grid of medals in the server's order.
+function renderAchievementsPage() {
+  const { status, data } = ui.achievements;
+  const messageByStatus = { loading: 'Завантаження…', failed: 'Не вдалося завантажити досягнення' };
+  $('achievements-message').textContent = data ? '' : messageByStatus[status] ?? '';
+  const groups = data ? groupAchievements(data.groups, data.achievements) : [];
+  $('achievements-groups').replaceChildren(...groups.map(createAchievementGroup));
+}
+
+function createAchievementGroup(group) {
+  const section = document.createElement('section');
+  section.className = 'achievement-group';
+  const title = document.createElement('h2');
+  title.id = `achievement-group-${group.id}`;
+  title.className = 'stats-card__title';
+  title.textContent = group.title;
+  section.setAttribute('aria-labelledby', title.id);
+  const grid = document.createElement('div');
+  grid.className = 'medal-grid';
+  grid.append(...group.items.map(createMedalCell));
+  section.append(title, grid);
+  return section;
+}
+
+// One medal of the grid: the whole cell is the tap target (at least 44px tall); a locked one shows its progress.
+function createMedalCell(achievement) {
+  const cell = document.createElement('button');
+  cell.type = 'button';
+  cell.className = 'medal-cell';
+  cell.dataset.achievement = achievement.id;
+  cell.setAttribute('aria-label', `${achievement.title}. ${formatAchievementLeft(achievement)}`);
+  cell.append(createMedal(achievement));
+  const title = document.createElement('span');
+  title.className = 'medal-cell__title';
+  title.textContent = achievement.title;
+  cell.append(title);
+  if (!achievement.unlocked) {
+    const bar = document.createElement('span');
+    bar.className = 'medal-bar';
+    bar.setAttribute('aria-hidden', 'true');
+    const fill = document.createElement('span');
+    fill.style.width = `${achievementProgressPercent(achievement)}%`;
+    bar.append(fill);
+    const count = document.createElement('span');
+    count.className = 'medal-cell__count';
+    count.textContent = formatAchievementProgress(achievement);
+    cell.append(bar, count);
+  }
+  return cell;
+}
+
+// The detail dialog of one medal: its description and «Отримано» or what is left.
+function openAchievementDialog(id) {
+  const achievement = ui.achievements.data?.achievements.find(item => item.id === id);
+  if (!achievement) return;
+  const medal = $('achievement-dialog-medal');
+  medal.className = `medal medal--large ${achievement.unlocked ? 'medal--unlocked' : 'medal--locked'}`;
+  medal.replaceChildren(drawAchievementIcon(achievement.icon));
+  $('achievement-dialog-title').textContent = achievement.title;
+  $('achievement-dialog-description').textContent = achievement.description;
+  $('achievement-dialog-left').textContent = formatAchievementLeft(achievement);
+  $('achievement-dialog-bar').style.width = `${achievementProgressPercent(achievement)}%`;
+  $('achievement-dialog-count').textContent = formatAchievementProgress(achievement);
+  const dialog = $('achievement-dialog');
+  if (!dialog.open) dialog.showModal();
+}
+
+function handleMedalClick(event) {
+  const medal = event.target.closest('[data-achievement]');
+  if (medal) openAchievementDialog(medal.dataset.achievement);
+}
+
 // ---------- wiring ----------
 
 function bindEvents() {
@@ -3641,6 +3832,11 @@ function bindEvents() {
   $('word-sheet-edit').addEventListener('submit', event => {
     event.preventDefault();
     saveWordEdit();
+  });
+  $('achievements-groups').addEventListener('click', handleMedalClick);
+  $('profile-achievements-recent').addEventListener('click', handleMedalClick);
+  $('achievement-dialog').addEventListener('click', event => {
+    if (event.target === $('achievement-dialog')) $('achievement-dialog').close();
   });
   $('word-sheet').addEventListener('click', event => {
     if (event.target === $('word-sheet')) $('word-sheet').close();

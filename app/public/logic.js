@@ -615,6 +615,7 @@ export const TAB_TITLES = Object.freeze({
   texts: 'Тексти',
   stats: 'Статистика',
   week: 'Тиждень у підсумку',
+  achievements: 'Досягнення',
 });
 
 // The line under the page title in the gold header (Головна has its own greeting).
@@ -632,6 +633,7 @@ export const TAB_SUBTITLES = Object.freeze({
   texts: 'Тексти для читання',
   stats: 'Як іде навчання',
   week: 'Твій тиждень коротко',
+  achievements: 'Твої відзнаки',
 });
 
 const PERIOD_RANGE_PREFIX = Object.freeze({
@@ -1169,6 +1171,7 @@ export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
   practice: 'practice',
   stats: 'stats',
   profile: 'profile',
+  achievements: 'profile',
   table: 'profile',
   rules: 'profile',
   texts: 'profile',
@@ -1634,4 +1637,71 @@ export function buildCalendarGrid(days) {
   const weeks = [];
   for (let start = 0; start < cells.length; start += 7) weeks.push(cells.slice(start, start + 7));
   return { weeks };
+}
+
+// ---------- achievements (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §5) ----------
+
+// How many medals the Profile card shows in its row.
+export const ACHIEVEMENT_RECENT_COUNT = 6;
+
+// «Отримано 12 з 87».
+export function summarizeAchievements(achievements = []) {
+  const total = achievements.length;
+  const unlocked = achievements.filter(achievement => achievement.unlocked).length;
+  return { unlocked, total, text: `Отримано ${unlocked} з ${total}` };
+}
+
+// The latest unlocked medals for the Profile row. The list has no unlock times, so the later ones of the catalog
+// come first (the server lists each group from its first to its last target).
+export function pickRecentAchievements(achievements = [], limit = ACHIEVEMENT_RECENT_COUNT) {
+  return achievements.filter(achievement => achievement.unlocked).reverse().slice(0, limit);
+}
+
+// The achievements of each group, in the server's group order; groups without achievements are left out.
+export function groupAchievements(groups = [], achievements = []) {
+  return groups
+    .map(group => ({ id: group.id, title: group.title, items: achievements.filter(a => a.group === group.id) }))
+    .filter(group => group.items.length > 0);
+}
+
+// The bar's fill in percent: full when unlocked, otherwise current / target.
+export function achievementProgressPercent(achievement) {
+  if (achievement.unlocked) return 100;
+  const { current = 0, target = 0 } = achievement.progress ?? {};
+  if (!(target > 0)) return 0;
+  return Math.min(100, Math.max(0, Math.round((current / target) * 100)));
+}
+
+// «7 / 10» (the current never shows above the target).
+export function formatAchievementProgress(achievement) {
+  const { current = 0, target = 0 } = achievement.progress ?? {};
+  return `${Math.min(current, target)} / ${target}`;
+}
+
+// «Отримано» when unlocked, otherwise «Ще 3 до відзнаки».
+export function formatAchievementLeft(achievement) {
+  if (achievement.unlocked) return 'Отримано';
+  const { current = 0, target = 0 } = achievement.progress ?? {};
+  return `Ще ${Math.max(0, target - current)} до відзнаки`;
+}
+
+// The unlocked achievements the learner has not seen yet, in list order. isFirstLoad (nothing saved yet): no
+// toasts, every current unlock counts as seen.
+export function findNewUnlocks(achievements = [], seenIds = [], isFirstLoad = false) {
+  if (isFirstLoad) return [];
+  const seen = new Set(seenIds);
+  return achievements.filter(achievement => achievement.unlocked && !seen.has(achievement.id));
+}
+
+// The seen ids with every unlocked achievement of the list added (in their order, no repeats).
+export function markUnlockedSeen(achievements = [], seenIds = []) {
+  const seen = [...new Set(seenIds)];
+  for (const achievement of achievements) {
+    if (achievement.unlocked && !seen.includes(achievement.id)) seen.push(achievement.id);
+  }
+  return seen;
+}
+
+export function formatAchievementToast(achievement) {
+  return `Нове досягнення: ${achievement.title}`;
 }

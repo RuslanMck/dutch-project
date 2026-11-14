@@ -144,6 +144,8 @@ export const saveGoal = goal => request('PUT', '/api/goal', { goal });
 export const getWeek = week => request('GET', `/api/stats/week?week=${enc(week)}`);
 // Календар занять: one entry per day, oldest first.
 export const getCalendar = (days = 84) => request('GET', `/api/stats/calendar?days=${enc(days)}`);
+// Medals by group, with each achievement's unlock and progress (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §2.2).
+export const getAchievements = () => request('GET', '/api/achievements');
 
 // Calls onChange(collection) for every live change. 'all' means refetch everything.
 // Uses SSE; while the stream is down (error or not yet open) it polls every 5 s.
