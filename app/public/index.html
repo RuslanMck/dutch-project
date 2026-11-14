@@ -162,7 +162,7 @@
             <input id="chapter-input" type="number" inputmode="numeric" min="1" max="99" step="1" required>
             <button type="submit" class="primary">Зберегти</button>
           </div>
-          <p id="chapter-hint" class="hint">Слова поточної і попередньої глави рахуються вдвічі поширенішими. Глава оновлюється сама, коли додаєш слова з новішої глави.</p>
+          <p id="chapter-hint" class="hint">Слова поточної і попередньої глави вважаються вдвічі поширенішими. Глава оновлюється сама, коли додаєш слова з новішої глави.</p>
           <p id="chapter-message" class="muted goal-form__message" role="status"></p>
         </form>
       </section>
@@ -650,7 +650,7 @@
     <!-- 6 · Тексти -->
     <!-- 4 · Що я вже знаю (plan §4) -->
     <section id="tab-known-check" class="tab" data-tab="known-check" hidden>
-      <p class="hint known-check__note">Познач слова, які ти вже знаєш. Вони не прийдуть як нові, а одразу стануть на повторення через 2–4 тижні.</p>
+      <p class="hint known-check__note">Познач слова, які ти вже знаєш. Вони не прийдуть як нові, а одразу підуть на повторення через 2–4 тижні.</p>
       <p id="known-check-message" class="muted" role="status" aria-live="polite"></p>
       <div id="known-check-chips" class="known-check__chips"></div>
       <div id="known-check-actions" class="known-check__actions">
@@ -705,6 +705,7 @@
       <button type="button" data-priority="first" aria-pressed="false">Вчити першим</button>
       <button type="button" data-priority="later" aria-pressed="false">Пізніше</button>
     </div>
+    <p id="word-sheet-priority-message" class="msg bad" role="alert"></p>
   </div>
   <dl id="word-sheet-details" class="sheet__details"></dl>
   <form id="word-sheet-edit" class="form sheet__edit" autocomplete="off" hidden>

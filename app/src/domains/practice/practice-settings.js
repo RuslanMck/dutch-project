@@ -9,6 +9,7 @@ const WORD_SET_SETTING_NAME = 'word_set';
 const PHRASE_SET_SETTING_NAME = 'phrase_set';
 const DAILY_GOAL_SETTING_NAME = 'daily_goal';
 const KNOWN_CHECK_SEEN_SETTING_NAME = 'known_check_seen';
+export const KNOWN_CHECK_KNOWN_SETTING_NAME = 'known_check_known';
 const PRIORITY_RULES_VERSION_SETTING_NAME = 'priority_rules_version';
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
 
@@ -32,6 +33,7 @@ export function createPracticeSettings({ practiceRepository }) {
       wordSet: mapFromStoredSet(settingByName[WORD_SET_SETTING_NAME]),
       phraseSet: mapFromStoredSet(settingByName[PHRASE_SET_SETTING_NAME]),
       knownCheckSeen: settingByName[KNOWN_CHECK_SEEN_SETTING_NAME] ?? [],
+      knownCheckKnown: settingByName[KNOWN_CHECK_KNOWN_SETTING_NAME] ?? [],
       priorityRulesVersion: settingByName[PRIORITY_RULES_VERSION_SETTING_NAME] ?? 1,
     });
   }
@@ -61,6 +63,11 @@ export function createPracticeSettings({ practiceRepository }) {
   }
 
   // wordIds: the ids (an array of numbers) the known check has shown as unknown so far.
+  // The words marked known in the check: not learned through practice, so the achievements leave them out.
+  function saveKnownCheckKnown(wordIds) {
+    practiceRepository.saveSetting(KNOWN_CHECK_KNOWN_SETTING_NAME, wordIds);
+  }
+
   function saveKnownCheckSeen(wordIds) {
     practiceRepository.saveSetting(KNOWN_CHECK_SEEN_SETTING_NAME, wordIds);
   }
@@ -88,6 +95,7 @@ export function createPracticeSettings({ practiceRepository }) {
     savePhraseSet,
     saveDailyGoal,
     saveKnownCheckSeen,
+    saveKnownCheckKnown,
     isFsrsActive,
     markFsrsMigrated,
   });

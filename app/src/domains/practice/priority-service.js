@@ -11,6 +11,7 @@ import {
 } from './priority-calculation.js';
 
 const PREVIEW_EXAMPLE_LIMIT = 10;
+const MAXIMUM_CHAPTER_STEP = 2;
 const MAXIMUM_CHAPTER_NUMBER = 99;
 
 export function createPriorityService({
@@ -54,12 +55,14 @@ export function createPriorityService({
   }
 
   // Words just added from a chapter after the current one make that chapter current, and every priority is then
-  // recalculated. Runs inside the caller's transaction and publishes nothing. A chapter above 99 is not taken.
+  // recalculated. Runs inside the caller's transaction and publishes nothing. Only the next two chapters are followed
+  // (a typo such as '76' for '7.6' must not move it); a later one is set in Профіль.
   function followChapterOfAddedWords(wordIds) {
     const { currentChapter } = practiceSettings.readSettings();
     const addedChapterNumbers = wordIds
       .map(wordId => parseChapterNumber(getPracticeWordOrThrow(wordId).section_code))
-      .filter(chapterNumber => chapterNumber !== null && chapterNumber <= MAXIMUM_CHAPTER_NUMBER);
+      .filter(chapterNumber => chapterNumber !== null && chapterNumber <= MAXIMUM_CHAPTER_NUMBER
+        && chapterNumber <= currentChapter + MAXIMUM_CHAPTER_STEP);
     if (addedChapterNumbers.length === 0) return;
     const newestChapterNumber = Math.max(...addedChapterNumbers);
     if (newestChapterNumber <= currentChapter) return;

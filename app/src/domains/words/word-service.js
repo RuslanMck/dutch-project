@@ -116,6 +116,8 @@ export function createWordService({
       }
     });
     changeEventBus.publishChange('words');
+    // «визначить автоматично»: a cleared category is sorted again in the background.
+    if (wordChanges.category === null) wordCategorizer.categorizeInBackground();
     return getWord(wordId);
   }
 

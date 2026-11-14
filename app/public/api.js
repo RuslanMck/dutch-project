@@ -89,6 +89,8 @@ const enc = encodeURIComponent;
 
 export const listWords = () => request('GET', '/api/words');
 export const addWord = body => request('POST', '/api/words', body);
+// Several words in one request; existing ones are skipped: { added, skipped }.
+export const addWords = bodies => request('POST', '/api/words/bulk', bodies);
 export const updateWord = (id, patch) => request('PATCH', `/api/words/${enc(id)}`, patch);
 export const deleteWord = id => request('DELETE', `/api/words/${enc(id)}`);
 export const recordResult = (id, body) => request('POST', `/api/words/${enc(id)}/result`, body);

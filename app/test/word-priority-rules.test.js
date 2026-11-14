@@ -235,3 +235,12 @@ test('one-off recalculation: stale priorities are recalculated once, then the ma
   assert.equal(context.priorityService.upgradePriorityRules(), false, 'the marker is 2: nothing runs');
   assert.equal(context.wordService.getWord(wordId).priority, 1, 'a second run would have recalculated it');
 });
+
+test('a chapter far ahead (a typo such as 76 for 7.6) does not become the current chapter', () => {
+  const context = createTestContext();
+  context.priorityService.setCurrentChapter(6);
+  context.wordService.createWords([{ nl: 'typfout', uk: 'помилка', section: '76' }]);
+  assert.equal(context.practiceSettings.readSettings().currentChapter, 6);
+  context.wordService.createWords([{ nl: 'jas', uk: 'куртка', section: '8.1' }]);
+  assert.equal(context.practiceSettings.readSettings().currentChapter, 8);
+});

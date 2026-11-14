@@ -5,7 +5,10 @@
 const DEFAULT_DAILY_GOAL = 20;
 
 export function createAchievementRepository({ database, statisticsRepository }) {
-  const selectWordStatusesStatement = database.prepare('SELECT status, category FROM words');
+  const selectWordStatusesStatement = database.prepare('SELECT id, status, category FROM words');
+  const selectKnownCheckKnownStatement = database.prepare(
+    "SELECT value FROM practice_settings WHERE name = 'known_check_known'",
+  ).pluck();
   const selectDeckSessionAnswersStatement = database.prepare(`
     SELECT session_id, grade, answered_at
     FROM deck_answers
@@ -41,7 +44,7 @@ export function createAchievementRepository({ database, statisticsRepository }) 
       ...statisticsRepository.listDrillAnswers().map(answer => ({ ...answer, kind: 'drill' })),
     ];
     return {
-      words: selectWordStatusesStatement.all(),
+      words: listWordsLearnedInPractice(),
       activityAnswers,
       deckAnswers: statisticsRepository.listCountingDeckAnswers(),
       deckSessionAnswers: selectDeckSessionAnswersStatement.all(),
@@ -49,6 +52,13 @@ export function createAchievementRepository({ database, statisticsRepository }) 
       ruleAnswers: selectRuleAnswersStatement.all(),
       dailyGoal: readDailyGoal(),
     };
+  }
+
+  // Words marked known in the quick check were not learned through practice, so no medal counts them.
+  function listWordsLearnedInPractice() {
+    const storedKnownIds = selectKnownCheckKnownStatement.get();
+    const knownIdSet = new Set(storedKnownIds === undefined ? [] : JSON.parse(storedKnownIds));
+    return selectWordStatusesStatement.all().filter(word => !knownIdSet.has(word.id));
   }
 
   // The stored goal is JSON; without one the goal is the default.

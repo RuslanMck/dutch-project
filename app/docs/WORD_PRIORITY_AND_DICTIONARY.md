@@ -108,14 +108,23 @@ home search lead to it; Головна gets a tile «Словник» with the l
   toggles «знаю» (green, a check). Buttons: «Знаю всі» (marks all), «Готово» (POST: chosen → known, the rest →
   unknown). After it: «Позначено як знайомі: n. Ці слова прийдуть на повторення пізніше.» and «Далі (ще <remaining>)»
   for the next batch, or «Нових слів більше немає» when none left. A note under the title: «Познач слова, які ти вже
-  знаєш. Вони не прийдуть як нові, а одразу стануть на повторення через 2–4 тижні.»
+  знаєш. Вони не прийдуть як нові, а одразу підуть на повторення через 2–4 тижні.»
 - de/het: a Головна tile «Артикль» (line «de чи het») that opens Практика in mode «Артикль» (`art`); Колоди «Готові
   колоди» gets a card «Артикль: de чи het» with «Практикувати» doing the same.
 - Профіль: a field «Поточна глава» (number 1–99, «Зберегти») under the goal field, using `GET/PUT
-  /api/practice/chapter`; hint «Слова поточної і попередньої глави рахуються вдвічі поширенішими. Глава оновлюється
+  /api/practice/chapter`; hint «Слова поточної і попередньої глави вважаються вдвічі поширенішими. Глава оновлюється
   сама, коли додаєш слова з новішої глави.»; message «Збережено».
 - api.js: `getKnownCheck(limit)`, `postKnownCheck(knownIds, unknownIds)`, `getChapter()`, `saveChapter(chapter)`.
 
 ## 5. Ownership
 S1, S2 server; C1, C2 page, coded against the shapes above. Each in its own worktree/branch; shared files get small
 local additions.
+
+## 6. After the review (14.11.2026)
+- Words marked known in the check are kept in the setting `known_check_known`: the achievements leave them out, and
+  their `introduced_on` stays null (not today's introductions). A practice reset clears both check lists.
+- The chapter follows added words at most two chapters ahead (a typo such as '76' does not move it).
+- Suggestions are added in one request, `POST /api/words/bulk` (existing words skipped); a failure keeps the checklist.
+- The add sheet clears the form once the word is saved, so a failed tag never leads to a second copy.
+- The word sheet shows a failed priority save inside the sheet. A search from Головна clears the filters.
+- A category cleared in the edit form («визначить автоматично») is sorted again in the background.

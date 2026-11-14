@@ -98,7 +98,7 @@ test('Профіль: the chapter field sits right after the goal form, with its
   const chapter = html.indexOf('id="profile-chapter"');
   assert.ok(chapter > goalForm);
   assert.match(html, /<label id="profile-chapter-label" class="goal-form__label" for="chapter-input">Поточна глава<\/label>/);
-  assert.match(html, /Слова поточної і попередньої глави рахуються вдвічі поширенішими\. Глава оновлюється сама, коли додаєш слова з новішої глави\./);
+  assert.match(html, /Слова поточної і попередньої глави вважаються вдвічі поширенішими\. Глава оновлюється сама, коли додаєш слова з новішої глави\./);
 });
 
 test('api.js exposes the known-check and chapter calls with the plan shapes', () => {

@@ -35,6 +35,9 @@ export function createPracticeResetService({
       phrasePracticeRepository.markPhraseAnswersSuperseded(timestamp);
       practiceSettings.saveWordSet(null);
       practiceSettings.savePhraseSet(null);
+      // Every word is new again, so the quick check may ask about all of them.
+      practiceSettings.saveKnownCheckSeen([]);
+      practiceSettings.saveKnownCheckKnown([]);
       return counts;
     });
     if (!isDryRun) {

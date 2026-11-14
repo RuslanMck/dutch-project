@@ -54,16 +54,20 @@ export function createKnownCheckService({
         practiceRepository.updateWordSchedule(wordRow.id, {
           fsrsCard: serializeCard(card),
           dueAt,
-          introducedOn: today,
+          // Not introduced through practice: today's introductions and the statistics leave it out.
+          introducedOn: null,
           learningStatus: 'learned',
           updatedAt: timestamp,
         });
       });
       const seenWordIds = [...new Set([...settings.knownCheckSeen, ...unknownWordIds])];
       if (unknownWordIds.length) practiceSettings.saveKnownCheckSeen(seenWordIds);
+      if (knownWordRows.length) {
+        practiceSettings.saveKnownCheckKnown([...new Set([...settings.knownCheckKnown, ...knownWordRows.map(wordRow => wordRow.id)])]);
+      }
       const remaining = listKnownCheckCandidates({
         wordRows: practiceRepository.listPracticeWords(),
-      currentChapter: settings.currentChapter,
+        currentChapter: settings.currentChapter,
         seenWordIds,
         openSetWordIds,
       }).length;

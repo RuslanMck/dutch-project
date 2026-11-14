@@ -492,6 +492,10 @@ function handleHomeSearch(event) {
   event.preventDefault();
   const query = $('home-search-input').value.trim();
   ui.table.q = query;
+  // A search from Головна looks through every word, whatever filter was left on.
+  ui.table.filter = 'all';
+  ui.table.category = '';
+  $('table-category').value = '';
   $('table-q').value = query;
   $('home-search-input').value = '';
   showTab('table');
@@ -1089,15 +1093,21 @@ async function handleWordAdd(event) {
     form.elements[error].focus();
     return;
   }
+  let created = null;
   const saved = await actInSheet(async () => {
-    const created = await api.addWord(body);
-    if (priorityTag) await api.setWordPriorityTag(created.id, priorityTag);
+    created = await api.addWord(body);
   }, ['words', 'topics'], $('word-add-message'));
   if (!saved) return;
+  // The word is saved: the form is cleared even if the tag then fails, so «Додати» never makes a second copy.
   form.reset();
   form.elements.priority.value = 'auto';
   setPriorityChoice(form, 'auto');
   $('word-add-message').textContent = '';
+  if (priorityTag) {
+    const isTagSaved = await actInSheet(() => api.setWordPriorityTag(created.id, priorityTag), ['words'],
+      $('word-add-message'));
+    if (!isTagSaved) $('word-add-message').textContent = `Слово додано, але пріоритет не збережено. ${$('word-add-message').textContent}`;
+  }
   form.elements.nl.focus();
 }
 
@@ -1111,12 +1121,11 @@ async function handleSheetPriorityClick(event) {
   const choice = PRIORITY_TAG_CHOICES.find(option => option.value === button.dataset.priority);
   const container = $('word-sheet-priority');
   setPriorityChoice(container, choice.value);
-  let failed = true;
-  await act(async () => {
-    await api.setWordPriorityTag(word.id, choice.tag);
-    failed = false;
-  }, ['words']);
-  if (failed) setPriorityChoice(container, word.priority_tag || 'auto');
+  const message = $('word-sheet-priority-message');
+  message.textContent = '';
+  // The message sits in the sheet: the page notice would be hidden behind it.
+  const isSaved = await actInSheet(() => api.setWordPriorityTag(word.id, choice.tag), ['words'], message);
+  if (!isSaved) setPriorityChoice(container, word.priority_tag || 'auto');
 }
 
 function handleSheetDelete() {
@@ -1180,18 +1189,17 @@ async function handleSuggestionAdd(event) {
     .map(input => ui.suggest.items[Number(input.dataset.index)]);
   if (!chosen.length) return;
   $('suggest-add').disabled = true;
-  // The bulk add is not in the API: each word is posted with the add call, in order.
-  let added = 0;
+  // One request for all of them: a failure keeps the checklist on screen to try again.
+  let result = null;
   await act(async () => {
-    for (const suggestion of chosen) {
-      await api.addWord(buildSuggestionWordBody(suggestion));
-      added += 1;
-    }
+    result = await api.addWords(chosen.map(buildSuggestionWordBody));
   }, ['words', 'topics']);
+  $('suggest-add').disabled = false;
+  if (!result) return;
   ui.suggest.items = [];
   setSuggestView('idle');
-  $('suggest-add').disabled = false;
-  $('suggest-message').textContent = added ? formatAddedWords(added) : '';
+  const addedCount = result.added?.length ?? 0;
+  $('suggest-message').textContent = addedCount ? formatAddedWords(addedCount) : '';
 }
 
 // A live refresh while the sheet is open shows the word's new values, or closes the sheet if it was deleted. An open
@@ -1206,6 +1214,7 @@ function syncOpenWordSheet() {
 // The word sheet: details of one word, and «Змінити» to edit it. Delete stays in the table row.
 function openWordSheet(word) {
   ui.table.sheetWordId = word.id;
+  $('word-sheet-priority-message').textContent = '';
   setWordSheetEditing(false);
   const view = buildWordDetailView(word);
   const title = $('word-sheet-title');

@@ -5,6 +5,7 @@ import express from 'express';
 import {
   categorizeWordsInputSchema,
   createWordInputSchema,
+  createWordsInputSchema,
   listWordsQuerySchema,
   logWordErrorInputSchema,
   recordPracticeResultInputSchema,
@@ -24,6 +25,11 @@ export function createWordRoutes({ wordService }) {
     response.json(wordService.listWords({ ...wordFilters, dueBefore }));
   });
 
+  // Several words at once (the Словник's suggestions): existing ones are skipped, one transaction, one change event.
+  wordRouter.post('/words/bulk', (request, response) => {
+    const wordInputs = createWordsInputSchema.parse(readRequestBody(request));
+    response.status(201).json(wordService.createWords(wordInputs));
+  });
   wordRouter.post('/words', (request, response) => {
     response.status(201).json(wordService.createWord(createWordInputSchema.parse(readRequestBody(request))));
   });

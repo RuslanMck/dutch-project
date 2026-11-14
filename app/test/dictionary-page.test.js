@@ -188,14 +188,16 @@ test('the page: home search still opens the list with the query; the list is one
   assert.doesNotMatch(filter, /innerHTML/, 'a filter never rebuilds the rows');
 });
 
-test('the page: the sheet saves the priority at once, and the add sheet posts the word then its tag', () => {
+test('the page: the sheet saves the priority at once, the add sheet posts the word then its tag, suggestions go in one bulk add', () => {
   const sheet = functionSource(appSource, 'async function handleSheetPriorityClick(event) {');
   assert.match(sheet, /api\.setWordPriorityTag\(word\.id, choice\.tag\)/);
   const add = functionSource(appSource, 'async function handleWordAdd(event) {');
   assert.match(add, /api\.addWord\(body\)/);
   assert.match(add, /api\.setWordPriorityTag\(created\.id, priorityTag\)/);
+  // The form is cleared once the word is saved, before the tag: «Додати» never makes a second copy.
+  assert.ok(add.indexOf('form.reset()') < add.indexOf('setWordPriorityTag'));
   const suggest = functionSource(appSource, 'async function handleSuggestionAdd(event) {');
-  assert.match(suggest, /api\.addWord\(buildSuggestionWordBody\(suggestion\)\)/);
+  assert.match(suggest, /api\.addWords\(chosen\.map\(buildSuggestionWordBody\)\)/);
 });
 
 test('the page: «Видалити» in the sheet asks first, with the existing dialog', () => {

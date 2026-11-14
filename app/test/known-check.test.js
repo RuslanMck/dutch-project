@@ -92,7 +92,7 @@ test('the check lists the New words in queue order, leaves out words with a card
   assert.equal(context.knownCheckService.getKnownCheck({ limit: 50 }).words.some(word => word.nl === 'boek'), false);
 });
 
-test('a known word gets a learned card due in 14 to 28 days, no deck places, introduced today', () => {
+test('a known word gets a learned card due in 14 to 28 days, no deck places, not counted as introduced', () => {
   const context = createFixture();
   migrate(context);
   const ids = addQueueWords(context);
@@ -102,7 +102,7 @@ test('a known word gets a learned card due in 14 to 28 days, no deck places, int
     const row = readWordRow(context, wordId);
     const card = parseCard(row.fsrs_card);
     assert.equal(row.status, 'learned');
-    assert.equal(row.introduced_on, '2026-11-14');
+    assert.equal(row.introduced_on, null);
     assert.equal(row.deck_required_correct, null);
     assert.equal(row.deck_reverse_required_correct, null);
     assert.equal(card.state, 2, 'review');
@@ -231,4 +231,17 @@ test('GET and POST /api/practice/known-check: the words, the counts, 400 for bad
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   }
+});
+
+test('known words earn no medals, and a practice reset clears the check lists', () => {
+  const context = createFixture();
+  migrate(context);
+  const ids = addQueueWords(context);
+  context.knownCheckService.recordKnownCheck({ knownIds: [ids.boek, ids.lezen], unknownIds: [ids.trui] });
+  const facts = context.achievementService.listAchievements().achievements;
+  assert.deepEqual(facts.find(medal => medal.id === 'words-10').progress, { current: 0, target: 10 });
+  assert.deepEqual(context.practiceSettings.readSettings().knownCheckKnown.sort(), [ids.boek, ids.lezen].sort());
+  context.practiceResetService.resetPractice({ isDryRun: false });
+  const settings = context.practiceSettings.readSettings();
+  assert.deepEqual([settings.knownCheckSeen, settings.knownCheckKnown], [[], []]);
 });
