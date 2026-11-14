@@ -38,6 +38,13 @@
         <h1 id="home-greeting" class="home-header__greeting" tabindex="-1">Hoi!</h1>
         <p class="home-header__subtitle">Що вчимо сьогодні?</p>
       </div>
+      <form id="home-search-form" class="home-search" role="search">
+        <label class="sr-only" for="home-search-input">Пошук слова</label>
+        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4"/></svg>
+        <input id="home-search-input" type="search" placeholder="Пошук слова…" autocomplete="off" autocapitalize="none"
+          spellcheck="false">
+      </form>
+
       <section id="home-goal" class="goal-card" aria-labelledby="home-goal-title" hidden>
         <div class="goal-card__ring">
           <svg class="goal-ring" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
@@ -51,13 +58,6 @@
           <p id="home-goal-line" class="goal-card__line" role="status"></p>
         </div>
       </section>
-      <form id="home-search-form" class="home-search" role="search">
-        <label class="sr-only" for="home-search-input">Пошук слова</label>
-        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4"/></svg>
-        <input id="home-search-input" type="search" placeholder="Пошук слова…" autocomplete="off" autocapitalize="none"
-          spellcheck="false">
-      </form>
-
       <section class="continue-card" aria-labelledby="home-continue-title">
         <div class="continue-card__top">
           <span class="continue-card__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg></span>
