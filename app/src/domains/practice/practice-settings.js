@@ -1,15 +1,18 @@
 // Practice settings in camelCase: reads them, saves the current chapter and the practice sets, and records the FSRS
 // migration. Also the one guard that refuses practice before the migration.
+import { DAILY_GOAL_DEFAULT } from '../../contracts/statistics-contracts.js';
 import { ConflictError } from '../../errors/domain-errors.js';
 import { mapFromStoredSet } from './practice-set.js';
 
 const FSRS_MIGRATED_AT_SETTING_NAME = 'fsrs_migrated_at';
 const WORD_SET_SETTING_NAME = 'word_set';
 const PHRASE_SET_SETTING_NAME = 'phrase_set';
+const DAILY_GOAL_SETTING_NAME = 'daily_goal';
 const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to_fsrs';
 
 export function createPracticeSettings({ practiceRepository }) {
   // fsrsMigratedAt is null until migrate_to_fsrs has run for real. newPerDay is the set size, for words and phrases.
+  // dailyGoal is the answers per day the learner aims for (DAILY_GOAL_DEFAULT until it is saved).
   // wordSet and phraseSet are the pinned sets ({ openedOn, openedAt, itemIds }), null when none is stored.
   function readSettings() {
     const settingByName = practiceRepository.listSettings();
@@ -20,6 +23,7 @@ export function createPracticeSettings({ practiceRepository }) {
       desiredRetention: settingByName.desired_retention,
       learnedThresholdDays: settingByName.learned_threshold_days,
       timeZone: settingByName.timezone,
+      dailyGoal: settingByName[DAILY_GOAL_SETTING_NAME] ?? DAILY_GOAL_DEFAULT,
       fsrsMigratedAt: settingByName[FSRS_MIGRATED_AT_SETTING_NAME] ?? null,
       wordSet: mapFromStoredSet(settingByName[WORD_SET_SETTING_NAME]),
       phraseSet: mapFromStoredSet(settingByName[PHRASE_SET_SETTING_NAME]),
@@ -46,6 +50,11 @@ export function createPracticeSettings({ practiceRepository }) {
     practiceRepository.saveSetting(PHRASE_SET_SETTING_NAME, storedSet);
   }
 
+  // goal: an integer already checked by the contract.
+  function saveDailyGoal(goal) {
+    practiceRepository.saveSetting(DAILY_GOAL_SETTING_NAME, goal);
+  }
+
   function isFsrsActive() {
     return readSettings().fsrsMigratedAt !== null;
   }
@@ -61,6 +70,7 @@ export function createPracticeSettings({ practiceRepository }) {
     saveCurrentChapter,
     saveWordSet,
     savePhraseSet,
+    saveDailyGoal,
     isFsrsActive,
     markFsrsMigrated,
   });

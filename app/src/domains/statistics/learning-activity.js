@@ -248,3 +248,60 @@ export function findLearnedMoments(deckAnswers) {
   }
   return learnedWords;
 }
+
+// The answers and the good ones of each calendar day (practice time zone): Map of date → { answers, correct }.
+export function countAnswersByDay(answers, timeZone) {
+  const countsByDate = new Map();
+  for (const answer of answers) {
+    const date = formatCalendarDateInTimeZone(answer.answered_at, timeZone);
+    const counts = countsByDate.get(date) ?? { answers: 0, correct: 0 };
+    counts.answers += 1;
+    if (answer.grade === 'good') counts.correct += 1;
+    countsByDate.set(date, counts);
+  }
+  return countsByDate;
+}
+
+// The week recap: the calendar week (Monday to Sunday) of `now` when week is 'current' (it ends today), or the week
+// before it (it ends on its Sunday). The sources are the same as summarizeLearningActivity's. The streak is the one at
+// the end of the week shown. Pure.
+export function summarizeWeek({ week, now, timeZone, answers, startedWords, learnedWords, wordsById }) {
+  const today = formatCalendarDateInTimeZone(now, timeZone);
+  const currentMondayDate = resolvePeriodRange({ period: 'week', today, timeZone, firstAnswerAt: now }).fromDate;
+  const endDate = week === 'previous' ? addDaysToCalendarDate(currentMondayDate, -1) : today;
+  // The activity is read at the start of the end day, so its "today" is the end of the week shown.
+  const activity = summarizeLearningActivity({
+    period: 'week', now: findStartOfDay(endDate, timeZone), timeZone, answers, startedWords, learnedWords, wordsById,
+  });
+  const { totals, chart, hardest_words: hardestWords, streak } = activity;
+  const hardestWord = hardestWords[0];
+  return {
+    range: { start: activity.from_date, end: endDate },
+    answers: totals.answers,
+    accuracy: totals.accuracy === null ? null : Math.round(totals.accuracy * 100),
+    days_practised: totals.days_practised,
+    active_seconds: totals.active_seconds,
+    started_count: totals.new_words,
+    learned_count: totals.learned_words,
+    best_day: findBestDay(chart.buckets),
+    hardest_word: hardestWord
+      ? { nl: hardestWord.nl, article: hardestWord.article, uk: hardestWord.uk, mistakes: hardestWord.mistakes }
+      : null,
+    streak: { current: streak.current, longest: streak.longest },
+  };
+}
+
+// The day with the most answers; a tie goes to the higher accuracy, then to the earlier day (buckets are in order).
+// Null when no day has an answer.
+function findBestDay(dayBuckets) {
+  let best = null;
+  for (const bucket of dayBuckets) {
+    if (bucket.answers === 0) continue;
+    const ratio = (bucket.answers - bucket.mistakes) / bucket.answers;
+    if (best === null || bucket.answers > best.answers || (bucket.answers === best.answers && ratio > best.ratio)) {
+      best = { date: bucket.key, answers: bucket.answers, ratio };
+    }
+  }
+  if (best === null) return null;
+  return { date: best.date, answers: best.answers, accuracy: Math.round(best.ratio * 100) };
+}
