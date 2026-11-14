@@ -2263,6 +2263,43 @@ input { transition: border-color .25s, background-color .25s; }
 .article-basket__count--bump { display: inline-block; animation: motion-pulse .45s var(--motion-spring); }
 .article-hint { margin: 0; text-align: center; font-size: 14px; }
 
+/* Loading screen and logo: the windmill among tulips. The sails spin from the start, the tulips grow, then sway. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--garden-paper);
+  transition: opacity .35s ease, visibility .35s;
+}
+.splash--gone { opacity: 0; visibility: hidden; pointer-events: none; }
+.splash__logo { width: 112px; height: 112px; filter: drop-shadow(0 10px 22px rgba(160, 120, 50, .32)); }
+.splash__name { margin: 4px 0 0; font-size: 20px; font-weight: var(--garden-weight-heavy); animation: motion-rise .5s .5s var(--motion-out) both; }
+.splash__caption { margin: 0; font-size: 13px; color: var(--garden-ink-soft); font-weight: var(--garden-weight-strong); animation: motion-rise .5s .7s var(--motion-out) both; }
+.splash__bar { width: 104px; height: 5px; border-radius: 3px; background: var(--garden-tint); overflow: hidden; animation: motion-rise .5s .7s var(--motion-out) both; }
+.splash__bar i { display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--garden-primary); animation: splash-slide 1.2s ease-in-out infinite; }
+@keyframes splash-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.logo-sails { transform-box: view-box; transform-origin: 60px 48px; animation: splash-spin-up 1.1s ease-in both, splash-spin 1.6s 1.1s linear infinite; }
+.logo-tulip { transform-box: fill-box; transform-origin: 50% 100%; animation: splash-sway 1.6s ease-in-out infinite; }
+.logo-tulip__stem { transform-box: fill-box; transform-origin: 50% 100%; animation: splash-grow .7s var(--motion-out) both; }
+.logo-tulip__head { transform-box: fill-box; transform-origin: 50% 100%; animation: splash-open .5s var(--motion-spring) both; }
+.logo-tulip--1 { animation-delay: 1.3s; } .logo-tulip--1 .logo-tulip__stem { animation-delay: .15s; } .logo-tulip--1 .logo-tulip__head { animation-delay: .6s; }
+.logo-tulip--2 { animation-delay: 1.5s; } .logo-tulip--2 .logo-tulip__stem { animation-delay: .4s; } .logo-tulip--2 .logo-tulip__head { animation-delay: .85s; }
+.logo-tulip--3 { animation-delay: 1.7s; } .logo-tulip--3 .logo-tulip__stem { animation-delay: .65s; } .logo-tulip--3 .logo-tulip__head { animation-delay: 1.1s; }
+.logo-tulip--4 { animation-delay: 1.9s; } .logo-tulip--4 .logo-tulip__stem { animation-delay: .9s; } .logo-tulip--4 .logo-tulip__head { animation-delay: 1.35s; }
+@keyframes splash-spin-up { from { transform: rotate(-120deg); } to { transform: rotate(0); } }
+@keyframes splash-spin { to { transform: rotate(360deg); } }
+@keyframes splash-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes splash-open { from { transform: scale(0) translateY(10px); } to { transform: none; } }
+@keyframes splash-sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+
+.home-header__title { display: flex; align-items: center; gap: 12px; }
+.home-header__logo { width: 44px; height: 44px; flex: none; border-radius: 10px; box-shadow: 0 6px 14px rgba(90, 46, 28, .15); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;

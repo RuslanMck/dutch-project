@@ -292,6 +292,19 @@ function isArmed(kind, id) {
 const errs = w => w.error_count || 0;
 
 // Refetch the given state keys; re-render the active tab only if something actually changed.
+// The loading screen stays at least until the tulips have grown (1.4 s from the start), and never longer than 10 s.
+const SPLASH_SHORTEST_MS = 1400;
+const SPLASH_LONGEST_MS = 10000;
+function hideSplash() {
+  const splash = $('splash');
+  if (!splash || splash.classList.contains('splash--gone')) return;
+  const wait = Math.max(0, SPLASH_SHORTEST_MS - performance.now());
+  setTimeout(() => {
+    splash.classList.add('splash--gone');
+    setTimeout(() => splash.remove(), 400);
+  }, wait);
+}
+
 async function refresh(keys) {
   let changed = false;
   await Promise.all(keys.map(async key => {
@@ -4854,8 +4867,10 @@ function init() {
   if (typeof ResizeObserver === 'function') new ResizeObserver(placePill).observe(nav);
   document.fonts?.ready.then(placePill);
   refresh(ALL_KEYS)
+    .finally(hideSplash)
     .then(() => warmUpOfflineData())
     .catch(error => { if (!error.offline) notice(error.message || 'Не вдалося завантажити дані'); });
+  setTimeout(hideSplash, SPLASH_LONGEST_MS);
   api.subscribe(collection => {
     if (collection === 'word-order' || collection === 'all') refreshWordOrderIfNeeded();
     if (collection === 'word-order') return;

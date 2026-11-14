@@ -97,7 +97,7 @@ test('formatAchievementToast: «Нове досягнення: <title>»', () =>
 
 test('every icon name of the plan is drawn, with one icon per category id', () => {
   const planIcons = ['star', 'flame', 'calendar', 'check', 'sentence', 'rule', 'sun', 'moon', 'weekend', 'return', 'bolt',
-    'leaf', 'target'];
+    'leaf', 'target', 'trophy', 'crown', 'compass', 'layers'];
   const categoryIds = ['food', 'home', 'clothes', 'colours', 'numbers', 'people', 'body', 'city', 'work', 'nature', 'leisure',
     'feelings', 'actions', 'talk', 'other'];
   for (const name of [...planIcons, ...categoryIds]) {

@@ -9,10 +9,16 @@ const DAY_FORMS = ['день', 'дні', 'днів'];
 const ANSWER_FORMS = ['відповідь', 'відповіді', 'відповідей'];
 const TIME_FORMS = ['раз', 'рази', 'разів'];
 const SENTENCE_FORMS = ['речення', 'речення', 'речень'];
+const ACHIEVEMENT_FORMS = ['досягнення', 'досягнення', 'досягнень'];
+const TOPIC_FORMS = ['тема', 'теми', 'тем'];
 const CATEGORY_TARGETS = Object.freeze([5, 10, 15, 25, 50]);
 const EXCLUDED_CATEGORY_ID = 'other';
 
+// The meta group comes first: its medals count the other medals (achievement-service.js computes their metrics).
+export const META_GROUP_ID = 'meta';
+
 export const ACHIEVEMENT_GROUPS = Object.freeze([
+  Object.freeze({ id: META_GROUP_ID, title: 'Особливі' }),
   Object.freeze({ id: 'words', title: 'Слова' }),
   Object.freeze({ id: 'streak', title: 'Серія днів' }),
   Object.freeze({ id: 'answers', title: 'Відповіді' }),
@@ -138,7 +144,37 @@ const categoryMedals = WORD_CATEGORIES
     description: `Вивчи ${count(target, WORD_FORMS)} теми «${category.name}»`,
   })));
 
+// Meta medals. Metrics: collected (unlocked medals of the other groups), full_groups (groups with every medal),
+// groups_with_medal (groups with at least one), topics_with_five (categories with their 5-word medal).
+const FULL_GROUP_DESCRIPTIONS = Object.freeze({
+  1: 'Збери всі досягнення однієї групи',
+  3: 'Збери всі досягнення трьох груп',
+  6: 'Збери всі досягнення шести груп',
+});
+
+const metaMedals = [
+  ...[10, 25, 50, 75, 100].map(target => achievement({
+    id: `collected-${target}`, group: META_GROUP_ID, metric: 'collected', target, icon: 'trophy',
+    title: count(target, ACHIEVEMENT_FORMS),
+    description: `Отримай ${count(target, ACHIEVEMENT_FORMS)}`,
+  })),
+  ...[1, 3, 6].map(target => achievement({
+    id: `full-groups-${target}`, group: META_GROUP_ID, metric: 'full_groups', target, icon: 'crown',
+    title: target === 1 ? 'Повна група' : `Повних груп: ${target}`,
+    description: FULL_GROUP_DESCRIPTIONS[target],
+  })),
+  achievement({
+    id: 'every-group', group: META_GROUP_ID, metric: 'groups_with_medal', target: ACHIEVEMENT_GROUPS.length - 1,
+    icon: 'compass', title: 'Усього потроху', description: 'Отримай хоча б одне досягнення в кожній групі',
+  }),
+  ...[3, 7, 14].map(target => achievement({
+    id: `topics-${target}`, group: META_GROUP_ID, metric: 'topics_with_five', target, icon: 'layers',
+    title: `${count(target, TOPIC_FORMS)} по 5 слів`,
+    description: `Вивчи по 5 слів у ${target} темах`,
+  })),
+];
+
 export const ACHIEVEMENT_CATALOG = Object.freeze([
-  ...wordMedals, ...streakMedals, ...answerMedals, ...dayMedals, ...goalMedals, ...perfectMedals, ...fastMedals,
+  ...metaMedals, ...wordMedals, ...streakMedals, ...answerMedals, ...dayMedals, ...goalMedals, ...perfectMedals, ...fastMedals,
   ...orderMedals, ...ruleMedals, ...drillMedals, ...habitMedals, ...categoryMedals,
 ]);

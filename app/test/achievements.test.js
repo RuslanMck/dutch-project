@@ -33,13 +33,13 @@ test('pluralize picks the Ukrainian form by count', () => {
   assert.equal(pluralize(5, ['речення', 'речення', 'речень']), 'речень');
 });
 
-test('the catalog has every medal of the plan: 116, in twelve groups, ids unique', () => {
-  assert.equal(ACHIEVEMENT_GROUPS.length, 12);
+test('the catalog has every medal of the plan: 128, in thirteen groups (meta first), ids unique', () => {
+  assert.equal(ACHIEVEMENT_GROUPS.length, 13);
   assert.deepEqual(ACHIEVEMENT_GROUPS.map(group => group.id), [
-    'words', 'streak', 'answers', 'days', 'goal', 'perfect', 'fast', 'order', 'rules', 'drill', 'habits', 'categories',
+    'meta', 'words', 'streak', 'answers', 'days', 'goal', 'perfect', 'fast', 'order', 'rules', 'drill', 'habits', 'categories',
   ]);
-  assert.equal(ACHIEVEMENT_CATALOG.length, 116);
-  assert.equal(new Set(ACHIEVEMENT_CATALOG.map(achievement => achievement.id)).size, 116);
+  assert.equal(ACHIEVEMENT_CATALOG.length, 128);
+  assert.equal(new Set(ACHIEVEMENT_CATALOG.map(achievement => achievement.id)).size, 128);
   const groupIds = new Set(ACHIEVEMENT_GROUPS.map(group => group.id));
   assert.ok(ACHIEVEMENT_CATALOG.every(achievement => groupIds.has(achievement.group)));
 });
@@ -177,8 +177,8 @@ test('the most words learned in one day are counted by the day of each moment', 
 test('the service lists every medal, locked at 0 for an empty database, with the progress capped at the target', () => {
   const context = createTestContext();
   const { groups, achievements } = context.achievementService.listAchievements();
-  assert.equal(groups.length, 12);
-  assert.equal(achievements.length, 116);
+  assert.equal(groups.length, 13);
+  assert.equal(achievements.length, 128);
   assert.ok(achievements.every(achievement => achievement.unlocked === false));
   assert.deepEqual(achievements[0].progress, { current: 0, target: 10 });
   assert.deepEqual(Object.keys(achievements[0]).sort(),
@@ -253,4 +253,35 @@ test('a medal once unlocked is saved with its time and stays unlocked when the f
   now += 3_600_000;
   const later = service.listAchievements().achievements.find(medal => medal.id === 'words-10');
   assert.deepEqual([later.unlocked, later.unlocked_at, later.progress], [true, unlockedAt, { current: 10, target: 10 }]);
+});
+
+test('meta medals count the other medals: collected, full groups, every group and topics', () => {
+  const saved = new Map();
+  const repository = {
+    readFactSources: () => ({
+      words: [
+        ...Array.from({ length: 10 }, () => ({ status: 'learned', category: 'food' })),
+        ...Array.from({ length: 5 }, () => ({ status: 'learned', category: 'clothes' })),
+        ...Array.from({ length: 5 }, () => ({ status: 'learned', category: 'colours' })),
+      ],
+      activityAnswers: [], deckAnswers: [], deckSessionAnswers: [], orderAnswers: [], ruleAnswers: [], dailyGoal: 20,
+    }),
+    listUnlocks: () => new Map(saved),
+    saveUnlocks: (ids, at) => { for (const id of ids) if (!saved.has(id)) saved.set(id, at); },
+  };
+  const service = createAchievementService({
+    achievementRepository: repository,
+    practiceSettings: { readSettings: () => ({ timeZone: TIME_ZONE }) },
+    clock: { now: () => Date.parse('2026-11-14T12:00:00+01:00') },
+  });
+  const { groups, achievements } = service.listAchievements();
+  const medal = id => achievements.find(item => item.id === id);
+  assert.equal(groups[0].title, 'Особливі');
+  // words-10, food-5, food-10, clothes-5, colours-5: five medals, three topics with five words.
+  assert.deepEqual(medal('collected-10').progress, { current: 5, target: 10 });
+  assert.equal(medal('topics-3').unlocked, true);
+  assert.equal(medal('topics-3').title, '3 теми по 5 слів');
+  assert.equal(medal('collected-25').title, '25 досягнень');
+  assert.equal(medal('full-groups-1').unlocked, false);
+  assert.deepEqual(medal('every-group').progress, { current: 2, target: 12 });
 });

@@ -223,3 +223,9 @@ and branch and touches only what its part needs; shared files (`index.html`, `ap
 - The goal card refuses an offline stored copy and hides. Goal petals drop once a day (the stored date is the guard).
 - The calendar asks for exactly 12 columns (11 weeks and this week up to today).
 - A new count-up or text on the same element stops the running one (`stopCountUp`).
+- Meta group «Особливі» (shown first, 12 medals, 128 in all): «10 / 25 / 50 / 75 / 100 досягнень» (medals of the
+  other groups), «Повна група» / «Повних груп: 3 / 6» (every medal of a group), «Усього потроху» (a medal in each of
+  the 12 other groups), «3 теми / 7 тем / 14 тем по 5 слів» (the 5-word medal of that many categories). The service
+  unlocks the other medals first, then counts them for the meta ones. Icons trophy, crown, compass, layers.
+- The loading screen and the icons: «Вітряк серед тюльпанів» (the sails spin from the start while the tulips grow,
+  then sway); `#splash` stays at least 1.4 s and at most 10 s; the logo also sits beside «Hoi!» on Головна.
