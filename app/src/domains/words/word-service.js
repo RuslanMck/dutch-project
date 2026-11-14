@@ -20,6 +20,7 @@ export function createWordService({
   runInTransaction,
   changeEventBus,
   clock,
+  wordCategorizer,
 }) {
   function getWord(wordId) {
     const word = wordRepository.findWordById(wordId);
@@ -67,6 +68,7 @@ export function createWordService({
       return insertedWordId;
     });
     changeEventBus.publishChange('words');
+    wordCategorizer.categorizeInBackground();
     return getWord(wordId);
   }
 
@@ -91,7 +93,10 @@ export function createWordService({
       priorityService.assignNewWordRanking(insertedWordIds);
       return { addedWordIds: insertedWordIds, skippedWords: duplicateWords };
     });
-    if (addedWordIds.length) changeEventBus.publishChange('words');
+    if (addedWordIds.length) {
+      changeEventBus.publishChange('words');
+      wordCategorizer.categorizeInBackground();
+    }
     return { added: addedWordIds.map(getWord), skipped: skippedWords };
   }
 
@@ -192,6 +197,11 @@ export function createWordService({
     return { word: updatedWord, created };
   }
 
+  // Sorts the uncategorized words into their categories now (POST /api/words/categorize).
+  function categorizeWords({ limit } = {}) {
+    return wordCategorizer.categorizeUncategorizedWords({ limit });
+  }
+
   function listTopics() {
     return topicRepository.listTopicsWithWordCounts();
   }
@@ -262,6 +272,7 @@ export function createWordService({
       columnChanges.sectionCode = sectionService.ensureSection(mapBlankTextToNull(wordChanges.section));
     }
     if (wordChanges.topic !== undefined) columnChanges.topicId = ensureTopic(mapBlankTextToNull(wordChanges.topic));
+    if (wordChanges.category !== undefined) columnChanges.category = wordChanges.category;
     if (wordChanges.status !== undefined) Object.assign(columnChanges, mapStatusChangeToColumns(wordChanges.status));
     columnChanges.updatedAt = clock.now();
     return columnChanges;
@@ -301,6 +312,7 @@ export function createWordService({
     recordPracticeError,
     logWordError,
     logWordErrorByLookup,
+    categorizeWords,
     listTopics,
     ensureTopic,
   });

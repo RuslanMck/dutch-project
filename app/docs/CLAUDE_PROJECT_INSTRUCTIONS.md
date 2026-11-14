@@ -25,6 +25,7 @@ what still needs to be saved.
 **What the data means.**
 - Words and multi-word expressions share one dictionary (`kind` is detected automatically). `article` is `de`,
   `het` or empty; `section` is the textbook chapter (e.g. `6.1`).
+- `category` is the word's topic (food, home, clothes, colours, numbers, people, body, city, work, nature, leisure, feelings, actions, talk, other) or null; the app sets it in the background after `add_words`, and `update_word` can change it.
 - Word status follows the FSRS schedule: `new` (not in rotation yet) → `learning` → `learned` (the review interval is
   21 days or more). I never set it by hand. The error count of a word is how often I got it wrong; it shows how
   critical the word is.
@@ -162,3 +163,5 @@ say I know a word, that does not change its status; the practice schedule decide
 
 **Progress questions.** For "how am I doing" use `stats`, `practice_stats`, `list_rules` (error counts) and
 `list_words` with `sort: "errors"`, and answer in a few lines.
+
+**Achievements («Досягнення»).** `list_achievements` (read-only) gives every medal with its progress; mention medals only when I ask about them or have just unlocked one.

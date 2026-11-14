@@ -6,7 +6,8 @@ const WORD_SELECT = `
     v_words.example_nl, v_words.example_uk, topics.name AS topic, v_words.section_code AS section,
     v_words.status, v_words.error_count, v_words.priority, v_words.priority_override, v_words.frequency_rank,
     v_words.due_at, v_words.fsrs_card, v_words.deck_required_correct, v_words.deck_correct_count,
-    v_words.deck_reverse_required_correct, v_words.deck_reverse_correct_count, v_words.added_at, v_words.updated_at
+    v_words.deck_reverse_required_correct, v_words.deck_reverse_correct_count, v_words.category,
+    v_words.added_at, v_words.updated_at
   FROM v_words
   LEFT JOIN topics ON topics.id = v_words.topic_id
 `;
@@ -45,6 +46,7 @@ const COLUMN_NAME_BY_FIELD_NAME = Object.freeze({
   deckReverseRequiredCorrect: 'deck_reverse_required_correct',
   deckReverseCorrectCount: 'deck_reverse_correct_count',
   deckReverseEnteredByLapse: 'deck_reverse_entered_by_lapse',
+  category: 'category',
   updatedAt: 'updated_at',
 });
 
@@ -53,6 +55,12 @@ export function createWordRepository({ database }) {
   const selectWordsStatementBySortOrder = Object.fromEntries(Object.entries(ORDER_BY_SQL_BY_SORT_ORDER)
     .map(([sortOrder, orderBySql]) => [sortOrder, database.prepare(`${WORD_SELECT} ${WORD_FILTER} ${orderBySql}`)]));
   const selectWordTextsAndArticlesStatement = database.prepare('SELECT id, nl, article FROM words');
+  const selectUncategorizedWordsStatement = database.prepare(
+    'SELECT id, nl, uk FROM words WHERE category IS NULL ORDER BY id LIMIT @limit',
+  );
+  const countUncategorizedWordsStatement = database.prepare(
+    'SELECT COUNT(*) FROM words WHERE category IS NULL',
+  ).pluck();
   const insertWordStatement = database.prepare(`
     INSERT INTO words (
       nl, uk, article, kind, example_nl, example_uk, topic_id, section_code, status, added_at, updated_at
@@ -96,6 +104,15 @@ export function createWordRepository({ database }) {
     return selectWordTextsAndArticlesStatement.all();
   }
 
+  // The words still without a category, oldest first: id, nl and uk for the categorizer.
+  function listUncategorizedWords(limit) {
+    return selectUncategorizedWordsStatement.all({ limit });
+  }
+
+  function countUncategorizedWords() {
+    return countUncategorizedWordsStatement.get();
+  }
+
   // Returns the new word's id.
   function createWord(word) {
     const insertResult = insertWordStatement.run({
@@ -137,6 +154,8 @@ export function createWordRepository({ database }) {
     findWordById,
     listWords,
     listWordTextsAndArticles,
+    listUncategorizedWords,
+    countUncategorizedWords,
     createWord,
     updateWord,
     deleteWord,

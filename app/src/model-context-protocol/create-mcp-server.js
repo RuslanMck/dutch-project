@@ -2,6 +2,7 @@
 // stateless, so a fresh one is built for every request.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import { registerAchievementTools } from '../domains/achievements/achievement-tools.js';
 import { registerDeckTools } from '../domains/decks/deck-tools.js';
 import { registerMistakeTools } from '../domains/mistakes/mistake-tools.js';
 import { registerPhraseTools } from '../domains/phrases/phrase-tools.js';
@@ -28,6 +29,7 @@ export function createMcpServer({
   textService,
   statisticsService,
   deckService,
+  achievementService,
 }) {
   const mcpServer = new McpServer({ ...MCP_SERVER_INFORMATION }, { instructions: MCP_INSTRUCTIONS });
   registerStatisticsTools({ mcpServer, statisticsService });
@@ -46,5 +48,6 @@ export function createMcpServer({
   registerWordOrderTools({ mcpServer, wordOrderService });
   registerTextTools({ mcpServer, textService });
   registerDeckTools({ mcpServer, deckService });
+  registerAchievementTools({ mcpServer, achievementService });
   return mcpServer;
 }

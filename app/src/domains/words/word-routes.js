@@ -3,6 +3,7 @@
 import express from 'express';
 
 import {
+  categorizeWordsInputSchema,
   createWordInputSchema,
   listWordsQuerySchema,
   logWordErrorInputSchema,
@@ -28,6 +29,11 @@ export function createWordRoutes({ wordService }) {
   wordRouter.patch('/words/:id', (request, response) => {
     const { id } = wordPathParametersSchema.parse(request.params);
     response.json(wordService.updateWord(id, updateWordInputSchema.parse(readRequestBody(request))));
+  });
+
+  wordRouter.post('/words/categorize', async (request, response) => {
+    const { limit } = categorizeWordsInputSchema.parse(readRequestBody(request));
+    response.json(await wordService.categorizeWords({ limit }));
   });
 
   wordRouter.delete('/words/:id', (request, response) => {

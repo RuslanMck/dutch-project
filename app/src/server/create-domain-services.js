@@ -2,6 +2,8 @@
 // all get their services from here, so they share one wiring. configuration is optional: without it (tests, scripts)
 // the OpenRouter client is simply not configured.
 import { createTransactionRunner } from '../database/run-in-transaction.js';
+import { createAchievementRepository } from '../domains/achievements/achievement-repository.js';
+import { createAchievementService } from '../domains/achievements/achievement-service.js';
 import { createArtifactExportRepository } from '../domains/artifact-export/artifact-export-repository.js';
 import { createArtifactExportService } from '../domains/artifact-export/artifact-export-service.js';
 import { createArtifactImportRepository } from '../domains/artifact-export/artifact-import-repository.js';
@@ -36,6 +38,7 @@ import { createTextService } from '../domains/texts/text-service.js';
 import { createWordOrderRepository } from '../domains/word-order/word-order-repository.js';
 import { createWordOrderService } from '../domains/word-order/word-order-service.js';
 import { createTopicRepository } from '../domains/words/topic-repository.js';
+import { createWordCategorizer } from '../domains/words/word-categorizer.js';
 import { createWordRepository } from '../domains/words/word-repository.js';
 import { createWordService } from '../domains/words/word-service.js';
 import { createOpenRouterClient } from '../integrations/openrouter-client.js';
@@ -46,12 +49,25 @@ export function createDomainServices({
   clock,
   isFsrsFuzzEnabled = true,
   configuration = {},
+  openRouterClient: injectedOpenRouterClient,
+  logger = console,
 }) {
   const runInTransaction = createTransactionRunner({ database });
   const sharedDependencies = { runInTransaction, changeEventBus, clock };
 
   const sectionService = createSectionService({ sectionRepository: createSectionRepository({ database }) });
   const wordRepository = createWordRepository({ database });
+  const openRouterClient = injectedOpenRouterClient ?? createOpenRouterClient({
+    apiKey: configuration.openRouterApiKey,
+    model: configuration.openRouterModel,
+  });
+  const wordCategorizer = createWordCategorizer({
+    wordRepository,
+    openRouterClient,
+    model: configuration.wordCategoryModel,
+    changeEventBus,
+    logger,
+  });
   const practiceRepository = createPracticeRepository({ database });
   const practiceSettings = createPracticeSettings({ practiceRepository });
   const priorityService = createPriorityService({
@@ -67,6 +83,7 @@ export function createDomainServices({
     sectionService,
     priorityService,
     practiceSettings,
+    wordCategorizer,
     ...sharedDependencies,
   });
   const fsrsScheduler = createFsrsScheduler({
@@ -114,10 +131,6 @@ export function createDomainServices({
     practiceSettings,
     ...sharedDependencies,
   });
-  const openRouterClient = createOpenRouterClient({
-    apiKey: configuration.openRouterApiKey,
-    model: configuration.openRouterModel,
-  });
   const wordOrderService = createWordOrderService({
     wordOrderRepository: createWordOrderRepository({ database }),
     openRouterClient,
@@ -152,6 +165,14 @@ export function createDomainServices({
     practiceSettings,
     ...sharedDependencies,
   });
+  const achievementService = createAchievementService({
+    achievementRepository: createAchievementRepository({
+      database,
+      statisticsRepository: createStatisticsRepository({ database }),
+    }),
+    practiceSettings,
+    clock,
+  });
   const artifactImportService = createArtifactImportService({
     artifactImportRepository: createArtifactImportRepository({ database }),
     sectionService,
@@ -177,5 +198,7 @@ export function createDomainServices({
     artifactImportService,
     deckService,
     ruleExerciseService,
+    achievementService,
+    wordCategorizer,
   });
 }

@@ -33,6 +33,7 @@ export function parseEnvironmentConfiguration(environment, { shouldRequireSecret
     openRouterApiKey: variables.OPENROUTER_API_KEY,
     openRouterModel: variables.OPENROUTER_MODEL,
     ruleExerciseModel: variables.RULE_EXERCISE_MODEL,
+    wordCategoryModel: variables.WORD_CATEGORY_MODEL,
   });
 }
 

@@ -72,6 +72,8 @@ export function registerWordTools({ mcpServer, wordService }) {
     title: 'Update word',
     description: 'Change fields of one word by id. Only the given fields change. '
       + 'Empty string or null clears example_nl, example_uk, section, topic. '
+      + 'category is a category id (food, home, clothes, colours, numbers, people, body, city, work, nature, leisure, '
+      + 'feelings, actions, talk, other) or null; words are also sorted into categories automatically. '
       + 'Changing nl re-detects kind unless kind is given. '
       + 'Once practice is set up on FSRS, status follows the schedule: only "new" is accepted, and it takes the word '
       + 'out of rotation (its schedule is cleared). Learning and learned come from grading in practice.',

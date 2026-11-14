@@ -9,6 +9,7 @@ export function mapWordToCompactWord(word) {
     kind: word.kind,
     section: word.section,
     topic: word.topic,
+    category: word.category ?? null,
     status: word.status,
     error_count: word.error_count,
     example_nl: word.example_nl,

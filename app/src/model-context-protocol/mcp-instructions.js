@@ -5,6 +5,9 @@ export const MCP_INSTRUCTIONS = [
   "Words and expressions share the words table; kind ('word' | 'expression') is detected automatically.",
   "article is 'de', 'het' or '' (none). section is the textbook chapter code, e.g. '6.1'. "
     + 'status follows the FSRS schedule: new (not in rotation yet) → learning → learned (interval of 21 days or more).',
+  "category is the word's topic: food, home, clothes, colours, numbers, people, body, city, work, nature, leisure, "
+    + 'feelings, actions, talk or other, or null until it is set. It is filled in the background after add_words; '
+    + 'update_word changes it.',
   "Rule codes such as '5.5' or 'Д1' are what feedback must cite: they are the rule numbers shown in the app.",
   '',
   'Workflows:',
@@ -99,5 +102,7 @@ export const MCP_INSTRUCTIONS = [
   '   add_word_ids / remove_word_ids change them, not together with word_ids; a deck keeps at least one word);',
   '   delete_deck (its words stay). To build a deck from the hard words, call get_struggling_words and pass the ids to',
   '   create_deck. Ask the learner before creating, changing or deleting a deck.',
+  '10. Achievements («Досягнення»): list_achievements (read-only) gives every medal with its progress. Mention a medal '
+    + 'only when the learner asks about achievements or has just unlocked one.',
   'Changes appear live in the web app.',
 ].join('\n');

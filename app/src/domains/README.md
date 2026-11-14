@@ -7,6 +7,7 @@ The app's data, business rules and their adapters, one folder per domain. Inside
 | File | What it does |
 |---|---|
 | `blank-text.js` | `mapBlankTextToNull`: optional text that is missing or only whitespace is stored as NULL. Pure. |
+| `ukrainian-plural.js` | `pluralize(count, [one, few, many])`: the Ukrainian plural form by count, for the texts the server writes. Pure. |
 
 ## Folders
 
@@ -21,7 +22,8 @@ The app's data, business rules and their adapters, one folder per domain. Inside
 | `word-order/` | The word-order exercise: stored Dutch sentences (from MCP, a Markdown import or an LLM through OpenRouter), the shuffled set with distractor words, and the answers. |
 | `texts/` | Bilingual texts such as textbook dialogues. |
 | `sections/` | Textbook sections, created on demand by the other domains. |
-| `statistics/` | Counts across all collections. |
+| `statistics/` | Counts across all collections, the calendar, the week recap and the learning activity. |
+| `achievements/` | Medals («Досягнення»): the catalog, the facts of the learner's practice, and the progress of each medal. |
 | `artifact-export/` | Export to, and import from, the claude.ai artifact's JSON format. |
 
 ## Conventions
