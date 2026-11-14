@@ -9,12 +9,20 @@ export function isMotionReduced() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Plays a CSS animation class again, even when the element already has it.
+// Plays a CSS animation class again, even when the element already has it. The class goes away once the animation
+// is over: an element that leaves display:none restarts its animations, so a class left on would replay them each
+// time its tab or form is shown again.
+const ONE_SHOT_MS = 1500;
+const classTimers = new WeakMap();
 export function replayClass(element, className) {
   if (!element) return;
   element.classList.remove(className);
   void element.offsetWidth;
   element.classList.add(className);
+  const timers = classTimers.get(element) ?? new Map();
+  clearTimeout(timers.get(className));
+  timers.set(className, setTimeout(() => element.classList.remove(className), ONE_SHOT_MS));
+  classTimers.set(element, timers);
 }
 
 function makeSvg(viewBox, className, parts) {
@@ -31,12 +39,15 @@ function makeSvg(viewBox, className, parts) {
 }
 
 // The small sprout that grows next to «✓ Правильно».
+// Once grown it stays still, so showing the message again does not grow it anew.
 export function makeSprout() {
-  return makeSvg('0 0 30 30', 'sprout', [
+  const sprout = makeSvg('0 0 30 30', 'sprout', [
     ['path', { class: 'sprout__stem', d: 'M15 28 V12', stroke: '#3e5240', 'stroke-width': '2.5', 'stroke-linecap': 'round', fill: 'none' }],
     ['path', { class: 'sprout__leaf sprout__leaf--left', d: 'M15 16 C9 16 6 12 6 8 C11 8 15 11 15 16z', fill: '#3e5240' }],
     ['path', { class: 'sprout__leaf sprout__leaf--right', d: 'M15 13 C20 13 24 10 24 5 C19 5 15 8 15 13z', fill: '#6a5d2e' }],
   ]);
+  setTimeout(() => sprout.classList.add('sprout--grown'), ONE_SHOT_MS);
+  return sprout;
 }
 
 // The sprout growing in a pot, for the long loading of the rule exercises.
@@ -169,28 +180,40 @@ export function celebrateWhenShown(section, { petalCount = 0, numbers = [] } = {
   dropPetals(section, petalCount);
 }
 
-// Turns an element over in 3D: to 90°, swap() changes the side, back to 0°.
+// Turns an element over in 3D: to 90°, swap() changes the side, back to 0°. isTurning tells a second tap to wait.
+const turningElements = new WeakSet();
+export function isTurning(element) {
+  return turningElements.has(element);
+}
+
 export function turnOver(element, swap) {
   if (isMotionReduced() || !element.animate) {
     swap();
     return;
   }
+  turningElements.add(element);
   const half = element.animate([{ transform: 'perspective(900px) rotateY(0)' }, { transform: 'perspective(900px) rotateY(90deg)' }],
     { duration: 140, easing: 'ease-in' });
   half.onfinish = () => {
     swap();
-    element.animate([{ transform: 'perspective(900px) rotateY(-90deg)' }, { transform: 'perspective(900px) rotateY(0)' }],
+    const back = element.animate([{ transform: 'perspective(900px) rotateY(-90deg)' }, { transform: 'perspective(900px) rotateY(0)' }],
       { duration: 320, easing: SPRING });
+    back.onfinish = back.oncancel = () => turningElements.delete(element);
   };
+  half.oncancel = () => turningElements.delete(element);
 }
 
 // The digits of a number that roll like a meter. from: the value shown before (rolls to value), or null (no roll).
 export function renderOdometer(holder, value, from) {
   const digits = String(value).split('');
+  const spoken = document.createElement('span');
+  spoken.className = 'sr-only';
+  spoken.textContent = String(value);
   const startDigits = from == null ? digits : String(from).padStart(digits.length, '0').slice(-digits.length).split('');
   holder.replaceChildren(...digits.map(() => {
     const digit = document.createElement('span');
     digit.className = 'odometer__digit';
+    digit.setAttribute('aria-hidden', 'true');
     const strip = document.createElement('span');
     strip.className = 'odometer__strip';
     for (let n = 0; n <= 9; n += 1) {
@@ -200,8 +223,7 @@ export function renderOdometer(holder, value, from) {
     }
     digit.append(strip);
     return digit;
-  }));
-  holder.setAttribute('aria-label', String(value));
+  }), spoken);
   const strips = [...holder.querySelectorAll('.odometer__strip')];
   strips.forEach((strip, index) => { strip.style.transform = `translateY(-${Number(startDigits[index])}em)`; });
   if (from == null || isMotionReduced()) {
@@ -215,20 +237,25 @@ export function renderOdometer(holder, value, from) {
   });
 }
 
-// The bottom menu's sand pill under the chosen item; hidden when no plain item is chosen (the play button).
+// The bottom menu's sand pill under the chosen item's icon; hidden when no plain item is chosen (the play button).
+// Measured from layout offsets and computed sizes, not rects, so a tapped button's press scale does not skew it.
 export function placeNavPill(nav, pill) {
-  const current = nav.querySelector('.bottom-nav__item[aria-current="page"] .garden-icon');
-  if (!current) {
+  const item = nav.querySelector('.bottom-nav__item[aria-current="page"]');
+  const icon = item?.querySelector('.garden-icon');
+  if (!icon) {
     pill.classList.remove('bottom-nav__pill--shown');
     return;
   }
   // The first placement jumps there; later ones glide.
   if (!pill.dataset.placed) pill.style.transition = 'none';
-  const navRect = nav.getBoundingClientRect();
-  const iconRect = current.getBoundingClientRect();
-  pill.style.width = `${iconRect.width}px`;
-  pill.style.height = `${iconRect.height}px`;
-  pill.style.transform = `translate(${iconRect.left - navRect.left}px, ${iconRect.top - navRect.top}px)`;
+  const iconStyle = getComputedStyle(icon);
+  const width = parseFloat(iconStyle.width) + parseFloat(iconStyle.paddingLeft) + parseFloat(iconStyle.paddingRight);
+  const height = parseFloat(iconStyle.height) + parseFloat(iconStyle.paddingTop) + parseFloat(iconStyle.paddingBottom);
+  const left = item.offsetLeft + (item.offsetWidth - width) / 2;
+  const top = item.offsetTop + parseFloat(getComputedStyle(item).paddingTop);
+  pill.style.width = `${width}px`;
+  pill.style.height = `${height}px`;
+  pill.style.transform = `translate(${left}px, ${top}px)`;
   pill.classList.add('bottom-nav__pill--shown');
   if (!pill.dataset.placed) {
     pill.dataset.placed = '1';

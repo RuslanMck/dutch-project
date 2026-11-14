@@ -4,7 +4,7 @@ import * as api from './api.js';
 import { offlineStore, flushOutbox, getStore as getOfflineStore } from './offline-store.js';
 import {
   replayClass, makeSprout, makeGrowingPot, makeFlame, showInputResult, snapshotTiles, playTileMoves, waveTiles,
-  celebrateWhenShown, turnOver, renderOdometer, placeNavPill,
+  celebrateWhenShown, turnOver, isTurning, renderOdometer, placeNavPill,
 } from './motion.js';
 import {
   buildHomeSummary,
@@ -512,7 +512,8 @@ function renderStats() {
   $('stats-streak').innerHTML = renderTiles(buildStreakTiles(activity.streak));
   if (shownStreak?.dataset.streak === String(activity.streak.current)) {
     document.querySelector('#stats-streak .stat-tile__value').replaceWith(shownStreak);
-  } else {
+  } else if (ui.tab === 'stats') {
+    // A render behind another tab would use the roll up unseen.
     decorateStreakTile(activity.streak.current);
   }
   $('stats-hardest').innerHTML = activity.hardest_words.length
@@ -898,6 +899,7 @@ function showNextWordCard() {
 // Phrases: the card turns over only when it is not turned yet; grading is done with the buttons.
 function handleCardClick() {
   const cards = ui.cards;
+  if (isTurning($('card'))) return;
   if (cards.mode === 'words') {
     if (!cards.words.deck.length || isWordDeckFinished()) return;
     cards.flipped = !cards.flipped;
@@ -1232,15 +1234,13 @@ function renderRoundSummary() {
     // Finished offline: only the local tally is known.
     const localRound = ui.fsrs.round;
     $('practice-round-title').textContent = localRound.title;
-    $('practice-round-stats').innerHTML = localRound.stats.map(([label, value]) =>
-      `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
+    renderSummaryItems($('practice-round-stats'), localRound.stats);
     renderRoundDrillButtons(localRound);
     return;
   }
   const view = buildRoundSummaryView(ui.fsrs.round);
   $('practice-round-title').textContent = view.title;
-  $('practice-round-stats').innerHTML = view.stats.map(([label, value]) =>
-    `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
+  renderSummaryItems($('practice-round-stats'), view.stats);
   $('practice-round-hardest').textContent = view.hardestText;
   $('practice-round-words-summary').textContent = view.wordsLabel;
   // A new summary starts folded; a re-render of the same one keeps the learner's choice.
@@ -1627,12 +1627,15 @@ function animateNewPracticeQuestion() {
 // The finish screens of the practice tab celebrate when they appear: numbers count up, petals for a good result.
 function celebratePracticeSummaries() {
   const round = ui.fsrs.round ?? {};
-  const answers = Number(round.answer_count) || 0;
+  const { again, hard, good } = ui.fsrs.tally;
+  // A round finished offline has no server counts: the local tally stands in.
+  const hasRoundCounts = Number.isFinite(round.answer_count);
+  const answers = hasRoundCounts ? round.answer_count : again + hard + good;
+  const rightAnswers = hasRoundCounts ? answers - (Number(round.mistake_count) || 0) : good;
   celebrateWhenShown($('practice-round'), {
-    petalCount: choosePetalCount(answers - (Number(round.mistake_count) || 0), answers),
+    petalCount: choosePetalCount(rightAnswers, answers),
     numbers: $('practice-round-stats').querySelectorAll('strong'),
   });
-  const { again, hard, good } = ui.fsrs.tally;
   celebrateWhenShown($('practice-summary'), {
     petalCount: choosePetalCount(good, again + hard + good),
     numbers: $('practice-summary-list').querySelectorAll('strong'),
@@ -1750,8 +1753,24 @@ function renderPracticeSummary() {
     ['Нових слів', session.introducedCount],
     ['Завтра повторити', session.dueTomorrow ?? '…'],
   ];
-  $('practice-summary-list').innerHTML = items.map(([label, value]) =>
-    `<li class="practice-summary__item">${esc(label)}: <strong>${esc(value)}</strong></li>`).join('');
+  renderSummaryItems($('practice-summary-list'), items);
+}
+
+// «Label: value» rows of a summary. The same rows are updated in place, so a count-up running on them goes on.
+function renderSummaryItems(list, items) {
+  const rows = [...list.children];
+  const isSameRows = rows.length === items.length && items.every(([label], index) => rows[index].dataset.label === String(label));
+  if (!isSameRows) {
+    list.innerHTML = items.map(([label, value]) => `<li class="practice-summary__item" data-label="${esc(label)}">`
+      + `${esc(label)}: <strong data-value="${esc(value)}">${esc(value)}</strong></li>`).join('');
+    return;
+  }
+  items.forEach(([, value], index) => {
+    const strong = rows[index].querySelector('strong');
+    if (strong.dataset.value === String(value)) return;
+    strong.dataset.value = String(value);
+    strong.textContent = String(value);
+  });
 }
 
 // The FSRS summary's count of the drill's words, read fresh each time the summary shows. A failed read leaves the
@@ -2655,7 +2674,7 @@ function renderWordOrderSentences() {
   const generate = $('word-order-generate');
   generate.hidden = !canGenerate;
   generate.disabled = !!busy;
-  generate.textContent = busy === 'generate' ? 'Генерую' : 'Згенерувати ще 20';
+  generate.textContent = busy === 'generate' ? 'Генерую' : 'Згенерувати ще 20';   // the dots are .is-busy's
   generate.classList.toggle('is-busy', busy === 'generate');
   $('word-order-import-button').disabled = !!busy;
 
@@ -3100,10 +3119,14 @@ function renderRuleQuizSetup() {
 function renderRuleQuizExercise() {
   const quiz = ui.ruleQuiz;
   const { exercise, result, chosen } = quiz.current;
+  // The pulse, the shake, the sprout and the rise play once, when the result arrives; live re-renders keep still.
+  const resultKey = result ? `${quiz.index}:${result.is_correct}:${result.answer}` : '';
+  const isFreshResult = !!result && $('rule-quiz-exercise').dataset.result !== resultKey;
+  $('rule-quiz-exercise').dataset.result = resultKey;
   $('rule-quiz-progress').textContent = formatRuleQuizProgress(quiz.index, quiz.exercises.length);
   $('rule-quiz-rule').textContent = `${exercise.rule_code} · ${exercise.rule_title}`;
   $('rule-quiz-question').textContent = exercise.question;
-  renderRuleQuizSentence(exercise, result);
+  renderRuleQuizSentence(exercise, result, isFreshResult);
   const isGap = exercise.kind === 'gap';
   $('rule-quiz-form').hidden = !isGap || !!result;
   $('rule-quiz-options').hidden = isGap;
@@ -3117,7 +3140,10 @@ function renderRuleQuizExercise() {
       button.textContent = option;
       button.lang = 'nl';
       button.disabled = !!result;
-      if (result && option === result.answer) button.classList.add('rule-quiz__option--right');
+      if (result && option === result.answer) {
+        button.classList.add('rule-quiz__option--right');
+        if (isFreshResult) button.classList.add('pulse-once');
+      }
       if (result && option === chosen && !result.is_correct) button.classList.add('rule-quiz__option--wrong');
       return button;
     }));
@@ -3126,9 +3152,7 @@ function renderRuleQuizExercise() {
   if (result) {
     const others = result.accepted_answers.length ? ` (або: ${result.accepted_answers.join(', ')})` : '';
     const text = result.is_correct ? `✓ Правильно${others}` : `✗ Правильно: ${result.answer}${others}`;
-    // The sprout and the rise play once, when the result arrives.
-    if (message.dataset.shown !== text) {
-      message.dataset.shown = text;
+    if (isFreshResult) {
       message.textContent = text;
       message.className = `msg ${result.is_correct ? 'ok' : 'bad'}`;
       if (result.is_correct) message.prepend(makeSprout());
@@ -3137,7 +3161,6 @@ function renderRuleQuizExercise() {
   } else {
     message.textContent = '';
     message.className = 'msg';
-    delete message.dataset.shown;
   }
   $('rule-quiz-translation').hidden = !result?.translation;
   $('rule-quiz-translation').textContent = result?.translation ?? '';
@@ -3149,7 +3172,7 @@ function renderRuleQuizExercise() {
 }
 
 // The Dutch sentence with its gap: empty before the answer, the right answer after it.
-function renderRuleQuizSentence(exercise, result) {
+function renderRuleQuizSentence(exercise, result, isFreshResult) {
   const sentenceElement = $('rule-quiz-sentence');
   const parts = splitRuleQuizSentence(exercise.sentence);
   sentenceElement.hidden = !parts;
@@ -3157,6 +3180,7 @@ function renderRuleQuizSentence(exercise, result) {
   const gap = document.createElement('span');
   gap.className = `rule-quiz__gap${result ? (result.is_correct ? ' rule-quiz__gap--right' : ' rule-quiz__gap--wrong') : ''}`;
   gap.textContent = result ? result.answer : '＿＿＿';
+  if (isFreshResult) gap.classList.add(result.is_correct ? 'pulse-once' : 'shake');
   const pieces = [parts.before, gap, parts.after];
   if (exercise.hint) {
     const hint = document.createElement('span');
@@ -4208,6 +4232,11 @@ function init() {
   let saved = 'home';
   try { saved = localStorage.getItem('tab') || 'home'; } catch { /* storage unavailable */ }
   showTab(saved);
+  // The menu's pill follows its item when the menu changes size (rotation, a wider window, the font arriving).
+  const nav = $('bottom-nav');
+  const placePill = () => placeNavPill(nav, $('bottom-nav-pill'));
+  if (typeof ResizeObserver === 'function') new ResizeObserver(placePill).observe(nav);
+  document.fonts?.ready.then(placePill);
   refresh(ALL_KEYS)
     .then(() => warmUpOfflineData())
     .catch(error => { if (!error.offline) notice(error.message || 'Не вдалося завантажити дані'); });
