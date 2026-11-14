@@ -614,6 +614,7 @@ export const TAB_TITLES = Object.freeze({
   rules: 'Правила',
   texts: 'Тексти',
   stats: 'Статистика',
+  week: 'Тиждень у підсумку',
 });
 
 // The line under the page title in the gold header (Головна has its own greeting).
@@ -630,6 +631,7 @@ export const TAB_SUBTITLES = Object.freeze({
   rules: 'Граматика з номерами правил',
   texts: 'Тексти для читання',
   stats: 'Як іде навчання',
+  week: 'Твій тиждень коротко',
 });
 
 const PERIOD_RANGE_PREFIX = Object.freeze({
@@ -1170,6 +1172,7 @@ export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
   table: 'profile',
   rules: 'profile',
   texts: 'profile',
+  week: 'home',
 });
 
 export function findNavigationSection(tab) {
@@ -1494,4 +1497,141 @@ export function findBasketAt(point, rects) {
     if (rect && point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom) return id;
   }
   return null;
+}
+
+// ---------- Головна: daily goal, week recap, calendar (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §4) ----------
+
+const WEEKDAY_NAMES = Object.freeze(['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота']);
+export const GOAL_REACHED_TEXT = 'Ціль виконано! Можна ще, але вже без поспіху.';
+
+// The daily goal card (§4.1): the ring's percent, the number in the ring, and the line under it.
+// goal: the day's goal (5–500); answers: the activity answers today.
+export function buildGoalView({ goal, answers }) {
+  const count = Math.max(0, answers ?? 0);
+  const target = Math.max(1, goal);
+  const remaining = target - count;
+  const reached = remaining <= 0;
+  return {
+    reached,
+    percent: Math.min(100, Math.round((count / target) * 100)),
+    number: String(count),
+    ofText: `з ${target}`,
+    line: reached ? GOAL_REACHED_TEXT : `Ще ${remaining} ${pluralize(remaining, ANSWER_WORDS)} до цілі`,
+  };
+}
+
+// The weekday of a «2026-11-14» date, in Ukrainian lower case. The date is a calendar day, so UTC is used.
+export function weekdayName(isoDate) {
+  const [year, month, day] = String(isoDate).split('-').map(Number);
+  return WEEKDAY_NAMES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
+function accuracySuffix(accuracy) {
+  return accuracy == null ? '' : `, ${accuracy} % правильно`;
+}
+
+// The story slides of the week recap (§4.2). A slide whose data is null or 0 is left out. An empty week has one slide.
+// countUp: the big value starts with a number that counts up when the slide shows.
+export function buildWeekSlides(week) {
+  if (!week || !week.answers) {
+    return [{ id: 'empty', title: '', big: 'Цього тижня ще немає відповідей', text: "Почни практику, і тут з'явиться підсумок", countUp: false }];
+  }
+  const slides = [{
+    id: 'answers',
+    title: 'Цього тижня',
+    big: String(week.answers),
+    text: `${pluralize(week.answers, ANSWER_WORDS)}${accuracySuffix(week.accuracy)}`,
+    countUp: true,
+  }];
+  if (week.started_count) {
+    slides.push({
+      id: 'started',
+      title: 'Нових слів',
+      big: String(week.started_count),
+      text: `почато, ${week.learned_count ?? 0} вивчено`,
+      countUp: true,
+    });
+  }
+  if (week.best_day) {
+    const { date, answers, accuracy } = week.best_day;
+    slides.push({
+      id: 'best-day',
+      title: 'Найкращий день',
+      big: weekdayName(date),
+      text: `${answers} ${pluralize(answers, ANSWER_WORDS)}${accuracySuffix(accuracy)}`,
+      countUp: false,
+    });
+  }
+  if (week.hardest_word && week.hardest_word.mistakes) {
+    const { nl, article, mistakes } = week.hardest_word;
+    slides.push({
+      id: 'hardest',
+      title: 'Найважче слово',
+      big: article ? `${article} ${nl}` : nl,
+      text: `${mistakes} ${pluralize(mistakes, MISTAKE_WORDS)} — воно буде частіше`,
+      countUp: false,
+    });
+  }
+  if (week.streak?.current) {
+    const { current, longest } = week.streak;
+    slides.push({
+      id: 'streak',
+      title: 'Серія',
+      big: `${current} ${pluralizeDays(current)}`,
+      text: `найдовша — ${longest} ${pluralizeDays(longest)}`,
+      countUp: true,
+    });
+  }
+  if (week.active_seconds) {
+    const days = week.days_practised ?? 0;
+    slides.push({
+      id: 'time',
+      title: 'Час навчання',
+      big: formatDuration(week.active_seconds),
+      text: `за ${days} ${pluralizeDays(days)} практики`,
+      countUp: false,
+    });
+  }
+  return slides;
+}
+
+// The shade of a calendar day (§4.3): 0 none, 1 to 14 answers, 2 to 34, 3 to 59, 4 from 60.
+export function calendarLevel(answers) {
+  if (answers <= 0) return 0;
+  if (answers <= 14) return 1;
+  if (answers <= 34) return 2;
+  if (answers <= 59) return 3;
+  return 4;
+}
+
+// Monday = 0 … Sunday = 6, for an ISO date.
+function mondayFirstIndex(isoDate) {
+  const [year, month, day] = String(isoDate).split('-').map(Number);
+  return (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+}
+
+function calendarCell(day) {
+  const answers = day.answers ?? 0;
+  const correct = day.correct ?? 0;
+  const accuracy = answers ? Math.round((correct / answers) * 100) : null;
+  const [, month, dayOfMonth] = String(day.date).split('-');
+  const dayText = `${dayOfMonth}.${month}`;
+  const label = answers
+    ? `${dayText}: ${answers} ${pluralize(answers, ANSWER_WORDS)}, ${accuracy} % правильно`
+    : `${dayText}: без практики`;
+  return { date: day.date, answers, correct, accuracy, level: calendarLevel(answers), label };
+}
+
+// The calendar of the days, oldest first (§4.3): weeks are columns of seven cells, Monday on top. Cells before the
+// first day and after the last one are null, so every column has seven entries.
+export function buildCalendarGrid(days) {
+  if (!days?.length) return { weeks: [] };
+  const cells = [
+    ...Array.from({ length: mondayFirstIndex(days[0].date) }, () => null),
+    ...days.map(calendarCell),
+  ];
+  while (cells.length % 7) cells.push(null);
+  const weeks = [];
+  for (let start = 0; start < cells.length; start += 7) weeks.push(cells.slice(start, start + 7));
+  return { weeks };
 }

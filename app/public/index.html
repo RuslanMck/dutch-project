@@ -37,6 +37,19 @@
         <h1 id="home-greeting" class="home-header__greeting" tabindex="-1">Hoi!</h1>
         <p class="home-header__subtitle">Що вчимо сьогодні?</p>
       </div>
+      <section id="home-goal" class="goal-card" aria-labelledby="home-goal-title" hidden>
+        <div class="goal-card__ring">
+          <svg class="goal-ring" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+            <circle class="goal-ring__track" cx="60" cy="60" r="50" pathLength="100"/>
+            <circle id="home-goal-arc" class="goal-ring__arc" cx="60" cy="60" r="50" pathLength="100"/>
+          </svg>
+          <span class="goal-ring__number"><span id="home-goal-answers"></span><small id="home-goal-of"></small></span>
+        </div>
+        <div class="goal-card__text">
+          <h2 id="home-goal-title" class="goal-card__title">Ціль на день</h2>
+          <p id="home-goal-line" class="goal-card__line" role="status"></p>
+        </div>
+      </section>
       <form id="home-search-form" class="home-search" role="search">
         <label class="sr-only" for="home-search-input">Пошук слова</label>
         <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4"/></svg>
@@ -85,6 +98,11 @@
           <span class="practice-tile__name">Важкі слова</span>
           <span id="home-tile-struggling" class="practice-tile__line"></span>
         </button>
+        <button class="practice-tile practice-tile--week" type="button" data-tab="week">
+          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14v14H5zM5 10h14M9 3v4M15 3v4"/></svg></span>
+          <span class="practice-tile__name">Тиждень у підсумку</span>
+          <span class="practice-tile__line">Підсумок тижня</span>
+        </button>
       </div>
     </section>
 
@@ -95,6 +113,16 @@
         <button class="profile-menu__link" type="button" data-tab="rules"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg><span>Правила</span></button>
         <button class="profile-menu__link" type="button" data-tab="texts"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg><span>Тексти</span></button>
       </nav>
+      <section id="profile-goal" class="stats-card goal-setting" aria-labelledby="profile-goal-label" hidden>
+        <form id="goal-form" class="goal-form" novalidate>
+          <label id="profile-goal-label" class="goal-form__label" for="goal-input">Ціль на день</label>
+          <div class="goal-form__row">
+            <input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" required>
+            <button type="submit" class="primary">Зберегти</button>
+          </div>
+          <p id="goal-message" class="muted goal-form__message" role="status"></p>
+        </form>
+      </section>
       <form class="profile-logout" method="post" action="/auth/logout">
         <button class="ghost" type="submit">Вийти</button>
       </form>
@@ -381,6 +409,22 @@
           <div id="stats-chart" class="bar-chart"></div>
           <p id="stats-chart-detail" class="muted bar-chart__detail" aria-live="polite"></p>
         </section>
+        <section id="stats-calendar" class="stats-card" aria-labelledby="stats-calendar-title" hidden>
+          <h2 id="stats-calendar-title" class="stats-card__title">Календар занять</h2>
+          <div class="calendar__scroll">
+            <div id="stats-calendar-grid" class="calendar__grid"></div>
+          </div>
+          <p id="stats-calendar-detail" class="muted calendar__detail" aria-live="polite">Торкніться дня, щоб побачити деталі.</p>
+          <div class="calendar__legend" aria-hidden="true">
+            <span>менше</span>
+            <span class="calendar__cell calendar__cell--l0"></span>
+            <span class="calendar__cell calendar__cell--l1"></span>
+            <span class="calendar__cell calendar__cell--l2"></span>
+            <span class="calendar__cell calendar__cell--l3"></span>
+            <span class="calendar__cell calendar__cell--l4"></span>
+            <span>більше</span>
+          </div>
+        </section>
         <section class="stats-card" aria-labelledby="stats-streak-title">
           <h2 id="stats-streak-title" class="stats-card__title">Серія днів поспіль</h2>
           <div id="stats-streak" class="stat-tiles stat-tiles--two"></div>
@@ -394,6 +438,27 @@
           <div id="stats-overview" class="stat-tiles"></div>
         </section>
       </div>
+    </section>
+
+    <!-- Тиждень у підсумку -->
+    <section id="tab-week" class="tab" data-tab="week" aria-labelledby="page-title" hidden>
+      <div class="week-story" id="week-story">
+        <div id="week-progress" class="week-story__progress"></div>
+        <div class="week-story__body">
+          <div id="week-slide" class="week-story__slide">
+            <p id="week-slide-title" class="week-story__title"></p>
+            <p id="week-slide-big" class="week-story__big"></p>
+            <p id="week-slide-text" class="week-story__text"></p>
+          </div>
+          <button class="week-story__zone week-story__zone--back" type="button" data-week-step="-1" aria-label="Попередній слайд"></button>
+          <button class="week-story__zone week-story__zone--next" type="button" data-week-step="1" aria-label="Наступний слайд"></button>
+        </div>
+      </div>
+      <div id="week-periods" class="segmented segmented--two" role="group" aria-label="Тиждень">
+        <button type="button" data-week-period="current" aria-pressed="true">Цей тиждень</button>
+        <button type="button" data-week-period="previous" aria-pressed="false">Минулий тиждень</button>
+      </div>
+      <p id="week-message" class="muted" role="status"></p>
     </section>
 
     <!-- 4 · Правила -->
