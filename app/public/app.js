@@ -235,6 +235,8 @@ const ui = {
     },
   },
   practice: {
+    // isModePickerOpen: «змінити» showed the mode select during a running practice (docs/MOTION.md, focused practice).
+    isModePickerOpen: false,
     mode: 'fsrs', current: null, lastWordId: null, feedback: null, score: { correct: 0, total: 0 },
     // Article practice: the words put into each basket (right answers) in this visit.
     baskets: { de: 0, het: 0 },
@@ -433,6 +435,11 @@ function showTab(name) {
   }
   // Головна has its own gold header with the greeting.
   $('top-header').hidden = ui.tab === 'home';
+  // The focused practice hides the header; any other tab shows it again, and the mode select comes back next time.
+  if (ui.tab !== 'practice') {
+    document.body.classList.remove('is-practice-focused');
+    ui.practice.isModePickerOpen = false;
+  }
   $('page-title').textContent = TAB_TITLES[ui.tab];
   $('page-subtitle').textContent = TAB_SUBTITLES[ui.tab];
   document.title = `${TAB_TITLES[ui.tab]} · Dutch матеріали`;
@@ -1946,6 +1953,22 @@ async function loadDueTomorrow() {
 // Enter or the button: check the answer; once checked the button reads "Далі" and moves on.
 // Grading: only the FSRS mode posts grades. The custom drill (and its struggling mode) takes the drill branch, which
 // posts nothing; the dispatch here, handlePracticeSkipClick and the override listener are pinned by a test.
+// The answer field keeps the focus between questions, so the phone keyboard stays open and the page does not jump.
+function focusPracticeAnswer() {
+  const input = $('practice-input');
+  if (!$('practice-form').hidden) input.focus({ preventScroll: true });
+}
+
+// While a question is on screen the page header and the mode select step aside (more room above the keyboard);
+// «<режим> · змінити» brings the select back.
+function renderPracticeFocus(isQuestionOnScreen) {
+  const isFocused = ui.tab === 'practice' && isQuestionOnScreen && !ui.practice.isModePickerOpen;
+  $('tab-practice').classList.toggle('practice--focused', isFocused);
+  document.body.classList.toggle('is-practice-focused', isFocused);
+  const select = $('practice-mode');
+  $('practice-mode-chip-label').textContent = select.options[select.selectedIndex]?.textContent ?? '';
+}
+
 function submitPractice() {
   if (ui.practice.mode === 'fsrs') submitFsrsAnswer();
   else if (isCustomPracticeMode()) submitCustomAnswer();
@@ -1992,8 +2015,8 @@ function revealFsrsAnswer() {
   const { word, direction } = session.current;
   answerFsrsWord(direction === 'uk_nl' ? revealTranslationAnswer(word) : revealReverseTranslationAnswer(word),
     undefined);
-  // «Не знаю» is hidden once the answer is shown; «Далі» takes the focus.
-  $('practice-btn').focus();
+  // «Не знаю» is hidden once the answer is shown; Enter in the field is «Далі».
+  focusPracticeAnswer();
 }
 
 // Checks the current word and shows the result. The answer is posted at once, unless the learner may still overrule
@@ -2044,7 +2067,7 @@ function handleOverrideClick() {
   session.feedback = { text: '✓ Зараховано', ok: true };
   recordFsrsAnswer(current);
   renderPractice();
-  $('practice-btn').focus();
+  focusPracticeAnswer();
 }
 
 // The response carries the deck position, which the line under the message shows. Offline (or while older answers wait in
@@ -2150,6 +2173,7 @@ function renderPractice() {
   else renderCustomPractice();
   animateNewPracticeQuestion();
   celebratePracticeSummaries();
+  renderPracticeFocus(!$('practice-form').hidden || !$('practice-board').hidden);
 }
 
 // The word's example sentence under the result, right or wrong, once the answer is checked. The practice words carry
@@ -2849,7 +2873,7 @@ function revealCustomAnswer() {
   const { word, direction } = drill.current;
   if (drill.formDeck) answerCustomWord(revealFormAnswer(word, direction));
   else answerCustomWord(direction === 'uk_nl' ? revealTranslationAnswer(word) : revealReverseTranslationAnswer(word));
-  $('practice-btn').focus();
+  focusPracticeAnswer();
 }
 
 // Checks the word on screen. A wrong round-2 answer can still be overruled («Я мав рацію») until «Далі».
@@ -2868,7 +2892,7 @@ function overrideCustomAnswer() {
   drill.current.canOverride = false;
   drill.feedback = { text: '✓ Зараховано', ok: true };
   renderPractice();
-  $('practice-btn').focus();
+  focusPracticeAnswer();
 }
 
 // «Далі»: a word right on its check leaves the round; any other word comes back later among the active words. The first
@@ -4312,6 +4336,7 @@ function bindEvents() {
       return;
     }
     ui.practice.mode = choice;
+    ui.practice.isModePickerOpen = false;
     if (ui.practice.mode === 'art') pickArticleQuestion();
     $('practice-input').value = '';
     if (ui.practice.mode === 'struggling') startStrugglingDrill();
@@ -4321,6 +4346,19 @@ function bindEvents() {
   $('practice-form').addEventListener('submit', event => {
     event.preventDefault();
     submitPractice();
+  });
+  // A tap on these buttons does not take the focus from the answer field: the keyboard stays open.
+  for (const id of ['practice-btn', 'practice-skip-button', 'practice-override-button']) {
+    for (const type of ['pointerdown', 'mousedown']) {
+      $(id).addEventListener(type, event => {
+        if (document.activeElement === $('practice-input')) event.preventDefault();
+      });
+    }
+  }
+  $('practice-mode-chip').addEventListener('click', () => {
+    ui.practice.isModePickerOpen = true;
+    renderPractice();
+    $('practice-mode').focus();
   });
   $('practice-skip-button').addEventListener('click', handlePracticeSkipClick);
   bindArticleBoard();

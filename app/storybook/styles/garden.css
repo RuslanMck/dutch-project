@@ -2172,6 +2172,23 @@ input { transition: border-color .25s, background-color .25s; }
 .article-basket__count--bump { display: inline-block; animation: motion-pulse .45s var(--motion-spring); }
 .article-hint { margin: 0; text-align: center; font-size: 14px; }
 
+/* Focused practice: while a question is on screen the header and the mode select step aside. */
+.practice-mode-chip { display: none; }
+.is-practice-focused #top-header { display: none; }
+#tab-practice.practice--focused > .hint-field { display: none; }
+#tab-practice.practice--focused .practice-mode-chip {
+  display: inline-block;
+  min-height: 36px;
+  margin: 4px 0 8px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--garden-tint);
+  color: var(--garden-ink-soft);
+  font-size: 13px;
+  font-weight: var(--garden-weight-strong);
+}
+
 /* Loading screen and logo: the windmill among tulips. The sails spin from the start, the tulips grow, then sway. */
 .splash {
   position: fixed;
