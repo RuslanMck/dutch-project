@@ -166,6 +166,27 @@ export function gradeTranslationAnswer(word, input, { words = [] } = {}) {
   return { counted: true, grade: 'again', message: `✗ Правильно: ${right}` };
 }
 
+// The meanings of a translation may be typed in any order («що за, який» for «який, що за»), with or without the
+// commas, but the words inside one meaning keep their order: «який, за що» is wrong. Every meaning must be there once.
+const MAX_MEANINGS_TO_PERMUTE = 6;
+export function hasSameMeaningsInAnyOrder(uk, input) {
+  const meanings = splitTranslationMeanings(uk);
+  const normalizedInput = normalizeAnswerText(input);
+  if (meanings.length < 2 || !normalizedInput) return false;
+  if (meanings.length > MAX_MEANINGS_TO_PERMUTE) {
+    const typedMeanings = splitTranslationMeanings(input);
+    return typedMeanings.length === meanings.length && [...typedMeanings].sort().join('|') === [...meanings].sort().join('|');
+  }
+  const matchesFrom = (rest, remaining) => {
+    if (!remaining.length) return rest === '';
+    return remaining.some((meaning, index) => {
+      if (rest !== meaning && !rest.startsWith(`${meaning} `)) return false;
+      return matchesFrom(rest.slice(meaning.length).trimStart(), remaining.filter((_, other) => other !== index));
+    });
+  };
+  return matchesFrom(normalizedInput, meanings);
+}
+
 // «Не знаю» in the reverse round (the Dutch is shown, the Ukrainian is wanted): the right answer is shown, graded again.
 export function revealReverseTranslationAnswer(word) {
   return { counted: true, grade: 'again', message: `✗ Правильно: ${word.uk}` };
@@ -180,7 +201,9 @@ export function gradeReverseTranslationAnswer(word, input) {
   if (normalizedInput === 'dnk') return revealReverseTranslationAnswer(word);
   // Notes in brackets («смачний (звичайне слово)») only guide the learner; the answer may leave them out.
   const acceptedAnswers = [word.uk, String(word.uk ?? '').replace(/\([^)]*\)/g, ' ')].map(normalizeAnswerText);
-  if (acceptedAnswers.includes(normalizedInput)) return { counted: true, grade: 'good', message: '✓ Правильно' };
+  if (acceptedAnswers.includes(normalizedInput) || hasSameMeaningsInAnyOrder(word.uk, input)) {
+    return { counted: true, grade: 'good', message: '✓ Правильно' };
+  }
   return { counted: true, grade: 'again', message: `✗ Правильно: ${word.uk}`, canOverride: true };
 }
 

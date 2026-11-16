@@ -53,6 +53,7 @@ import {
   planCustomDrill,
   CUSTOM_DRILL_NOTE,
   gradeReverseTranslationAnswer,
+  hasSameMeaningsInAnyOrder,
   revealReverseTranslationAnswer,
   orderNextRound,
   formatRoundProgress,
@@ -1678,4 +1679,24 @@ test('rule quiz helpers: the gap, the rule line, the selection, the progress and
   assert.equal(formatRuleQuizProgress(2, 10), 'Питання 3 з 10');
   assert.equal(formatRuleQuizResult([{ is_correct: true }, { is_correct: false }]), 'Правильно 1 з 2');
   assert.equal(formatRuleQuizResult([{ is_correct: true }]), 'Правильно 1 з 1 🎉');
+});
+
+test('gradeReverseTranslationAnswer: the meanings may come in any order, the words inside a meaning may not', () => {
+  const welk = { nl: 'welk', uk: 'який, що за' };
+  assert.equal(gradeReverseTranslationAnswer(welk, 'який, що за').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'що за, який').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'що за який').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'що за; який').grade, 'good');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'який, за що').grade, 'again');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'за що, який').grade, 'again');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'який').grade, 'again');
+  assert.equal(gradeReverseTranslationAnswer(welk, 'який, що за, який').grade, 'again');
+  assert.equal(gradeReverseTranslationAnswer(nemen, 'замовляти, брати').grade, 'good');
+});
+
+test('hasSameMeaningsInAnyOrder: one meaning is not reordered, many meanings are compared as a set', () => {
+  assert.equal(hasSameMeaningsInAnyOrder('що за', 'за що'), false);
+  const many = 'а, б, в, г, ґ, д, е';
+  assert.equal(hasSameMeaningsInAnyOrder(many, 'е, д, ґ, г, в, б, а'), true);
+  assert.equal(hasSameMeaningsInAnyOrder(many, 'е, д, ґ, г, в, б'), false);
 });
