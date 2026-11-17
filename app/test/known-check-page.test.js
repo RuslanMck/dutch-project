@@ -61,11 +61,11 @@ test('parseChapterInput accepts integers 1 to 99 only', () => {
   for (const bad of ['', '0', '100', '-3', '2.5', 'abc']) assert.equal(parseChapterInput(bad), null, bad);
 });
 
-test('known-check belongs to Головна: title, subtitle and navigation', () => {
+test('known-check belongs to Вчити: title, subtitle and navigation', () => {
   assert.equal(TAB_TITLES['known-check'], 'Що я вже знаю');
   assert.equal(TAB_SUBTITLES['known-check'], 'Швидка перевірка слів');
-  assert.equal(findNavigationSection('known-check'), 'home');
-  assert.equal(NAVIGATION_SECTION_FOR_TAB['known-check'], 'home');
+  assert.equal(findNavigationSection('known-check'), 'learn');
+  assert.equal(NAVIGATION_SECTION_FOR_TAB['known-check'], 'learn');
 });
 
 test('the known-check tab is registered in TABS and has its page section', () => {
@@ -76,19 +76,17 @@ test('the known-check tab is registered in TABS and has its page section', () =>
   }
 });
 
-test('Головна has the «Що я вже знаю» and «Артикль» tiles after the existing tiles', () => {
-  const weekTile = html.indexOf('practice-tile--week');
-  const knownTile = html.indexOf('id="home-tile-known-check"');
-  const articleTile = html.indexOf('id="home-tile-article"');
-  assert.ok(knownTile > weekTile && articleTile > knownTile);
-  assert.match(html, /id="home-tile-known-check"[^>]*data-tab="known-check"/);
-  assert.match(html, /Що я вже знаю<\/span>\s*<span class="practice-tile__line">Пропусти знайомі слова/);
-  assert.match(html, /Артикль<\/span>\s*<span class="practice-tile__line">de чи het/);
+test('Вчити has the «Артикль» tile, then «Що я знаю» in the words row', () => {
+  const article = html.indexOf('id="learn-article"');
+  const knownTile = html.indexOf('<button class="learn-tile" type="button" data-tab="known-check">');
+  assert.ok(article > 0 && knownTile > article);
+  assert.match(html, /<span class="learn-tile__name">Що я знаю<\/span>\s*<span class="learn-tile__line">Пропусти знайомі слова/);
+  assert.match(html, /<span class="learn-tile__name">Артикль<\/span>\s*<span class="learn-tile__line">de чи het/);
 });
 
-test('Практика links to the known check; the article tile and the Колоди card open the art mode', () => {
-  assert.match(html, /<button id="practice-known-check-link"[^>]*data-tab="known-check">Перевірити, що я вже знаю<\/button>/);
-  assert.match(appSource, /\$\('home-tile-article'\)\.addEventListener\('click', openArticlePractice\)/);
+test('the known check is linked from Вчити; the article tile opens the art mode', () => {
+  assert.doesNotMatch(html, /practice-known-check-link/);
+  assert.match(appSource, /\$\('learn-article'\)\.addEventListener\('click', openArticlePractice\)/);
   assert.match(appSource, /function openArticlePractice\(\) \{\s*ui\.practice\.mode = 'art';/);
   assert.match(appSource, /'Артикль: de чи het'/);
 });

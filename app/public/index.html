@@ -30,6 +30,12 @@
     <p id="page-subtitle" class="top__subtitle"></p>
   </header>
 
+  <!-- The exercise bar replaces the gold header on the exercise screens (§5): ✕ goes back to Вчити. -->
+  <header id="exercise-bar" class="exercise-bar">
+    <button id="exercise-close" class="icon-button" type="button" aria-label="Закрити вправу"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h1 id="exercise-title" class="exercise-bar__title" tabindex="-1"></h1>
+  </header>
+
   <div id="offline-banner" class="offline-banner" role="status" hidden>
     <span id="offline-banner-text" class="offline-banner__text"></span>
     <button id="offline-banner-send" class="offline-banner__action" type="button" hidden>Надіслати</button>
@@ -51,7 +57,7 @@
       </div>
       <form id="home-search-form" class="home-search" role="search">
         <label class="sr-only" for="home-search-input">Пошук слова</label>
-        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4"/></svg>
+        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>
         <input id="home-search-input" type="search" placeholder="Пошук слова…" autocomplete="off" autocapitalize="none"
           spellcheck="false">
       </form>
@@ -83,73 +89,93 @@
         <p id="home-progress-label" class="continue-card__progress-label"></p>
       </section>
 
-      <h2 class="home-section-title">Тренування</h2>
-      <div class="practice-tiles">
-        <button id="home-tile-new" class="practice-tile practice-tile--cards" type="button">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h12v14H7zM4 7v13h12"/></svg></span>
-          <span class="practice-tile__name">Нові слова</span>
-          <span id="home-tile-new-line" class="practice-tile__line"></span>
+    </section>
+
+    <!-- 0a · Вчити (the round hub of the bottom bar, §4) -->
+    <section id="tab-learn" class="tab" data-tab="learn" aria-labelledby="page-title" hidden>
+      <button id="learn-resume" class="learn-resume" type="button" hidden>
+        <span class="learn-resume__text">
+          <span id="learn-resume-title" class="learn-resume__title"></span>
+          <span id="learn-resume-line" class="learn-resume__line"></span>
+        </span>
+        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+
+      <h2 class="learn-section-title">Щодня</h2>
+      <div class="learn-daily">
+        <button id="learn-new" class="learn-card learn-card--new" type="button">
+          <span class="learn-card__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M12 10.5v6M9 13.5h6"/></svg></span>
+          <span class="learn-card__body">
+            <span class="learn-card__name">Нові слова</span>
+            <span id="learn-new-line" class="learn-card__line">…</span>
+            <span class="progress-bar learn-card__bar" aria-hidden="true"><span id="learn-new-fill" class="progress-bar__fill"></span></span>
+          </span>
+          <span class="learn-card__side">
+            <span id="learn-new-pill" class="learn-pill">Почати</span>
+            <span id="learn-new-done" class="learn-done" hidden><svg class="garden-icon garden-icon--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Зроблено</span>
+          </span>
         </button>
-        <button id="home-tile-review" class="practice-tile practice-tile--review" type="button">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12a8 8 0 0114-5.3M20 12a8 8 0 01-14 5.3M18 3v4h-4M6 21v-4h4"/></svg></span>
-          <span class="practice-tile__name">Запам'ятовування</span>
-          <span id="home-tile-review-line" class="practice-tile__line"></span>
-        </button>
-        <button class="practice-tile practice-tile--word-order" type="button" data-tab="word-order">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg></span>
-          <span class="practice-tile__name">Порядок слів</span>
-          <span id="home-tile-word-order" class="practice-tile__line"></span>
-        </button>
-        <button class="practice-tile practice-tile--phrases" type="button" data-tab="phrases">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
-          <span class="practice-tile__name">Фрази</span>
-          <span id="home-tile-phrases" class="practice-tile__line"></span>
-        </button>
-        <button class="practice-tile practice-tile--rule-quiz" type="button" data-tab="rule-quiz">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM9 9h5M9 13h3"/></svg></span>
-          <span class="practice-tile__name">Вправи з правил</span>
-          <span id="home-tile-rule-quiz" class="practice-tile__line">Граматика в реченнях</span>
-        </button>
-        <button id="home-tile-struggling-button" class="practice-tile practice-tile--struggling" type="button">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg></span>
-          <span class="practice-tile__name">Важкі слова</span>
-          <span id="home-tile-struggling" class="practice-tile__line"></span>
-        </button>
-        <button class="practice-tile practice-tile--dictionary" type="button" data-tab="table">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h7v14H4zM13 5h7v14h-7zM6.5 9h2M6.5 12h2M15.5 9h2M15.5 12h2"/></svg></span>
-          <span class="practice-tile__name">Словник</span>
-          <span id="home-tile-dictionary" class="practice-tile__line"></span>
-        </button>
-        <button class="practice-tile practice-tile--week" type="button" data-tab="week">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14v14H5zM5 10h14M9 3v4M15 3v4"/></svg></span>
-          <span class="practice-tile__name">Тиждень у підсумку</span>
-          <span class="practice-tile__line">Підсумок тижня</span>
-        </button>
-        <button id="home-tile-known-check" class="practice-tile practice-tile--known-check" type="button" data-tab="known-check">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg></span>
-          <span class="practice-tile__name">Що я вже знаю</span>
-          <span class="practice-tile__line">Пропусти знайомі слова</span>
-        </button>
-        <button id="home-tile-article" class="practice-tile practice-tile--article" type="button">
-          <span class="practice-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h7v10H4zM13 7h7v10h-7z"/></svg></span>
-          <span class="practice-tile__name">Артикль</span>
-          <span class="practice-tile__line">de чи het</span>
+        <button id="learn-review" class="learn-card learn-card--review" type="button">
+          <span class="learn-card__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/><path d="M12 8v4l2.5 1.5"/></svg></span>
+          <span class="learn-card__body">
+            <span class="learn-card__name">Запам'ятовування</span>
+            <span id="learn-review-line" class="learn-card__line">…</span>
+          </span>
+          <span class="learn-card__side">
+            <span id="learn-review-pill" class="learn-pill">Почати</span>
+            <span id="learn-review-done" class="learn-done" hidden><svg class="garden-icon garden-icon--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Зроблено</span>
+          </span>
         </button>
       </div>
+
+      <h2 class="learn-section-title">Слова</h2>
+      <div class="learn-tiles">
+        <button id="learn-article" class="learn-tile" type="button">
+          <span class="learn-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.5L11 5h8.5v8.5L12 21z"/><circle cx="15.5" cy="9" r="1.2"/></svg></span>
+          <span class="learn-tile__name">Артикль</span>
+          <span class="learn-tile__line">de чи het</span>
+        </button>
+        <button id="learn-struggling" class="learn-tile" type="button">
+          <span class="learn-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 8a3 3 0 0 1 6 0"/><path d="M7 9.5h10l1.5 10.5h-13z"/></svg></span>
+          <span class="learn-tile__name">Важкі слова</span>
+          <span id="learn-struggling-line" class="learn-tile__line">…</span>
+        </button>
+        <button class="learn-tile" type="button" data-tab="known-check">
+          <span class="learn-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.2l2.6 2.6 4.8-5.4"/></svg></span>
+          <span class="learn-tile__name">Що я знаю</span>
+          <span class="learn-tile__line">Пропусти знайомі слова</span>
+        </button>
+      </div>
+
+      <h2 class="learn-section-title">Речення</h2>
+      <div class="learn-tiles">
+        <button class="learn-tile" type="button" data-tab="word-order">
+          <span class="learn-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h9M4 12h9M4 18h6"/><path d="M18 4v15M15 16l3 3 3-3"/></svg></span>
+          <span class="learn-tile__name">Порядок слів</span>
+          <span class="learn-tile__line">Склади речення</span>
+        </button>
+        <button class="learn-tile" type="button" data-tab="rule-quiz">
+          <span class="learn-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 4.5l5 5L9 20H4v-5z"/><path d="M13 6l5 5"/></svg></span>
+          <span class="learn-tile__name">Граматика</span>
+          <span class="learn-tile__line">У реченнях</span>
+        </button>
+        <button class="learn-tile" type="button" data-tab="phrases">
+          <span class="learn-tile__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h11v8H9l-5 4z"/><path d="M15 9h5v8l-3-2h-6v-2"/></svg></span>
+          <span class="learn-tile__name">Фрази</span>
+          <span id="learn-phrases-line" class="learn-tile__line">Фрази з діалогів</span>
+        </button>
+      </div>
+
+      <div class="learn-section-head">
+        <h2 class="learn-section-title">Мої колоди</h2>
+        <button class="learn-section-link" type="button" data-tab="decks">Усі</button>
+      </div>
+      <div id="learn-decks" class="learn-decks"></div>
     </section>
 
     <!-- 0b · Профіль -->
     <section id="tab-profile" class="tab" data-tab="profile" hidden>
-      <section id="profile-achievements" class="achievements-card" aria-labelledby="profile-achievements-title" hidden>
-        <h2 id="profile-achievements-title" class="stats-card__title">Досягнення</h2>
-        <p id="profile-achievements-count" class="muted"></p>
-        <div id="profile-achievements-recent" class="medal-row"></div>
-        <button id="profile-achievements-open" class="ghost" type="button" data-tab="achievements">Усі досягнення</button>
-      </section>
       <nav class="profile-menu" aria-label="Інші розділи">
-        <button class="profile-menu__link" type="button" data-tab="table"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Словник</span></button>
-        <button class="profile-menu__link" type="button" data-tab="rules"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg><span>Правила</span></button>
-        <button class="profile-menu__link" type="button" data-tab="texts"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg><span>Тексти</span></button>
         <button class="profile-menu__link" type="button" data-tab="settings"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4"/></svg><span>Налаштування</span></button>
       </nav>
       <section id="profile-goal" class="stats-card goal-setting" aria-labelledby="profile-goal-label" hidden>
@@ -174,12 +200,17 @@
         </form>
       </section>
       <form class="profile-logout" method="post" action="/auth/logout">
-        <button class="ghost" type="submit">Вийти</button>
+        <button class="ghost profile-logout__button" type="submit"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4M6 12h10"/></svg>Вийти</button>
       </form>
     </section>
 
     <!-- 0c · Досягнення (from Профіль) -->
     <section id="tab-achievements" class="tab" data-tab="achievements" aria-labelledby="page-title" hidden>
+      <nav class="section-tabs segmented segmented--three" aria-label="Розділи прогресу">
+        <button type="button" data-tab="stats">Статистика</button>
+        <button type="button" data-tab="week">Тиждень</button>
+        <button type="button" data-tab="achievements">Досягнення</button>
+      </nav>
       <p id="achievements-message" class="muted" role="status"></p>
       <div id="achievements-groups"></div>
     </section>
@@ -196,7 +227,7 @@
             <span class="theme-option__name">Сад</span>
             <span class="theme-option__mood">Перша тема застосунку: кремовий фон, золото й теплий коричневий.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <p class="theme-picker__group">Осінній гарбуз</p>
         <label class="theme-option" data-theme="dry-leaves">
@@ -206,7 +237,7 @@
             <span class="theme-option__name">Сухе листя</span>
             <span class="theme-option__mood">Опале листя на стежці: світлі тони гарбуза, теплі коричневі акценти й спокійне світло.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="pumpkin-field">
           <input class="theme-option__input" type="radio" name="theme" value="pumpkin-field">
@@ -215,7 +246,7 @@
             <span class="theme-option__name">Гарбузове поле</span>
             <span class="theme-option__mood">Гарбузи на полі в погожий вересень: помаранчеві акценти, чорнобривці на кнопках і темний мох у написах.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="olive-path">
           <input class="theme-option__input" type="radio" name="theme" value="olive-path">
@@ -224,7 +255,7 @@
             <span class="theme-option__name">Оливкова стежка</span>
             <span class="theme-option__mood">Тихий ранок у лісі: оливкова зелень, світлий світанок у фонах і м'який теплий штрих у написах.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="rose-mist">
           <input class="theme-option__input" type="radio" name="theme" value="rose-mist">
@@ -233,7 +264,7 @@
             <span class="theme-option__name">Рожевий туман</span>
             <span class="theme-option__mood">Ранковий туман над полем: приглушена троянда на картках, оливкові смуги прогресу і темний оливковий текст.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="cinnamon-oat">
           <input class="theme-option__input" type="radio" name="theme" value="cinnamon-oat">
@@ -242,7 +273,7 @@
             <span class="theme-option__name">Кориця й овес</span>
             <span class="theme-option__mood">Кориця, вівсяне поле й темний ґрунт: глибша і тепліша палітра для вечірніх занять.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="moss-pumpkin">
           <input class="theme-option__input" type="radio" name="theme" value="moss-pumpkin">
@@ -251,7 +282,7 @@
             <span class="theme-option__name">Мох і гарбуз</span>
             <span class="theme-option__mood">Мох на пні й помаранчевий гарбуз: зелений і помаранчевий контраст, але без неонових тонів.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="wheat-field">
           <input class="theme-option__input" type="radio" name="theme" value="wheat-field">
@@ -260,7 +291,7 @@
             <span class="theme-option__name">Пшеничне поле</span>
             <span class="theme-option__mood">Жовте поле після жнив: пшенична світлість, вівсяні тони і тихий оливковий акцент.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="chestnut-light">
           <input class="theme-option__input" type="radio" name="theme" value="chestnut-light">
@@ -269,7 +300,7 @@
             <span class="theme-option__name">Каштанове світло</span>
             <span class="theme-option__mood">Персикові картки і темний каштан у написах: глибше за інші, але без важкості.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="branch-khaki">
           <input class="theme-option__input" type="radio" name="theme" value="branch-khaki">
@@ -278,7 +309,7 @@
             <span class="theme-option__name">Гілка й хакі</span>
             <span class="theme-option__mood">Суха гілка, хакі й мох: стримана осінь із теплим відтінком, майже без яскравих акцентів.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
         <label class="theme-option" data-theme="honey-fall">
           <input class="theme-option__input" type="radio" name="theme" value="honey-fall">
@@ -287,13 +318,18 @@
             <span class="theme-option__name">Листопадний мед</span>
             <span class="theme-option__mood">Листопадний ранок: медові кнопки, шкіряний акцент і світлі картки на тлі кремового жовтого.</span>
           </span>
-          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </label>
       </fieldset>
     </section>
 
     <!-- 1 · Словник -->
     <section id="tab-table" class="tab" data-tab="table" hidden>
+      <nav class="section-tabs segmented segmented--three" aria-label="Розділи словника">
+        <button type="button" data-tab="table">Слова</button>
+        <button type="button" data-tab="rules">Правила</button>
+        <button type="button" data-tab="texts">Тексти</button>
+      </nav>
       <div class="dict-toolbar">
         <input id="table-q" type="search" placeholder="Пошук" aria-label="Пошук у словах" autocomplete="off" autocapitalize="none" spellcheck="false">
         <button id="word-add-open" class="primary" type="button">Додати слово</button>
@@ -437,25 +473,14 @@
 
     <!-- 3 · Практика -->
     <section id="tab-practice" class="tab" data-tab="practice" hidden>
-      <button id="practice-mode-chip" class="practice-mode-chip" type="button" aria-label="Змінити режим практики">
-        <span id="practice-mode-chip-label"></span> · змінити</button>
-      <div class="hint-field">
-        <div class="hint-label">
-          <label for="practice-mode">Режим</label>
-          <button class="icon-button icon-button--compact" type="button" aria-expanded="false" aria-controls="practice-mode-hint"
-            aria-label="Пояснення до режиму" data-hint-button><svg class="garden-icon garden-icon--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg></button>
-        </div>
-        <select id="practice-mode">
-          <option value="fsrs">Нові слова</option>
-          <option value="review">Запам'ятовування</option>
-          <option value="art">Артикль</option>
-          <option value="struggling">Важкі слова</option>
-          <option value="custom" hidden disabled>Тренування</option>
-        </select>
-        <p id="practice-kind-line" class="muted practice-kind-line" hidden></p>
-        <button id="practice-known-check-link" class="practice-known-link" type="button" data-tab="known-check">Перевірити, що я вже знаю</button>
-        <p id="practice-mode-hint" class="hint" hidden>«Нові слова» — тільки нові слова, по 10 у наборі. Після набору можна повторити ці самі слова (розклад не зміниться) або взяти ще 10 нових. «Запам'ятовування» — тільки слова, які ти вже вчив і яким сьогодні час повторення, по 10 у наборі: спершу високий пріоритет, потім середній і низький, а в межах пріоритету — найважчі. Слово в наборі треба назвати правильно 2 рази; кожна помилка додає ще один раз, до 6. Набір іде у два раунди: спершу UA → NL, потім NL → UA; слово вивчене, коли ти знаєш його в обидва боки. Нові слова, які ти почав сьогодні, переходять у запам'ятовування із завтрашнього дня. «Артикль» і «Важкі слова» — тренування, які нічого не змінюють у розкладі.</p>
-      </div>
+      <select id="practice-mode" hidden>
+        <option value="fsrs">Нові слова</option>
+        <option value="review">Запам'ятовування</option>
+        <option value="art">Артикль</option>
+        <option value="struggling">Важкі слова</option>
+        <option value="custom" hidden disabled>Тренування</option>
+      </select>
+      <p id="practice-kind-line" class="muted practice-kind-line" hidden></p>
       <div id="practice-progress-bar" class="progress-bar practice-progress-bar" role="progressbar" aria-label="Прогрес набору"
         aria-valuemin="0" aria-valuemax="100" hidden><span id="practice-progress-fill" class="progress-bar__fill"></span></div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
@@ -546,6 +571,11 @@
 
     <!-- Статистика -->
     <section id="tab-stats" class="tab" data-tab="stats" aria-labelledby="page-title" hidden>
+      <nav class="section-tabs segmented segmented--three" aria-label="Розділи прогресу">
+        <button type="button" data-tab="stats">Статистика</button>
+        <button type="button" data-tab="week">Тиждень</button>
+        <button type="button" data-tab="achievements">Досягнення</button>
+      </nav>
       <div id="stats-periods" class="segmented" role="group" aria-label="Період">
         <button type="button" data-period="day" aria-pressed="false">День</button>
         <button type="button" data-period="week" aria-pressed="true">Тиждень</button>
@@ -595,6 +625,11 @@
 
     <!-- Тиждень у підсумку -->
     <section id="tab-week" class="tab" data-tab="week" aria-labelledby="page-title" hidden>
+      <nav class="section-tabs segmented segmented--three" aria-label="Розділи прогресу">
+        <button type="button" data-tab="stats">Статистика</button>
+        <button type="button" data-tab="week">Тиждень</button>
+        <button type="button" data-tab="achievements">Досягнення</button>
+      </nav>
       <div class="week-story" id="week-story">
         <div id="week-progress" class="week-story__progress"></div>
         <div class="week-story__body">
@@ -616,6 +651,11 @@
 
     <!-- 4 · Правила -->
     <section id="tab-rules" class="tab" data-tab="rules" hidden>
+      <nav class="section-tabs segmented segmented--three" aria-label="Розділи словника">
+        <button type="button" data-tab="table">Слова</button>
+        <button type="button" data-tab="rules">Правила</button>
+        <button type="button" data-tab="texts">Тексти</button>
+      </nav>
       <input id="rules-q" type="search" placeholder="Пошук у правилах і помилках" aria-label="Пошук у правилах">
       <div id="rules-list" class="rules-list"></div>
     </section>
@@ -785,17 +825,22 @@
     </section>
 
     <section id="tab-texts" class="tab" data-tab="texts" hidden>
+      <nav class="section-tabs segmented segmented--three" aria-label="Розділи словника">
+        <button type="button" data-tab="table">Слова</button>
+        <button type="button" data-tab="rules">Правила</button>
+        <button type="button" data-tab="texts">Тексти</button>
+      </nav>
       <div id="texts-list"></div>
     </section>
   </main>
 
   <nav id="bottom-nav" class="bottom-nav" aria-label="Розділи">
     <span id="bottom-nav-pill" class="bottom-nav__pill" aria-hidden="true"></span>
-    <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg><span>Головна</span></button>
-    <button class="bottom-nav__item" type="button" data-tab="decks" data-nav="decks"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4h12v14H7zM4 7v13h12"/></svg><span>Колоди</span></button>
-    <button class="bottom-nav__play" type="button" data-tab="practice" data-nav="practice" aria-label="Практика"><svg class="garden-icon garden-icon--filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></button>
-    <button class="bottom-nav__item" type="button" data-tab="stats" data-nav="stats"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Статистика</span></button>
-    <button class="bottom-nav__item" type="button" data-tab="profile" data-nav="profile"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zM4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span>Профіль</span></button>
+    <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 10.5L12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5h4v5"/></svg><span>Головна</span></button>
+    <button class="bottom-nav__item" type="button" data-tab="table" data-nav="dictionary"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/><path d="M9.5 12.5l2-5.5 2 5.5M10.2 10.8h2.6"/></svg><span>Словник</span></button>
+    <button class="bottom-nav__hub" type="button" data-tab="learn" data-nav="learn"><span class="bottom-nav__slot" aria-hidden="true"></span><span class="bottom-nav__disc"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1V19c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5V20"/></svg></span><span>Вчити</span></button>
+    <button class="bottom-nav__item" type="button" data-tab="stats" data-nav="progress"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h16"/><path d="M7 16v-3M12 16V9M17 16V5"/></svg><span>Прогрес</span></button>
+    <button class="bottom-nav__item" type="button" data-tab="profile" data-nav="profile"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-3.8 4-5.8 7.5-5.8s6.5 2 7.5 5.8"/></svg><span>Профіль</span></button>
   </nav>
 </div>
 

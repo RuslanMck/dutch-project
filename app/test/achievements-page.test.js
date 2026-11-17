@@ -107,16 +107,16 @@ test('every icon name of the plan is drawn, with one icon per category id', () =
   assert.equal(ACHIEVEMENT_ICON_NAMES.length, planIcons.length + categoryIds.length);
 });
 
-test('the achievements tab belongs to Профіль and has its title and subtitle', () => {
+test('the achievements tab belongs to Прогрес and has its title and subtitle', () => {
   assert.equal(TAB_TITLES.achievements, 'Досягнення');
   assert.equal(TAB_SUBTITLES.achievements, 'Твої відзнаки');
-  assert.equal(NAVIGATION_SECTION_FOR_TAB.achievements, 'profile');
+  assert.equal(NAVIGATION_SECTION_FOR_TAB.achievements, 'progress');
 });
 
-test('app.js lists the tab, loads the medals and fills the Профіль card and the tab', () => {
+test('app.js lists the tab, loads the medals and fills the tab (the Профіль card is gone)', () => {
   const appSource = readPublic('app.js');
   assert.match(appSource, /const TABS = \[[^\]]*'achievements'[^\]]*\];/);
-  assert.match(appSource, /profile: renderProfileAchievements,/);
+  assert.doesNotMatch(appSource, /renderProfileAchievements/);
   assert.match(appSource, /achievements: renderAchievementsPage,/);
   assert.match(appSource, /await api\.getAchievements\(\)/);
   assert.match(appSource, /localStorage\.setItem\(ACHIEVEMENTS_SEEN_KEY/);
@@ -131,16 +131,14 @@ test('sw.js precaches the achievement icons', () => {
   assert.match(readPublic('sw.js'), /'\/achievement-icons\.js'/);
 });
 
-test('index.html has the Профіль card, the tab, the toast box and the medal dialog', () => {
+test('index.html has the tab in Прогрес, the toast box and the medal dialog; the Профіль card is gone', () => {
   const html = readPublic('index.html');
-  for (const id of ['profile-achievements', 'profile-achievements-count', 'profile-achievements-recent',
-    'tab-achievements', 'achievements-message', 'achievements-groups', 'achievement-toasts', 'achievement-dialog',
+  for (const id of ['tab-achievements', 'achievements-message', 'achievements-groups', 'achievement-toasts', 'achievement-dialog',
     'achievement-dialog-medal', 'achievement-dialog-title', 'achievement-dialog-description', 'achievement-dialog-bar']) {
     assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
   }
-  assert.match(html, /<button id="profile-achievements-open"[^>]*data-tab="achievements">Усі досягнення<\/button>/);
-  assert.match(html, /<h2 id="profile-achievements-title" class="stats-card__title">Досягнення<\/h2>/);
-  assert.ok(html.indexOf('id="profile-achievements"') < html.indexOf('<nav class="profile-menu"'), 'the card is above the menu');
+  assert.doesNotMatch(html, /profile-achievements/);
+  assert.match(html, /<nav class="section-tabs segmented segmented--three" aria-label="Розділи прогресу">[\s\S]*?<button type="button" data-tab="achievements">Досягнення<\/button>/);
 });
 
 test('garden.css: the medal grid has 4 columns and the toast and shine use the motion keyframes', () => {

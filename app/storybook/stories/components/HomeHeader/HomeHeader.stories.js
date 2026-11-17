@@ -14,7 +14,7 @@ export const Overview = {
       </div>
       <form id="home-search-form" class="home-search" role="search">
         <label class="sr-only" for="home-search-input">Пошук слова</label>
-        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4-4"/></svg>
+        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>
         <input id="home-search-input" type="search" placeholder="Пошук слова…" autocomplete="off" autocapitalize="none"
           spellcheck="false">
       </form>

@@ -154,11 +154,11 @@ test('api.js: setWordPriorityTag is PUT /api/words/:id/priority, getWordSuggesti
   assert.match(apiSource, /export const getWordSuggestions = \(limit = 30\) => request\('POST', '\/api\/words\/suggestions', \{ limit \}\)/);
 });
 
-test('the page: the tab, the Головна tile and the profile link name Словник; the old table form and topic select are gone', () => {
+test('the page: the tab, the bottom bar and the section tabs name Словник; the old table form and topic select are gone', () => {
   assert.match(html, /<section id="tab-table" class="tab" data-tab="table" hidden>/);
-  assert.match(html, /class="practice-tile practice-tile--dictionary" type="button" data-tab="table"/);
-  assert.match(html, /<span class="practice-tile__name">Словник<\/span>\s*<span id="home-tile-dictionary"/);
-  assert.match(html, /<button class="profile-menu__link" type="button" data-tab="table">[\s\S]*?<span>Словник<\/span>/);
+  assert.match(html, /<button class="bottom-nav__item" type="button" data-tab="table" data-nav="dictionary">/);
+  assert.match(html, /<span>Словник<\/span><\/button>/);
+  assert.match(html, /<button type="button" data-tab="table">Слова<\/button>/);
   assert.doesNotMatch(html, /id="table-topic"|id="words-body"|>Слова<\/span><\/button>/);
   assert.doesNotMatch(appSource, /table-topic|words-body|wdel/);
 });

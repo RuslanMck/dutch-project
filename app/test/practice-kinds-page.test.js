@@ -21,7 +21,7 @@ function functionBody(source, signature) {
 }
 
 test('the mode select: Нові слова, then Запам\'ятовування, then Артикль and Важкі слова', () => {
-  const select = html.match(/<select id="practice-mode">([\s\S]*?)<\/select>/)[1];
+  const select = html.match(/<select id="practice-mode" hidden>([\s\S]*?)<\/select>/)[1];
   const options = [...select.matchAll(/<option value="([\w]+)"[^>]*>([^<]+)<\/option>/g)].map(match => [match[1], match[2]]);
   assert.deepEqual(options.slice(0, 4), [
     ['fsrs', 'Нові слова'],
@@ -32,16 +32,16 @@ test('the mode select: Нові слова, then Запам\'ятовуванн�
   assert.match(html, /<p id="practice-kind-line" class="muted practice-kind-line" hidden><\/p>/);
 });
 
-test('the home tiles: Нові слова replaces Картки, Запам\'ятовування opens its mode', () => {
-  assert.doesNotMatch(html, /home-tile-cards|<button[^>]*data-tab="cards"/);
-  assert.match(html, /<button id="home-tile-new" class="practice-tile practice-tile--cards" type="button">[\s\S]*?<span class="practice-tile__name">Нові слова<\/span>\s*<span id="home-tile-new-line"/);
-  assert.match(html, /<button id="home-tile-review" class="practice-tile practice-tile--review" type="button">[\s\S]*?<span class="practice-tile__name">Запам'ятовування<\/span>\s*<span id="home-tile-review-line"/);
-  assert.ok(html.indexOf('id="home-tile-new"') < html.indexOf('id="home-tile-review"'), 'the review tile comes after the new-words tile');
-  assert.match(appSource, /\$\('home-tile-new'\)\.addEventListener\('click', \(\) => openFsrsPractice\('fsrs'\)\);/);
-  assert.match(appSource, /\$\('home-tile-review'\)\.addEventListener\('click', \(\) => openFsrsPractice\('review'\)\);/);
+test('the Вчити cards: Нові слова, then Запам\'ятовування, open their modes', () => {
+  assert.doesNotMatch(html, /home-tile-|practice-tile/);
+  assert.match(html, /<button id="learn-new" class="learn-card learn-card--new" type="button">[\s\S]*?<span class="learn-card__name">Нові слова<\/span>/);
+  assert.match(html, /<button id="learn-review" class="learn-card learn-card--review" type="button">[\s\S]*?<span class="learn-card__name">Запам'ятовування<\/span>/);
+  assert.ok(html.indexOf('id="learn-new"') < html.indexOf('id="learn-review"'), 'the review card comes after the new-words card');
+  assert.match(appSource, /\$\('learn-new'\)\.addEventListener\('click', \(\) => openFsrsPractice\('fsrs'\)\);/);
+  assert.match(appSource, /\$\('learn-review'\)\.addEventListener\('click', \(\) => openFsrsPractice\('review'\)\);/);
   assert.match(functionBody(appSource, 'function openFsrsPractice(mode) {'), /ui\.practice\.mode = mode;[\s\S]*showTab\('practice'\)/);
   assert.match(fs.readFileSync(path.join(here, '..', 'storybook', 'styles', 'garden.css'), 'utf8'),
-    /\.practice-tile--review \{ background: var\(--garden-line\); \}/);
+    /\.learn-card--review \{ background: var\(--garden-peach\); \}/);
 });
 
 test('the finished screens: Нові слова has «Ще 10 нових», «Повторити ці слова» and «Завершити»; the drill words are the set', () => {
