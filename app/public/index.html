@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preload" href="/fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="app.css">
+  <script src="theme.js"></script>
 </head>
 <body>
 <!-- The loading screen: the windmill turns and the tulips grow until the first data is on screen (docs/MOTION.md). -->
@@ -149,6 +150,7 @@
         <button class="profile-menu__link" type="button" data-tab="table"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Словник</span></button>
         <button class="profile-menu__link" type="button" data-tab="rules"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg><span>Правила</span></button>
         <button class="profile-menu__link" type="button" data-tab="texts"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg><span>Тексти</span></button>
+        <button class="profile-menu__link" type="button" data-tab="settings"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4"/></svg><span>Налаштування</span></button>
       </nav>
       <section id="profile-goal" class="stats-card goal-setting" aria-labelledby="profile-goal-label" hidden>
         <form id="goal-form" class="goal-form" novalidate>
@@ -180,6 +182,114 @@
     <section id="tab-achievements" class="tab" data-tab="achievements" aria-labelledby="page-title" hidden>
       <p id="achievements-message" class="muted" role="status"></p>
       <div id="achievements-groups"></div>
+    </section>
+
+    <!-- 0d · Налаштування (from Профіль) -->
+    <section id="tab-settings" class="tab" data-tab="settings" hidden>
+      <fieldset class="theme-picker">
+        <legend class="theme-picker__title">Тема</legend>
+        <p class="muted theme-picker__hint">Кольори застосунку. Тема зберігається на цьому пристрої.</p>
+        <label class="theme-option" data-theme="sad">
+          <input class="theme-option__input" type="radio" name="theme" value="sad">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Сад</span>
+            <span class="theme-option__mood">Перша тема застосунку: кремовий фон, золото й теплий коричневий.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <p class="theme-picker__group">Осінній гарбуз</p>
+        <label class="theme-option" data-theme="dry-leaves">
+          <input class="theme-option__input" type="radio" name="theme" value="dry-leaves">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Сухе листя</span>
+            <span class="theme-option__mood">Опале листя на стежці: світлі тони гарбуза, теплі коричневі акценти й спокійне світло.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="pumpkin-field">
+          <input class="theme-option__input" type="radio" name="theme" value="pumpkin-field">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Гарбузове поле</span>
+            <span class="theme-option__mood">Гарбузи на полі в погожий вересень: помаранчеві акценти, чорнобривці на кнопках і темний мох у написах.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="olive-path">
+          <input class="theme-option__input" type="radio" name="theme" value="olive-path">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Оливкова стежка</span>
+            <span class="theme-option__mood">Тихий ранок у лісі: оливкова зелень, світлий світанок у фонах і м'який теплий штрих у написах.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="rose-mist">
+          <input class="theme-option__input" type="radio" name="theme" value="rose-mist">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Рожевий туман</span>
+            <span class="theme-option__mood">Ранковий туман над полем: приглушена троянда на картках, оливкові смуги прогресу і темний оливковий текст.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="cinnamon-oat">
+          <input class="theme-option__input" type="radio" name="theme" value="cinnamon-oat">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Кориця й овес</span>
+            <span class="theme-option__mood">Кориця, вівсяне поле й темний ґрунт: глибша і тепліша палітра для вечірніх занять.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="moss-pumpkin">
+          <input class="theme-option__input" type="radio" name="theme" value="moss-pumpkin">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Мох і гарбуз</span>
+            <span class="theme-option__mood">Мох на пні й помаранчевий гарбуз: зелений і помаранчевий контраст, але без неонових тонів.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="wheat-field">
+          <input class="theme-option__input" type="radio" name="theme" value="wheat-field">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Пшеничне поле</span>
+            <span class="theme-option__mood">Жовте поле після жнив: пшенична світлість, вівсяні тони і тихий оливковий акцент.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="chestnut-light">
+          <input class="theme-option__input" type="radio" name="theme" value="chestnut-light">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Каштанове світло</span>
+            <span class="theme-option__mood">Персикові картки і темний каштан у написах: глибше за інші, але без важкості.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="branch-khaki">
+          <input class="theme-option__input" type="radio" name="theme" value="branch-khaki">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Гілка й хакі</span>
+            <span class="theme-option__mood">Суха гілка, хакі й мох: стримана осінь із теплим відтінком, майже без яскравих акцентів.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+        <label class="theme-option" data-theme="honey-fall">
+          <input class="theme-option__input" type="radio" name="theme" value="honey-fall">
+          <span class="theme-option__swatches" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="theme-option__text">
+            <span class="theme-option__name">Листопадний мед</span>
+            <span class="theme-option__mood">Листопадний ранок: медові кнопки, шкіряний акцент і світлі картки на тлі кремового жовтого.</span>
+          </span>
+          <svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>
+        </label>
+      </fieldset>
     </section>
 
     <!-- 1 · Словник -->

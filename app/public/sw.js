@@ -17,6 +17,7 @@ const SHELL_URLS = [
   '/motion.js',
   '/achievement-icons.js',
   '/app.css',
+  '/theme.js',
   '/icon.svg',
   '/manifest.webmanifest',
   '/icon-192.png',

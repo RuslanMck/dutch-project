@@ -655,6 +655,7 @@ export const TAB_TITLES = Object.freeze({
   week: 'Тиждень у підсумку',
   achievements: 'Досягнення',
   'known-check': 'Що я вже знаю',
+  settings: 'Налаштування',
 });
 
 // The line under the page title in the gold header (Головна has its own greeting).
@@ -674,6 +675,7 @@ export const TAB_SUBTITLES = Object.freeze({
   week: 'Твій тиждень коротко',
   achievements: 'Твої відзнаки',
   'known-check': 'Швидка перевірка слів',
+  settings: 'Тема й кольори',
 });
 
 const PERIOD_RANGE_PREFIX = Object.freeze({
@@ -1215,6 +1217,7 @@ export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
   table: 'profile',
   rules: 'profile',
   texts: 'profile',
+  settings: 'profile',
   week: 'home',
   'known-check': 'home',
 });
@@ -1974,4 +1977,13 @@ export function buildKnownCheckResult({ known, remaining }) {
 export function parseChapterInput(value) {
   const chapter = Number(value);
   return Number.isInteger(chapter) && chapter >= 1 && chapter <= 99 ? chapter : null;
+}
+
+// ---------- Налаштування ----------
+
+export const DEFAULT_THEME = 'sad';
+
+// The saved colour theme when it is one of the app's themes; otherwise (none saved, an old or broken name) Сад.
+export function pickTheme(saved, themeNames) {
+  return themeNames.includes(saved) ? saved : DEFAULT_THEME;
 }

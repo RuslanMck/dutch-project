@@ -150,10 +150,12 @@ import {
   buildKnownCheckPayload,
   buildKnownCheckResult,
   parseChapterInput,
+  pickTheme,
+  DEFAULT_THEME,
 } from './logic.js';
 
 const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
-  'stats', 'week', 'achievements', 'known-check'];
+  'stats', 'week', 'achievements', 'known-check', 'settings'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -420,6 +422,7 @@ const RENDER = {
   stats: renderStats,
   'known-check': renderKnownCheck,
   week: () => {},                    // drawn by renderWeek when the tab is shown, not on every render
+  settings: renderSettings,
 };
 
 function render() {
@@ -482,6 +485,35 @@ function showTab(name) {
 
 function focusTabHeading() {
   (ui.tab === 'home' ? $('home-greeting') : $('page-title')).focus();
+}
+
+// ---------- Налаштування ----------
+
+// The chosen colour theme. theme.js already put the saved one on <html> before the page drew; init checks it here.
+let currentTheme = DEFAULT_THEME;
+
+// The theme radios in Налаштування are the list of themes.
+function readThemeNames() {
+  return [...document.querySelectorAll('#tab-settings input[name="theme"]')].map(input => input.value);
+}
+
+// Puts the theme on <html> and gives the browser bar the theme's main colour.
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.dataset.theme = theme;
+  const primary = getComputedStyle(document.documentElement).getPropertyValue('--garden-primary').trim();
+  if (primary) document.querySelector('meta[name="theme-color"]').setAttribute('content', primary);
+}
+
+function renderSettings() {
+  for (const input of document.querySelectorAll('#tab-settings input[name="theme"]')) input.checked = input.value === currentTheme;
+}
+
+// A theme applies at once and is kept on this device.
+function handleThemeChange(event) {
+  if (event.target.name !== 'theme') return;
+  try { localStorage.setItem('theme', event.target.value); } catch { /* storage unavailable: this visit only */ }
+  applyTheme(event.target.value);
 }
 
 // ---------- Головна ----------
@@ -4355,6 +4387,7 @@ function bindEvents() {
   $('stats-periods').addEventListener('click', handleStatsPeriodClick);
   $('stats-calendar-grid').addEventListener('click', handleCalendarClick);
   $('goal-form').addEventListener('submit', handleGoalSave);
+  $('tab-settings').addEventListener('change', handleThemeChange);
   $('chapter-form').addEventListener('submit', handleChapterSave);
   $('week-periods').addEventListener('click', handleWeekPeriodClick);
   $('week-story').addEventListener('click', handleWeekZoneClick);
@@ -5361,6 +5394,9 @@ function init() {
     const savedPeriod = localStorage.getItem('statsPeriod');
     if (['day', 'week', 'month', 'year', 'all'].includes(savedPeriod)) ui.stats.period = savedPeriod;
   } catch { /* storage unavailable */ }
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem('theme'); } catch { /* storage unavailable */ }
+  applyTheme(pickTheme(savedTheme, readThemeNames()));
   wordOrder.rules = loadWordOrderRules();
   buildWordOrderRuleList();
   renderWordOrderRules();

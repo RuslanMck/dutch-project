@@ -33,6 +33,7 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `StatTile/` | Data group. Stories and guidelines. |
 | `StatusPill/` | Feedback group. Stories and guidelines. |
 | `TextCard/` | Content group. Stories and guidelines. |
+| `ThemePicker/` | Forms group. Stories and guidelines. |
 | `WordSheet/` | Content group. Stories and guidelines. |
 | `WordTable/` | Data group. Stories and guidelines. |
 | `WordTiles/` | Study group. Stories and guidelines. |

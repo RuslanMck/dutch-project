@@ -23,6 +23,7 @@
   --garden-slate: #5e6080;
   --garden-olive: #6a5d2e;
   --garden-line: #eadfcd;
+  --garden-right-soft: #e4ead9;
   --garden-role-subject: #5e6080;
   --garden-role-verb: #3e5240;
   --garden-role-object: #743521;
@@ -87,6 +88,215 @@
   --icon: 22px;
   --content-max: 640px;
   --drawer-width: 300px;
+}
+/* Сад */
+[data-theme="sad"] {
+  --garden-paper: #f7f1e6;
+  --garden-raised: #fffcf7;
+  --garden-tint: #efe5d2;
+  --garden-line: #eadfcd;
+  --garden-sand: #ddcb9b;
+  --garden-primary: #cca967;
+  --garden-on-primary: #3b2216;
+  --garden-ink: #3b2216;
+  --garden-ink-soft: #6b4a36;
+  --garden-rust: #9b411c;
+  --garden-mustard: #e3922a;
+  --garden-forest: #3e5240;
+  --garden-peach: #f3c7a7;
+  --garden-blush: #fde1d6;
+  --garden-periwinkle: #9f9a60;
+  --garden-right-soft: #e4ead9;
+}
+/* Сухе листя */
+[data-theme="dry-leaves"] {
+  --garden-paper: #f6ead7;
+  --garden-raised: #fcf6eb;
+  --garden-tint: #f0d9b0;
+  --garden-line: #e2c79e;
+  --garden-sand: #f3d59f;
+  --garden-primary: #f7c77e;
+  --garden-on-primary: #3b2615;
+  --garden-ink: #3b2615;
+  --garden-ink-soft: #553a22;
+  --garden-rust: #7a3210;
+  --garden-mustard: #f4af73;
+  --garden-forest: #4d3b1e;
+  --garden-peach: #fadcbd;
+  --garden-blush: #f5d8c6;
+  --garden-periwinkle: #f5d59a;
+  --garden-right-soft: #fbe2c4;
+}
+/* Гарбузове поле */
+[data-theme="pumpkin-field"] {
+  --garden-paper: #f7eada;
+  --garden-raised: #fcf6ec;
+  --garden-tint: #f4d5a8;
+  --garden-line: #e8c797;
+  --garden-sand: #f6cf8f;
+  --garden-primary: #f5c05d;
+  --garden-on-primary: #3a2412;
+  --garden-ink: #3a2412;
+  --garden-ink-soft: #533520;
+  --garden-rust: #7a2a0b;
+  --garden-mustard: #f2a72b;
+  --garden-forest: #324a1e;
+  --garden-peach: #fad8b0;
+  --garden-blush: #f7d9cb;
+  --garden-periwinkle: #facb82;
+  --garden-right-soft: #fadfc5;
+}
+/* Оливкова стежка */
+[data-theme="olive-path"] {
+  --garden-paper: #f1ebdd;
+  --garden-raised: #f8f5ed;
+  --garden-tint: #dfe1cb;
+  --garden-line: #cfd1b6;
+  --garden-sand: #e6dcc0;
+  --garden-primary: #c8cea7;
+  --garden-on-primary: #26301e;
+  --garden-ink: #26301e;
+  --garden-ink-soft: #3e4a34;
+  --garden-rust: #6b3a18;
+  --garden-mustard: #b0b991;
+  --garden-forest: #2f3b22;
+  --garden-peach: #efdfca;
+  --garden-blush: #eed8d5;
+  --garden-periwinkle: #d9dcbf;
+  --garden-right-soft: #e6e8d3;
+}
+/* Рожевий туман */
+[data-theme="rose-mist"] {
+  --garden-paper: #f5e9e2;
+  --garden-raised: #faf5f1;
+  --garden-tint: #eed8d2;
+  --garden-line: #e5c6c0;
+  --garden-sand: #eed5b2;
+  --garden-primary: #e9b4b4;
+  --garden-on-primary: #3a2226;
+  --garden-ink: #3a2226;
+  --garden-ink-soft: #553a3e;
+  --garden-rust: #6e3420;
+  --garden-mustard: #de9da2;
+  --garden-forest: #3f4a2c;
+  --garden-peach: #f5ddc6;
+  --garden-blush: #f4dcd8;
+  --garden-periwinkle: #f1cbc7;
+  --garden-right-soft: #f3ddd3;
+}
+/* Кориця й овес */
+[data-theme="cinnamon-oat"] {
+  --garden-paper: #efe0c9;
+  --garden-raised: #f9f0e3;
+  --garden-tint: #e6c8a0;
+  --garden-line: #d8b88f;
+  --garden-sand: #e9cb9e;
+  --garden-primary: #eaab6f;
+  --garden-on-primary: #3a2315;
+  --garden-ink: #3a2315;
+  --garden-ink-soft: #563725;
+  --garden-rust: #7a3010;
+  --garden-mustard: #ea9855;
+  --garden-forest: #5a3317;
+  --garden-peach: #f6d8b9;
+  --garden-blush: #eecfba;
+  --garden-periwinkle: #e9ba8c;
+  --garden-right-soft: #f5e0c7;
+}
+/* Мох і гарбуз */
+[data-theme="moss-pumpkin"] {
+  --garden-paper: #ebe7d3;
+  --garden-raised: #f6f4e7;
+  --garden-tint: #d9ddbe;
+  --garden-line: #c6cba7;
+  --garden-sand: #f2debb;
+  --garden-primary: #ffba7f;
+  --garden-on-primary: #2a2f18;
+  --garden-ink: #2a2f18;
+  --garden-ink-soft: #444b2e;
+  --garden-rust: #7a2a0b;
+  --garden-mustard: #e89a65;
+  --garden-forest: #35461a;
+  --garden-peach: #ffd4ab;
+  --garden-blush: #f4d8c6;
+  --garden-periwinkle: #d0d6af;
+  --garden-right-soft: #e1e5c8;
+}
+/* Пшеничне поле */
+[data-theme="wheat-field"] {
+  --garden-paper: #f4ead7;
+  --garden-raised: #f9f5ea;
+  --garden-tint: #ecd9b0;
+  --garden-line: #dfca95;
+  --garden-sand: #e9cf92;
+  --garden-primary: #e8c781;
+  --garden-on-primary: #33281a;
+  --garden-ink: #33281a;
+  --garden-ink-soft: #4e4030;
+  --garden-rust: #6e4416;
+  --garden-mustard: #e7bc73;
+  --garden-forest: #3f4a22;
+  --garden-peach: #f5e0bf;
+  --garden-blush: #f7decd;
+  --garden-periwinkle: #eed59d;
+  --garden-right-soft: #f3e8cc;
+}
+/* Каштанове світло */
+[data-theme="chestnut-light"] {
+  --garden-paper: #f3e2d1;
+  --garden-raised: #f9f0e8;
+  --garden-tint: #eccdaf;
+  --garden-line: #dfb897;
+  --garden-sand: #e8c598;
+  --garden-primary: #f4aa71;
+  --garden-on-primary: #3b1a0a;
+  --garden-ink: #3b1a0a;
+  --garden-ink-soft: #5a2f1a;
+  --garden-rust: #6b2208;
+  --garden-mustard: #eb8d51;
+  --garden-forest: #5b2008;
+  --garden-peach: #ffba7f;
+  --garden-blush: #eecbbe;
+  --garden-periwinkle: #efaf82;
+  --garden-right-soft: #f4d8be;
+}
+/* Гілка й хакі */
+[data-theme="branch-khaki"] {
+  --garden-paper: #efebdc;
+  --garden-raised: #f7f5ed;
+  --garden-tint: #e2d9c0;
+  --garden-line: #d3c8aa;
+  --garden-sand: #e5d2a6;
+  --garden-primary: #d7c18d;
+  --garden-on-primary: #2b2a1c;
+  --garden-ink: #2b2a1c;
+  --garden-ink-soft: #46412e;
+  --garden-rust: #6a4424;
+  --garden-mustard: #c8ac70;
+  --garden-forest: #3a4424;
+  --garden-peach: #f2e1c8;
+  --garden-blush: #ecd8cb;
+  --garden-periwinkle: #dccda9;
+  --garden-right-soft: #e6e5cc;
+}
+/* Листопадний мед */
+[data-theme="honey-fall"] {
+  --garden-paper: #f5e7d0;
+  --garden-raised: #faf4e5;
+  --garden-tint: #efd8ab;
+  --garden-line: #e3c591;
+  --garden-sand: #edd5a3;
+  --garden-primary: #f1c471;
+  --garden-on-primary: #3a2a14;
+  --garden-ink: #3a2a14;
+  --garden-ink-soft: #55402a;
+  --garden-rust: #7a4118;
+  --garden-mustard: #e7ad61;
+  --garden-forest: #4b3514;
+  --garden-peach: #f8debb;
+  --garden-blush: #f3d8c2;
+  --garden-periwinkle: #f3d190;
+  --garden-right-soft: #f7e3c1;
 }
 
 /* Dutch матеріали — component styles in the Сад look (structure from public/app.css; tokens in tokens.json). */
@@ -1876,6 +2086,81 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .profile-menu__link:hover { background: var(--garden-tint); }
+
+/* Налаштування: the theme picker. Each option carries data-theme, so it shows itself in its own colours. */
+.theme-picker {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.theme-picker__title {
+  padding: 0;
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: var(--garden-weight-heavy);
+}
+
+.theme-picker__hint { margin: 0 0 4px; }
+
+.theme-picker__group {
+  margin: 12px 0 0;
+  font-weight: var(--garden-weight-strong);
+  color: var(--garden-ink-soft);
+}
+
+.theme-option {
+  min-height: var(--tap-large);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid transparent;
+  border-radius: var(--garden-radius);
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+  box-shadow: var(--garden-shadow);
+  cursor: pointer;
+}
+
+.theme-option:has(:checked) { border-color: var(--garden-ink); }
+.theme-option:has(:focus-visible) { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
+
+/* The radio stays in the page for the keyboard and screen readers; the card shows the choice. */
+.theme-option__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-option__swatches {
+  display: flex;
+}
+
+.theme-option__swatches i {
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--garden-raised);
+}
+
+.theme-option__swatches i:first-child { margin-left: 0; box-shadow: 0 0 0 2px var(--garden-raised), inset 0 0 0 1px var(--garden-line); }
+.theme-option__swatches i:nth-child(1) { background: var(--garden-paper); }
+.theme-option__swatches i:nth-child(2) { background: var(--garden-sand); }
+.theme-option__swatches i:nth-child(3) { background: var(--garden-primary); }
+.theme-option__swatches i:nth-child(4) { background: var(--garden-mustard); }
+.theme-option__swatches i:nth-child(5) { background: var(--garden-forest); }
+
+.theme-option__text { display: grid; gap: 2px; min-width: 0; }
+.theme-option__name { font-weight: var(--garden-weight-strong); }
+.theme-option__mood { font-size: 0.875rem; color: var(--garden-ink-soft); }
+.theme-option__check { visibility: hidden; }
+.theme-option:has(:checked) .theme-option__check { visibility: visible; }
 .profile-logout { margin-top: 16px; }
 
 /* Слова: the word opens its sheet */
@@ -2065,7 +2350,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 :root {
   --motion-spring: cubic-bezier(.34, 1.56, .64, 1);
   --motion-out: cubic-bezier(.22, 1, .36, 1);
-  --garden-right-soft: #e4ead9;
 }
 
 @keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

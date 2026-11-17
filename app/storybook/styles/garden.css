@@ -1785,6 +1785,82 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .profile-menu__link:hover { background: var(--garden-tint); }
+
+/* Налаштування: the theme picker. Each option carries data-theme, so it shows itself in its own colours. */
+.theme-picker {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.theme-picker__title {
+  padding: 0;
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: var(--garden-weight-heavy);
+}
+
+.theme-picker__hint { margin: 0 0 4px; }
+
+.theme-picker__group {
+  margin: 12px 0 0;
+  font-weight: var(--garden-weight-strong);
+  color: var(--garden-ink-soft);
+}
+
+.theme-option {
+  position: relative;
+  min-height: var(--tap-large);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid transparent;
+  border-radius: var(--garden-radius);
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+  box-shadow: var(--garden-shadow);
+  cursor: pointer;
+}
+
+.theme-option:has(:checked) { border-color: var(--garden-ink); }
+.theme-option:has(:focus-visible) { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
+
+/* The radio stays in the page for the keyboard and screen readers; the card shows the choice. */
+.theme-option__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-option__swatches {
+  display: flex;
+}
+
+.theme-option__swatches i {
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--garden-raised);
+}
+
+.theme-option__swatches i:first-child { margin-left: 0; box-shadow: 0 0 0 2px var(--garden-raised), inset 0 0 0 1px var(--garden-line); }
+.theme-option__swatches i:nth-child(1) { background: var(--garden-paper); }
+.theme-option__swatches i:nth-child(2) { background: var(--garden-sand); }
+.theme-option__swatches i:nth-child(3) { background: var(--garden-primary); }
+.theme-option__swatches i:nth-child(4) { background: var(--garden-mustard); }
+.theme-option__swatches i:nth-child(5) { background: var(--garden-forest); }
+
+.theme-option__text { display: grid; gap: 2px; min-width: 0; }
+.theme-option__name { font-weight: var(--garden-weight-strong); }
+.theme-option__mood { font-size: 0.875rem; color: var(--garden-ink-soft); }
+.theme-option__check { visibility: hidden; }
+.theme-option:has(:checked) .theme-option__check { visibility: visible; }
 .profile-logout { margin-top: 16px; }
 
 /* Слова: the word opens its sheet */
@@ -1974,7 +2050,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 :root {
   --motion-spring: cubic-bezier(.34, 1.56, .64, 1);
   --motion-out: cubic-bezier(.22, 1, .36, 1);
-  --garden-right-soft: #e4ead9;
 }
 
 @keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

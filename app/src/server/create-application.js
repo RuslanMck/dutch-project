@@ -18,7 +18,7 @@ import { createApiRouter } from './create-api-router.js';
 
 const PUBLIC_DIRECTORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
 const PUBLIC_FILE_NAMES_BEFORE_SIGN_IN = Object.freeze([
-  'app.css', 'icon.svg', 'manifest.webmanifest',
+  'app.css', 'theme.js', 'icon.svg', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png',
 ]);
 const SERVICE_WORKER_FILE_NAME = 'sw.js';

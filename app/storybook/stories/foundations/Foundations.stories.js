@@ -32,6 +32,23 @@ export const ColoursAppToday = {
   render: () => renderSwatches(tokens.color.tokens.filter((token) => !isGardenToken(token))),
 };
 
+// Each colour theme from tokens.colorThemes, drawn inside its own [data-theme] box.
+export const Themes = {
+  render: () => `
+<p style="max-width:620px;font-size:14px">${tokens.colorThemes.usage}</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+${Object.entries(tokens.colorThemes.list).map(([id, theme]) => `
+  <div data-theme="${id}" style="background:var(--garden-paper);color:var(--garden-ink);border-radius:var(--garden-radius);box-shadow:var(--garden-shadow);padding:12px;display:grid;gap:8px">
+    <b>${theme.name}</b> <code style="font-size:12px">${id}</code>
+    <div style="font-size:12px;color:var(--garden-ink-soft)">${theme.description}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+    ${Object.entries(theme.values).map(([name, value]) => `
+      <div style="display:grid;gap:2px;font-size:10px"><span style="height:28px;border-radius:var(--garden-radius-sm);background:${value};box-shadow:inset 0 0 0 1px var(--garden-line)"></span>${name.replace('garden-', '')}</div>`).join('')}
+    </div>
+  </div>`).join('')}
+</div>`,
+};
+
 export const Typography = {
   render: () => tokens.type.groups.map((group) => `
 <h3 style="margin:24px 0 8px">${group.name}</h3>
