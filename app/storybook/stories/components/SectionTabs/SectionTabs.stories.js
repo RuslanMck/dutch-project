@@ -8,7 +8,7 @@ export default {
 export const Dictionary = {
   render: () => `
 <div class="col">
-  <nav class="section-tabs segmented segmented--three" aria-label="Розділи словника">
+  <nav class="section-tabs" aria-label="Розділи словника">
           <button type="button" data-tab="table" aria-current="page">Слова</button>
           <button type="button" data-tab="rules">Правила</button>
           <button type="button" data-tab="texts">Тексти</button>
@@ -20,7 +20,7 @@ export const Dictionary = {
 export const Progress = {
   render: () => `
 <div class="col">
-  <nav class="section-tabs segmented segmented--three" aria-label="Розділи прогресу">
+  <nav class="section-tabs" aria-label="Розділи прогресу">
           <button type="button" data-tab="stats">Статистика</button>
           <button type="button" data-tab="week" aria-current="page">Тиждень</button>
           <button type="button" data-tab="achievements">Досягнення</button>

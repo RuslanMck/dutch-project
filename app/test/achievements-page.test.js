@@ -138,7 +138,7 @@ test('index.html has the tab in Прогрес, the toast box and the medal dial
     assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
   }
   assert.doesNotMatch(html, /profile-achievements/);
-  assert.match(html, /<nav class="section-tabs segmented segmented--three" aria-label="Розділи прогресу">[\s\S]*?<button type="button" data-tab="achievements">Досягнення<\/button>/);
+  assert.match(html, /<nav class="section-tabs" aria-label="Розділи прогресу">[\s\S]*?<button type="button" data-tab="achievements">Досягнення<\/button>/);
 });
 
 test('garden.css: the medal grid has 4 columns and the toast and shine use the motion keyframes', () => {
