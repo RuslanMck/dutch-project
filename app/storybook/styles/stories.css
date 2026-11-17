@@ -7,3 +7,6 @@
 .story-static-nav { padding-top: 40px; max-width: 420px; }
 .story-static-nav .bottom-nav { position: static; transform: none; width: 100%; }
 .story-static-sheet .sheet--story { position: static; margin: 0; }
+
+/* The exercise bar shows only in body.is-exercise in the app; its story shows it on the page. */
+.story-exercise .exercise-bar { display: flex; }

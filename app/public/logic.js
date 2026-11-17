@@ -651,7 +651,8 @@ export const TAB_TITLES = Object.freeze({
   table: 'Словник',
   rules: 'Правила',
   texts: 'Тексти',
-  stats: 'Статистика',
+  learn: 'Вчити',
+  stats: 'Прогрес',
   week: 'Тиждень у підсумку',
   achievements: 'Досягнення',
   'known-check': 'Що я вже знаю',
@@ -671,6 +672,7 @@ export const TAB_SUBTITLES = Object.freeze({
   table: 'Усі твої слова',
   rules: 'Граматика з номерами правил',
   texts: 'Тексти для читання',
+  learn: 'Усі вправи в одному місці',
   stats: 'Як іде навчання',
   week: 'Твій тиждень коротко',
   achievements: 'Твої відзнаки',
@@ -1202,28 +1204,52 @@ export function formatSelectedCount(count) {
 
 // ---------- Сад layout: bottom navigation and home (docs/GARDEN_LAYOUT.md) ----------
 
-// The bottom-bar item each tab belongs to: home tiles under Головна, the Профіль links under Профіль.
+// The bottom-bar section each tab belongs to (§1 of the navigation spec): the Словник, Вчити, Прогрес and Профіль
+// sections group their own tabs; a tab that is not listed here lights Головна.
 export const NAVIGATION_SECTION_FOR_TAB = Object.freeze({
   home: 'home',
-  cards: 'home',
-  'word-order': 'home',
-  'rule-quiz': 'home',
-  phrases: 'home',
-  decks: 'decks',
-  practice: 'practice',
-  stats: 'stats',
+  table: 'dictionary',
+  rules: 'dictionary',
+  texts: 'dictionary',
+  learn: 'learn',
+  practice: 'learn',
+  cards: 'learn',
+  decks: 'learn',
+  phrases: 'learn',
+  'word-order': 'learn',
+  'rule-quiz': 'learn',
+  'known-check': 'learn',
+  stats: 'progress',
+  week: 'progress',
+  achievements: 'progress',
   profile: 'profile',
-  achievements: 'profile',
-  table: 'profile',
-  rules: 'profile',
-  texts: 'profile',
   settings: 'profile',
-  week: 'home',
-  'known-check': 'home',
 });
 
 export function findNavigationSection(tab) {
   return NAVIGATION_SECTION_FOR_TAB[tab] ?? 'home';
+}
+
+// The exercise tabs run full screen: no bottom bar and no gold header, the ✕ bar at the top instead (§5).
+export const EXERCISE_TABS = Object.freeze(['practice', 'cards', 'phrases', 'word-order', 'rule-quiz', 'known-check']);
+
+export function isExerciseTab(tab) {
+  return EXERCISE_TABS.includes(tab);
+}
+
+// The name of each practice mode: the exercise bar shows it while the Практика tab runs that mode.
+export const PRACTICE_MODE_TITLES = Object.freeze({
+  fsrs: 'Нові слова',
+  review: 'Запам\'ятовування',
+  art: 'Артикль',
+  struggling: 'Важкі слова',
+  custom: 'Тренування',
+});
+
+// The title of an exercise bar: the mode's name on the Практика tab, the tab's own title elsewhere.
+export function formatExerciseTitle(tab, mode) {
+  if (tab === 'practice') return PRACTICE_MODE_TITLES[mode] ?? 'Практика';
+  return TAB_TITLES[tab] ?? '';
 }
 
 // The home screen's numbers. words: the word list (status, due_at); now: milliseconds. The bar shows started words.
@@ -1250,6 +1276,80 @@ export function formatWordTotal(count) {
 export function formatStrugglingTileLine(count) {
   if (count == null) return 'Тренування без оцінок';
   return count ? formatWordTotal(count) : 'Немає важких слів';
+}
+
+// ---------- Вчити: the hub's cards and the resume strip ----------
+
+// A daily set is 10 new words; the review time assumes 15 seconds per word.
+export const LEARN_SET_SIZE = 10;
+export const REVIEW_SECONDS_PER_WORD = 15;
+
+// The minutes a review set takes: at least one minute, rounded to whole minutes. Zero when nothing is owed.
+export function estimateReviewMinutes(count) {
+  if (!(count > 0)) return 0;
+  return Math.max(1, Math.round((count * REVIEW_SECONDS_PER_WORD) / 60));
+}
+
+// «Сьогодні 3 з 10 · 42 слова чекають». Unknown counts (not read yet, or the read failed) give «…».
+export function formatLearnNewLine(introducedToday, newLeft) {
+  if (!Number.isFinite(introducedToday) || !Number.isFinite(newLeft)) return '…';
+  return `Сьогодні ${Math.min(introducedToday, LEARN_SET_SIZE)} з ${LEARN_SET_SIZE} · ${formatWaitingWords(newLeft)}`;
+}
+
+// «42 слова чекають», «1 слово чекає», «5 слів чекають»; no new word left gives «нових слів не лишилось».
+export function formatWaitingWords(count) {
+  if (count <= 0) return 'нових слів не лишилось';
+  return `${count} ${pluralize(count, ['слово', 'слова', 'слів'])} ${pluralize(count, ['чекає', 'чекають', 'чекають'])}`;
+}
+
+// The thin bar of the Нові слова card: today's words out of the set, never past full.
+export function computeLearnNewPercent(introducedToday) {
+  if (!Number.isFinite(introducedToday)) return 0;
+  return Math.min(100, Math.round((introducedToday / LEARN_SET_SIZE) * 100));
+}
+
+// The pill of the Нові слова card: «Ще 10» once today's set is full, «Почати» before.
+export function formatLearnNewPill(introducedToday) {
+  return Number.isFinite(introducedToday) && introducedToday >= LEARN_SET_SIZE ? 'Ще 10' : 'Почати';
+}
+
+// «N слів на сьогодні · близько M хв», or «На сьогодні все повторено» when nothing is owed. Unknown gives «…».
+export function formatLearnReviewLine(owed) {
+  if (!Number.isFinite(owed)) return '…';
+  if (owed <= 0) return 'На сьогодні все повторено';
+  const minutes = estimateReviewMinutes(owed);
+  return `${formatWordTotal(owed)} на сьогодні · близько ${minutes} хв`;
+}
+
+// The Важкі слова tile of Вчити: null (not read yet) gives «…».
+export function formatLearnStrugglingLine(count) {
+  if (!Number.isFinite(count)) return '…';
+  return count > 0 ? formatWordTotal(count) : 'Немає важких слів';
+}
+
+// The Фрази tile: the phrases of today's set, or the plain name when the set is empty.
+export function formatLearnPhrasesLine(setLeft) {
+  return Number.isFinite(setLeft) && setLeft > 0 ? `${setLeft} на сьогодні` : 'Фрази з діалогів';
+}
+
+// The resume strip. custom: the running drill { left } or null; fsrs: the daily set on screen
+// { kind, answered, left } (answered: at least one answer given). Returns null when nothing is open.
+// The custom drill wins: it is the exercise on screen when both are open.
+export function buildResumeView({ custom = null, fsrs = null } = {}) {
+  if (custom && custom.left > 0) {
+    return { mode: 'custom', title: 'Продовжити: тренування', line: formatResumeLeft(custom.left) };
+  }
+  if (fsrs && fsrs.answered && fsrs.left > 0) {
+    const mode = fsrsModeForKind(fsrs.kind);
+    const title = mode === 'review' ? 'Продовжити: Запам\'ятовування' : 'Продовжити: Нові слова';
+    return { mode, title, line: formatResumeLeft(fsrs.left) };
+  }
+  return null;
+}
+
+// «Залишилось 7»; an unknown count gives no line.
+export function formatResumeLeft(left) {
+  return Number.isFinite(left) ? `Залишилось ${left}` : '';
 }
 
 // ---------- Нові слова and Запам'ятовування: two FSRS practices (docs/NEW_AND_REVIEW_PRACTICE.md §2) ----------

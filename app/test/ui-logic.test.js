@@ -1380,7 +1380,7 @@ test('the decks section of app.js uses textContent only and reads or writes deck
   assert.doesNotMatch(section, /recordResult|gradePracticeWord|gradePracticePhrase|postFsrsGrade|postPhraseGrade/);
 });
 
-test('every decks element id used by app.js exists in index.html, and the bottom bar links to the tab', () => {
+test('every decks element id used by app.js exists in index.html, and Вчити links to the tab', () => {
   const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
   const start = appSource.indexOf('// ---------- 7 · Колоди ----------');
   const end = appSource.indexOf('// ---------- start ----------');
@@ -1388,7 +1388,7 @@ test('every decks element id used by app.js exists in index.html, and the bottom
   assert.ok(used.size > 15, 'the section uses many ids');
   for (const id of used) assert.match(html, new RegExp(`id="${id}"`), `index.html has #${id}`);
   assert.match(html, /<section id="tab-decks" class="tab" data-tab="decks"/);
-  assert.match(html, /class="bottom-nav__item" type="button" data-tab="decks" data-nav="decks">/);
+  assert.match(html, /<button class="learn-section-link" type="button" data-tab="decks">Усі<\/button>/);
 });
 
 test('api.js exports the deck calls with the REST paths of §2.2–2.3', () => {
@@ -1407,10 +1407,10 @@ test('every tab has a title, a header subtitle and belongs to one bottom-bar ite
   for (const tab of tabs) {
     assert.ok(TAB_TITLES[tab], `${tab} has a title`);
     assert.ok(TAB_SUBTITLES[tab], `${tab} has a header subtitle`);
-    assert.ok(['home', 'decks', 'practice', 'stats', 'profile'].includes(NAVIGATION_SECTION_FOR_TAB[tab]), `${tab} has a bar item`);
+    assert.ok(['home', 'dictionary', 'learn', 'progress', 'profile'].includes(NAVIGATION_SECTION_FOR_TAB[tab]), `${tab} has a bar item`);
   }
-  assert.equal(findNavigationSection('rules'), 'profile');
-  assert.equal(findNavigationSection('word-order'), 'home');
+  assert.equal(findNavigationSection('rules'), 'dictionary');
+  assert.equal(findNavigationSection('word-order'), 'learn');
   assert.equal(findNavigationSection('unknown'), 'home');
 });
 
@@ -1423,8 +1423,8 @@ test('a new set, a new round and a refill each start the practice progress bar f
 test('every tab is reachable: the bottom bar, the home tiles and the Профіль links name them all', () => {
   const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
   const linked = new Set([...html.matchAll(/<button[^>]*data-tab="([\w-]+)"/g)].map(match => match[1]));
-  // The Картки tab has no button since its home tile became «Нові слова» (the new words practice).
-  for (const tab of Object.keys(NAVIGATION_SECTION_FOR_TAB).filter(name => name !== 'cards')) {
+  // Картки and Практика have no static button: Вчити opens them from script (the deck strip, the daily cards).
+  for (const tab of Object.keys(NAVIGATION_SECTION_FOR_TAB).filter(name => !['cards', 'practice'].includes(name))) {
     assert.ok(linked.has(tab), `a button opens ${tab}`);
   }
   assert.doesNotMatch(html, /drawer/);

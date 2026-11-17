@@ -1079,21 +1079,6 @@ details.rule > summary::-webkit-details-marker {
   margin-top: 8px;
 }
 
-/* practice: "i" hints, skip button, schedule line, delete button */
-.hint-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.hint-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--garden-ink-soft);
-}
 
 /* The inline «i» next to a label: a compact icon button (32px target, 18px icon). */
 .icon-button--compact {
@@ -1804,7 +1789,7 @@ body { font-family: var(--font-display); font-weight: var(--garden-weight-regula
 
 /* Three weights, by role (tokens.json → type.weights): read = regular, tap or label = strong, heading = heavy. */
 h1, h2, h3, .top h1, .stats-card__title, .dialog__title, .login h1, .text-title { font-weight: var(--garden-weight-heavy); }
-label, th, dt, strong, b, summary, .field > span, .hint-label { font-weight: var(--garden-weight-strong); }
+label, th, dt, strong, b, summary, .field > span { font-weight: var(--garden-weight-strong); }
 input, select, textarea, .muted, .hint, .card-uk, .card-ex, .rule-body, .sheet__translation, .sheet__example-uk { font-weight: var(--garden-weight-regular); }
 h1, h2, h3, .top h1, .dialog__title, .stats-card__title, .deck-card__name, .text-title, .deck-picker__title, .practice-round__title { font-weight: var(--garden-weight-heavy); letter-spacing: -0.01em; }
 button { border-radius: var(--garden-radius-sm); border-color: transparent; font-weight: var(--garden-weight-strong); }
@@ -1858,7 +1843,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   flex: none;
 }
 
-.garden-icon--filled { fill: currentColor; stroke: none; }
 .garden-icon--sm { width: 18px; height: 18px; }
 .del .garden-icon { display: block; }
 
@@ -1901,15 +1885,34 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 
 .bottom-nav__item[aria-current="page"] { color: var(--garden-ink); }
 
-.bottom-nav__play {
-  justify-self: center;
+.bottom-nav__hub {
+  position: relative;
+  min-height: var(--tap-min);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--garden-ink-soft);
+  font-size: 11px;
+  font-weight: var(--garden-weight-strong);
+}
+
+/* The same height as the other items: the disc hangs above the bar and the label lines up with theirs. */
+.bottom-nav__slot { display: block; width: 30px; height: 30px; flex: none; }
+
+.bottom-nav__disc {
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 60px;
   height: 60px;
-  margin-top: -34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
   border: 5px solid var(--garden-paper);
   border-radius: 50%;
   background: var(--garden-primary);
@@ -1917,7 +1920,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   box-shadow: var(--garden-lift);
 }
 
-.bottom-nav__play[aria-current="page"] { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
+.bottom-nav__hub[aria-current="page"] { color: var(--garden-ink); }
+.bottom-nav__hub[aria-current="page"] .bottom-nav__disc { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
 
 /* Головна */
 .home-header {
@@ -2026,42 +2030,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
   transition: width 0.3s ease;
 }
 
-.home-section-title { margin: 24px 0 10px; font-size: 17px; font-weight: var(--garden-weight-heavy); }
-
-.practice-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-.practice-tile {
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 14px;
-  border: none;
-  border-radius: var(--garden-radius);
-  text-align: left;
-  color: var(--garden-ink);
-}
-
-.practice-tile__icon {
-  width: 42px;
-  height: 42px;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--garden-raised);
-}
-
-.practice-tile__name { font-size: 15px; font-weight: var(--garden-weight-heavy); }
-.practice-tile__line { font-size: 12px; font-weight: var(--garden-weight-regular); }
-.practice-tile--cards { background: var(--garden-periwinkle); }
-.practice-tile--review { background: var(--garden-line); }
-.practice-tile--word-order { background: var(--garden-sand); }
-.practice-tile--phrases { background: var(--garden-peach); }
-.practice-tile--struggling { background: var(--garden-blush); }
-
 /* Профіль */
 .profile-menu {
   display: grid;
@@ -2086,6 +2054,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .profile-menu__link:hover { background: var(--garden-tint); }
+.profile-menu__link .garden-icon { flex: none; }
+.profile-logout__button { display: inline-flex; align-items: center; gap: 8px; }
 
 /* Налаштування: the theme picker. Each option carries data-theme, so it shows itself in its own colours. */
 .theme-picker {
@@ -2113,6 +2083,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .theme-option {
+  position: relative;
   min-height: var(--tap-large);
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -2285,7 +2256,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .offline-banner__action[hidden] { display: none; }
 
 /* Вправи з правил */
-.practice-tile--rule-quiz { background: var(--garden-tint); }
 .rule-quiz__note { margin: 4px 0 12px; }
 .rule-quiz__start { width: 100%; min-height: 48px; }
 .rule-quiz__rule-title { display: block; }
@@ -2471,7 +2441,7 @@ input { transition: border-color .25s, background-color .25s; }
   pointer-events: none;
 }
 .bottom-nav__pill--shown { opacity: 1; }
-.bottom-nav__item, .bottom-nav__play { position: relative; z-index: 1; }
+.bottom-nav__item, .bottom-nav__hub { position: relative; z-index: 1; }
 .hop { animation: motion-hop .45s var(--motion-spring); }
 .tab-enter { animation: motion-enter .35s var(--motion-out) both; }
 
@@ -2559,22 +2529,9 @@ input { transition: border-color .25s, background-color .25s; }
 .article-basket__count--bump { display: inline-block; animation: motion-pulse .45s var(--motion-spring); }
 .article-hint { margin: 0; text-align: center; font-size: 14px; }
 
-/* Focused practice: while a question is on screen the header and the mode select step aside. */
-.practice-mode-chip { display: none; }
+
+/* Focused practice: while a question is on screen the header steps aside. */
 .is-practice-focused #top-header { display: none; }
-#tab-practice.practice--focused > .hint-field { display: none; }
-#tab-practice.practice--focused .practice-mode-chip {
-  display: inline-block;
-  min-height: 36px;
-  margin: 4px 0 8px;
-  padding: 6px 14px;
-  border: none;
-  border-radius: 999px;
-  background: var(--garden-tint);
-  color: var(--garden-ink-soft);
-  font-size: 13px;
-  font-weight: var(--garden-weight-strong);
-}
 
 /* Loading screen and logo: the windmill among tulips. The sails spin from the start, the tulips grow, then sway. */
 .splash {
@@ -2675,8 +2632,6 @@ input { transition: border-color .25s, background-color .25s; }
 .goal-form__message { min-height: 1.4em; margin: 8px 0 0; font-size: 14px; }
 
 /* Тиждень у підсумку: story slides with progress segments on top. */
-.practice-tile--week { background: var(--garden-line); }
-
 .week-story__progress { display: flex; gap: 4px; margin: 4px 0 10px; }
 .week-story__segment {
   flex: 1;
@@ -2926,22 +2881,7 @@ button.calendar__cell { cursor: pointer; }
 .achievement-toast__text { font-weight: var(--garden-weight-strong); overflow-wrap: anywhere; }
 .achievement-toast--out { opacity: 0; transform: translateY(-8px); }
 
-/* Що я вже знаю (plan §4): two Головна tiles, the link in Практика, the chips and the result. */
-.practice-tile--known-check { background: var(--garden-mustard); }
-.practice-tile--article { background: var(--garden-sand); }
-
-.practice-known-link {
-  min-height: 44px;
-  margin-top: 6px;
-  padding: 8px 12px;
-  border: none;
-  background: none;
-  color: var(--garden-forest);
-  font-weight: var(--garden-weight-strong);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.practice-known-link:focus-visible,
+/* Що я вже знаю (plan §4): the tile in Вчити, the chips and the result. */
 .known-check__chip:focus-visible { outline: 2px solid var(--garden-ink); outline-offset: 3px; }
 
 .known-check__note { margin: 0 0 12px; }
@@ -2968,7 +2908,6 @@ button.calendar__cell { cursor: pointer; }
 .known-check__line { margin: 0; font-weight: var(--garden-weight-strong); }
 .known-check__result button { min-height: 44px; }
 /* Словник: the word list, its filters and the sheets of a word (docs/WORD_PRIORITY_AND_DICTIONARY.md §3) */
-.practice-tile--dictionary { background: var(--garden-mustard); }
 
 .dict-toolbar {
   display: grid;
@@ -3091,3 +3030,168 @@ button.calendar__cell { cursor: pointer; }
 .sheet__actions--three { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .danger-text { color: var(--garden-wrong); }
 .sheet__edit .field.wide > span { font-size: 13px; color: var(--garden-ink-soft); }
+
+/* Словник and Прогрес: the section tabs under the page header (§2). The current one is filled like a pressed segment. */
+.section-tabs { margin: 0 0 14px; }
+.section-tabs button[aria-current="page"] {
+  background: var(--garden-primary);
+  color: var(--garden-on-primary);
+  border-color: var(--garden-primary);
+  font-weight: var(--garden-weight-strong);
+}
+
+/* Exercise screens (§5): the bottom bar and the gold header step aside; the ✕ bar names the exercise. */
+.exercise-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+body.is-exercise .exercise-bar { display: flex; }
+body.is-exercise #top-header,
+body.is-exercise #bottom-nav { display: none; }
+.exercise-bar__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: var(--garden-weight-heavy);
+}
+.exercise-bar__title:focus { outline: none; }
+
+/* Вчити (§4): the resume strip, the daily cards, the tiles and the deck strip. */
+.learn-resume {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: var(--garden-radius);
+  background: var(--garden-sand);
+  color: var(--garden-ink);
+  text-align: left;
+}
+.learn-resume__text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.learn-resume__title { font-size: 16px; font-weight: var(--garden-weight-heavy); }
+.learn-resume__line { font-size: 13px; color: var(--garden-ink-soft); }
+.learn-resume .garden-icon { flex: none; }
+
+.learn-section-title {
+  margin: 22px 0 10px;
+  font-size: 17px;
+  font-weight: var(--garden-weight-heavy);
+}
+.learn-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.learn-section-head .learn-section-title { margin: 22px 0 10px; }
+.learn-section-link {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--garden-forest);
+  font-weight: var(--garden-weight-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.learn-daily { display: grid; gap: 12px; }
+.learn-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--garden-radius);
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+  text-align: left;
+}
+.learn-card--new { background: var(--garden-right-soft); }
+.learn-card--review { background: var(--garden-peach); }
+.learn-card__icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--garden-raised);
+}
+.learn-card__body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.learn-card__name { font-size: 17px; font-weight: var(--garden-weight-heavy); }
+.learn-card__line { font-size: 13px; color: var(--garden-ink-soft); }
+.learn-card__bar { height: 8px; margin-top: 8px; border-radius: 4px; }
+.learn-card__bar .progress-bar__fill { border-radius: 4px; }
+.learn-card__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.learn-pill {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--garden-primary);
+  color: var(--garden-on-primary);
+  font-size: 13px;
+  font-weight: var(--garden-weight-strong);
+}
+.learn-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: var(--garden-weight-strong);
+  color: var(--garden-forest);
+}
+
+.learn-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.learn-tile {
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: none;
+  border-radius: var(--garden-radius);
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+  text-align: left;
+}
+.learn-tile__icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--garden-radius-sm);
+  background: var(--garden-sand);
+}
+.learn-tile__name { font-size: 14px; font-weight: var(--garden-weight-heavy); line-height: 1.2; }
+.learn-tile__line { font-size: 12px; line-height: 1.3; color: var(--garden-ink-soft); }
+@media (max-width: 339px) { .learn-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.learn-decks { display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 8px; }
+.learn-deck {
+  flex: 0 0 150px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px;
+  border: none;
+  border-radius: var(--garden-radius);
+  background: var(--garden-raised);
+  color: var(--garden-ink);
+  text-align: left;
+}
+.learn-deck:disabled { opacity: 0.6; }
+.learn-deck--new { background: transparent; border: 2px dashed var(--garden-line); }
+.learn-deck__name { font-size: 15px; font-weight: var(--garden-weight-heavy); overflow-wrap: anywhere; }
+.learn-deck__line { font-size: 12px; }

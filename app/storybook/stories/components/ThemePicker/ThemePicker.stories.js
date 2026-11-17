@@ -6,7 +6,7 @@ export default {
   parameters: { docs: { description: { component: readme } } },
 };
 
-const CHECK = '<svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l4 4 9-10"/></svg>';
+const CHECK = '<svg class="garden-icon garden-icon--sm theme-option__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const THEMES = Object.entries(tokens.colorThemes.list);
 
 // The same markup public/index.html has for each theme, built from tokens.json so the list never drifts.

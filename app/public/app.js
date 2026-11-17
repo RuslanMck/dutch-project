@@ -17,15 +17,22 @@ import {
   choosePetalCount,
   pickLoadingPhrase,
   chooseStreakRollStart,
-  formatStrugglingTileLine,
   isFsrsMode,
   fsrsKindForMode,
   fsrsModeForKind,
   practiceSnapshotKey,
   spareSnapshotKey,
-  formatNewWordsTileLine,
-  formatReviewTileLine,
   formatPracticeKindLine,
+  buildResumeView,
+  computeLearnNewPercent,
+  formatExerciseTitle,
+  formatLearnNewLine,
+  formatLearnNewPill,
+  formatLearnPhrasesLine,
+  formatLearnReviewLine,
+  formatLearnStrugglingLine,
+  isExerciseTab,
+  LEARN_SET_SIZE,
   formatRoundNextLabel,
   buildRoundRepeatButton,
   buildFsrsDoneScreen,
@@ -136,8 +143,6 @@ import {
   buildAnswerLetterDiff,
   findBasketAt,
   pluralize,
-  summarizeAchievements,
-  pickRecentAchievements,
   groupAchievements,
   achievementProgressPercent,
   formatAchievementProgress,
@@ -154,8 +159,8 @@ import {
   DEFAULT_THEME,
 } from './logic.js';
 
-const TABS = ['home', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz', 'texts',
-  'stats', 'week', 'achievements', 'known-check', 'settings'];
+const TABS = ['home', 'learn', 'profile', 'table', 'cards', 'practice', 'decks', 'rules', 'phrases', 'word-order', 'rule-quiz',
+  'texts', 'stats', 'week', 'achievements', 'known-check', 'settings'];
 const ALL_KEYS = ['words', 'topics', 'rules', 'patterns', 'phrases', 'texts'];
 // SSE collection name -> state keys to refetch.
 const KEYS_FOR = {
@@ -199,9 +204,10 @@ const ui = {
     error: '', isAnswering: false,
   },
   tab: 'home',
-  // Головна: the Важкі слова tile's count, and the two practice tiles' counts ({ introducedToday, reviewOwed }), null while unknown.
+  // Вчити: the Важкі слова count, and the daily practices' counts ({ introducedToday, reviewOwed, phraseSetLeft }), null while unknown.
   home: { strugglingCount: null, practiceCounts: null },
-  // Medals (Профіль card, Досягнення tab): status loading | ready | failed; data is the last answer of GET /api/achievements.
+  learnScrollY: 0,                   // where Вчити was scrolled when an exercise opened; ✕ goes back there
+  // Medals (Досягнення tab): status loading | ready | failed; data is the last answer of GET /api/achievements.
   achievements: { status: 'loading', data: null },
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
   // Statistics page: the chosen period, its activity and the vocabulary counts, and the bar tapped in the chart.
@@ -249,8 +255,6 @@ const ui = {
     },
   },
   practice: {
-    // isModePickerOpen: «змінити» showed the mode select during a running practice (docs/MOTION.md, focused practice).
-    isModePickerOpen: false,
     mode: 'fsrs', current: null, lastWordId: null, feedback: null, score: { correct: 0, total: 0 },
     // Article practice: the words put into each basket (right answers) in this visit.
     baskets: { de: 0, het: 0 },
@@ -384,8 +388,10 @@ function trackPendingPost(pendingPosts, post) {
 const CLOSE_ICON_PATH = 'M6 6l12 12M18 6L6 18';
 const CLOSE_ICON = `<svg class="garden-icon garden-icon--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${CLOSE_ICON_PATH}"/></svg>`;
 
-// The same close icon built with DOM calls, for code that never writes HTML strings.
-function createCloseIcon() {
+const ADD_ICON_PATH = 'M12 5v14M5 12h14';
+
+// A line icon built with DOM calls, for code that never writes HTML strings.
+function createLineIcon(pathData) {
   const svgNamespace = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNamespace, 'svg');
   svg.setAttribute('class', 'garden-icon garden-icon--sm');
@@ -393,9 +399,13 @@ function createCloseIcon() {
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   const path = document.createElementNS(svgNamespace, 'path');
-  path.setAttribute('d', CLOSE_ICON_PATH);
+  path.setAttribute('d', pathData);
   svg.append(path);
   return svg;
+}
+
+function createCloseIcon() {
+  return createLineIcon(CLOSE_ICON_PATH);
 }
 
 // "i" buttons: aria-expanded says whether the text block named by aria-controls is open.
@@ -408,7 +418,8 @@ function setHintOpen(button, isOpen) {
 
 const RENDER = {
   home: renderHome,
-  profile: renderProfileAchievements,
+  learn: renderLearn,
+  profile: () => {},                 // the goal and the chapter are drawn when their reads arrive
   achievements: renderAchievementsPage,
   table: renderTable,
   cards: renderCards,
@@ -429,13 +440,16 @@ function render() {
   if (state.loaded) RENDER[ui.tab]();
 }
 
-// The bottom menu's order, for the side a new page slides in from.
-const NAVIGATION_ORDER = ['home', 'decks', 'practice', 'stats', 'profile'];
+// The bottom bar's sections, in their order, for the side a new page slides in from.
+const NAVIGATION_ORDER = ['home', 'dictionary', 'learn', 'progress', 'profile'];
 
 function showTab(name) {
   const previousTab = ui.tab;
   const previousSection = findNavigationSection(previousTab);
-  ui.tab = TABS.includes(name) ? name : 'home';
+  const nextTab = TABS.includes(name) ? name : 'home';
+  // Leaving Вчити remembers where it was scrolled: ✕ on an exercise comes back to that place.
+  if (previousTab === 'learn' && nextTab !== 'learn') ui.learnScrollY = window.scrollY;
+  ui.tab = nextTab;
   ui.armed = null;                   // switching tabs disarms the phrase delete
   try { localStorage.setItem('tab', ui.tab); } catch { /* storage unavailable */ }
   for (const t of TABS) $(`tab-${t}`).hidden = t !== ui.tab;
@@ -443,6 +457,11 @@ function showTab(name) {
   for (const item of document.querySelectorAll('#bottom-nav [data-nav]')) {
     if (item.dataset.nav === section) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
+  }
+  // The section tabs of Словник and Прогрес mark the page on screen.
+  for (const link of document.querySelectorAll('.section-tabs [data-tab]')) {
+    if (link.dataset.tab === ui.tab) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   }
   placeNavPill($('bottom-nav'), $('bottom-nav-pill'));
   if (previousTab && previousTab !== ui.tab) {
@@ -455,11 +474,9 @@ function showTab(name) {
   }
   // Головна has its own gold header with the greeting.
   $('top-header').hidden = ui.tab === 'home';
-  // The focused practice hides the header; any other tab shows it again, and the mode select comes back next time.
-  if (ui.tab !== 'practice') {
-    document.body.classList.remove('is-practice-focused');
-    ui.practice.isModePickerOpen = false;
-  }
+  // The focused practice hides the header; any other tab shows it again.
+  if (ui.tab !== 'practice') document.body.classList.remove('is-practice-focused');
+  renderExerciseBar();
   $('page-title').textContent = TAB_TITLES[ui.tab];
   $('page-subtitle').textContent = TAB_SUBTITLES[ui.tab];
   document.title = `${TAB_TITLES[ui.tab]} · Dutch матеріали`;
@@ -469,7 +486,8 @@ function showTab(name) {
     if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = fsrsModeForKind(ui.fsrs.kind);
     ensureFsrsSession();
   }
-  if (ui.tab === 'home') { loadHomeStrugglingCount(); loadHomePracticeCounts(); loadGoal(); }
+  if (ui.tab === 'home') loadGoal();
+  if (ui.tab === 'learn') { loadHomeStrugglingCount(); loadHomePracticeCounts(); loadDeckList(); }
   if (ui.tab === 'profile') { loadGoal(); loadChapter(); }
   if (ui.tab === 'known-check') loadKnownCheck();
   if (ui.tab === 'cards') ensureCardsBatch();
@@ -484,7 +502,25 @@ function showTab(name) {
 }
 
 function focusTabHeading() {
-  (ui.tab === 'home' ? $('home-greeting') : $('page-title')).focus();
+  if (ui.tab === 'home') $('home-greeting').focus();
+  else if (isExerciseTab(ui.tab)) $('exercise-title').focus();
+  else $('page-title').focus();
+}
+
+// ---------- exercise screens (§5) ----------
+
+// The exercise tabs hide the bottom bar and the gold header (body.is-exercise); the ✕ bar names the exercise.
+function renderExerciseBar() {
+  document.body.classList.toggle('is-exercise', isExerciseTab(ui.tab));
+  $('exercise-title').textContent = formatExerciseTitle(ui.tab, ui.practice.mode);
+}
+
+// ✕ on an exercise: back to Вчити, at the scroll position it had.
+function closeExercise() {
+  const scrollY = ui.learnScrollY;
+  showTab('learn');
+  window.scrollTo(0, scrollY);
+  focusTabHeading();
 }
 
 // ---------- Налаштування ----------
@@ -518,7 +554,7 @@ function handleThemeChange(event) {
 
 // ---------- Головна ----------
 
-// The Важкі слова tile's count: read each time Головна opens; unknown (null) until it arrives or when it fails.
+// The Важкі слова count: read each time Вчити opens; unknown (null) until it arrives or when it fails.
 async function loadHomeStrugglingCount() {
   try {
     const listing = await api.getStrugglingWords();
@@ -526,17 +562,27 @@ async function loadHomeStrugglingCount() {
   } catch {
     ui.home.strugglingCount = null;
   }
-  if (ui.tab === 'home') renderHome();
+  renderPracticeCounts();
 }
 
-// The counts of the two practice tiles (Нові слова, Запам'ятовування) read each time Головна opens; null when unknown.
+// The counts of the daily practices (Нові слова, Запам'ятовування) and the phrases' set, read each time Вчити opens;
+// null when unknown. Головна may use them too.
 async function loadHomePracticeCounts() {
   try {
     const stats = await api.getPracticeStats();
-    ui.home.practiceCounts = { introducedToday: stats.introduced_today, reviewOwed: stats.review_owed };
+    ui.home.practiceCounts = {
+      introducedToday: stats.introduced_today,
+      reviewOwed: stats.review_owed,
+      phraseSetLeft: stats.phrases?.set_phrases_left,
+    };
   } catch {
     ui.home.practiceCounts = null;
   }
+  renderPracticeCounts();
+}
+
+function renderPracticeCounts() {
+  if (ui.tab === 'learn') renderLearn();
   if (ui.tab === 'home') renderHome();
 }
 
@@ -547,12 +593,90 @@ function renderHome() {
   $('home-progress').setAttribute('aria-valuenow', String(summary.startedPercent));
   $('home-progress-fill').style.width = `${summary.startedPercent}%`;
   $('home-progress-label').textContent = summary.progressLabel;
-  $('home-tile-new-line').textContent = formatNewWordsTileLine(ui.home.practiceCounts?.introducedToday);
-  $('home-tile-review-line').textContent = formatReviewTileLine(ui.home.practiceCounts?.reviewOwed);
-  $('home-tile-word-order').textContent = formatRuleFilterSummary(wordOrder.rules);
-  $('home-tile-phrases').textContent = summary.phrasesLine;
-  $('home-tile-struggling').textContent = formatStrugglingTileLine(ui.home.strugglingCount);
-  $('home-tile-dictionary').textContent = formatWordTotal(state.words.length);
+}
+
+// ---------- Вчити (§4) ----------
+
+// What the resume strip continues: a running custom drill first, then the daily set that has answers and words left.
+function currentResumeView() {
+  const drill = ui.custom;
+  const session = ui.fsrs;
+  const waiting = session.waiting.uk_nl.length + session.waiting.nl_uk.length;
+  const drillWaiting = drill.waiting.uk_nl.length + drill.waiting.nl_uk.length;
+  return buildResumeView({
+    custom: drill.status === 'ready' ? { left: drill.queue.length + drillWaiting } : null,
+    fsrs: session.status === 'ready'
+      ? { kind: session.kind, answered: session.answered.size > 0, left: session.queue.length + waiting }
+      : null,
+  });
+}
+
+// The resume strip goes back to the practice as it was: the drill on screen, or the daily set's mode.
+function resumeLearnPractice() {
+  const view = currentResumeView();
+  if (!view) return;
+  if (view.mode === 'custom') showTab('practice');
+  else openFsrsPractice(view.mode);
+}
+
+// Every number of Вчити: the cards and tiles. An unknown count shows «…», never «undefined».
+function renderLearn() {
+  const resume = currentResumeView();
+  $('learn-resume').hidden = !resume;
+  if (resume) {
+    $('learn-resume-title').textContent = resume.title;
+    $('learn-resume-line').textContent = resume.line;
+  }
+  const counts = ui.home.practiceCounts;
+  const introduced = counts?.introducedToday ?? NaN;
+  const owed = counts?.reviewOwed ?? NaN;
+  // The words still new are read from the word list: it is loaded with the page.
+  const newLeft = state.words.filter(word => word.status === 'new').length;
+  const newDone = Number.isFinite(introduced) && introduced >= LEARN_SET_SIZE;
+  $('learn-new-line').textContent = formatLearnNewLine(introduced, newLeft);
+  $('learn-new-fill').style.width = `${computeLearnNewPercent(introduced)}%`;
+  $('learn-new-pill').textContent = formatLearnNewPill(introduced);
+  $('learn-new-done').hidden = !newDone;
+  $('learn-review-line').textContent = formatLearnReviewLine(owed);
+  $('learn-review-done').hidden = owed !== 0;
+  $('learn-struggling-line').textContent = formatLearnStrugglingLine(ui.home.strugglingCount);
+  $('learn-phrases-line').textContent = formatLearnPhrasesLine(counts?.phraseSetLeft);
+  renderLearnDecks();
+}
+
+// «Мої колоди»: «Усі слова», then the decks of the list, then «Нова колода».
+function renderLearnDecks() {
+  const all = el('button', '', 'learn-deck');
+  all.type = 'button';
+  all.dataset.learnAct = 'cards';
+  all.append(el('span', 'Усі слова', 'learn-deck__name'), el('span', formatWordTotal(state.words.length), 'muted learn-deck__line'));
+  const deckButtons = decks.list.map(deck => {
+    const button = el('button', '', 'learn-deck');
+    button.type = 'button';
+    button.dataset.deckId = String(deck.id);
+    button.disabled = !deck.word_count;
+    button.append(el('span', deck.name, 'learn-deck__name'), el('span', formatDeckWordCount(deck.word_count), 'muted learn-deck__line'));
+    return button;
+  });
+  const add = el('button', '', 'learn-deck learn-deck--new');
+  add.type = 'button';
+  add.dataset.learnAct = 'new-deck';
+  add.append(createLineIcon(ADD_ICON_PATH), el('span', 'Нова колода', 'learn-deck__name'));
+  $('learn-decks').replaceChildren(all, ...deckButtons, add);
+}
+
+// A deck practices from here; the cards and the new deck open their tabs.
+function handleLearnDecksClick(event) {
+  const button = event.target.closest('button[data-learn-act], button[data-deck-id]');
+  if (!button) return;
+  if (button.dataset.learnAct === 'cards') showTab('cards');
+  else if (button.dataset.learnAct === 'new-deck') {
+    showTab('decks');
+    startNewDeck();
+  } else {
+    const deck = decks.list.find(item => item.id === Number(button.dataset.deckId));
+    if (deck) practiceDeck(deck);
+  }
 }
 
 // The home search opens Словник with the query in its search field.
@@ -745,7 +869,6 @@ function openArticlePractice() {
 // Practice in one of the FSRS modes: Головна's Нові слова and Запам'ятовування tiles.
 function openFsrsPractice(mode) {
   ui.practice.mode = mode;
-  ui.practice.isModePickerOpen = false;
   $('practice-input').value = '';
   showTab('practice');
 }
@@ -2052,14 +2175,11 @@ function focusPracticeAnswer() {
   if (!$('practice-form').hidden) input.focus({ preventScroll: true });
 }
 
-// While a question is on screen the page header and the mode select step aside (more room above the keyboard);
-// «<режим> · змінити» brings the select back.
+// While a question is on screen the page header steps aside (more room above the keyboard).
 function renderPracticeFocus(isQuestionOnScreen) {
-  const isFocused = ui.tab === 'practice' && isQuestionOnScreen && !ui.practice.isModePickerOpen;
+  const isFocused = ui.tab === 'practice' && isQuestionOnScreen;
   $('tab-practice').classList.toggle('practice--focused', isFocused);
   document.body.classList.toggle('is-practice-focused', isFocused);
-  const select = $('practice-mode');
-  $('practice-mode-chip-label').textContent = select.options[select.selectedIndex]?.textContent ?? '';
 }
 
 function submitPractice() {
@@ -2246,7 +2366,6 @@ function submitArticleAnswer() {
 // Switches the practice to a mode: from the mode select, or a finished screen's button. The FSRS modes load their batch.
 function choosePracticeMode(mode) {
   ui.practice.mode = mode;
-  ui.practice.isModePickerOpen = false;
   if (mode === 'art') pickArticleQuestion();
   $('practice-input').value = '';
   if (mode === 'struggling') startStrugglingDrill();
@@ -2258,6 +2377,7 @@ function renderPractice() {
   const mode = ui.practice.mode;
   const isFsrs = isFsrsMode(mode);
   $('practice-mode').value = mode;
+  renderExerciseBar();
   // The line under the mode select: today's new words (Нові слова) or the reviews still to do (Запам'ятовування).
   const kindLine = isFsrs ? formatPracticeKindLine(fsrsKindForMode(mode), ui.fsrs.counts) : '';
   $('practice-kind-line').textContent = kindLine;
@@ -4194,7 +4314,6 @@ async function loadAchievements() {
   } else {
     ui.achievements = { ...ui.achievements, status: 'failed' };
   }
-  renderProfileAchievements();
   renderAchievementsPage();
 }
 
@@ -4252,25 +4371,6 @@ function createMedal(achievement, extraClass = '') {
   medal.className = ['medal', achievement.unlocked ? 'medal--unlocked' : 'medal--locked', extraClass].filter(Boolean).join(' ');
   medal.append(drawAchievementIcon(achievement.icon));
   return medal;
-}
-
-// The Профіль card: the count and the latest unlocked medals. Hidden until the first answer arrives.
-function renderProfileAchievements() {
-  const { data } = ui.achievements;
-  $('profile-achievements').hidden = !data;
-  if (!data) return;
-  $('profile-achievements-count').textContent = summarizeAchievements(data.achievements).text;
-  const recent = pickRecentAchievements(data.achievements);
-  $('profile-achievements-recent').hidden = !recent.length;
-  $('profile-achievements-recent').replaceChildren(...recent.map(achievement => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'medal-row__item';
-    item.dataset.achievement = achievement.id;
-    item.setAttribute('aria-label', achievement.title);
-    item.append(createMedal(achievement, 'medal--small'));
-    return item;
-  }));
 }
 
 // The Досягнення tab: one section per group, a grid of medals in the server's order.
@@ -4358,10 +4458,13 @@ function bindEvents() {
   });
   $('home-search-form').addEventListener('submit', handleHomeSearch);
   $('home-continue-button').addEventListener('click', () => showTab('practice'));
-  $('home-tile-struggling-button').addEventListener('click', handleHomeStrugglingTile);
-  $('home-tile-article').addEventListener('click', openArticlePractice);
-  $('home-tile-new').addEventListener('click', () => openFsrsPractice('fsrs'));
-  $('home-tile-review').addEventListener('click', () => openFsrsPractice('review'));
+  $('learn-resume').addEventListener('click', resumeLearnPractice);
+  $('learn-new').addEventListener('click', () => openFsrsPractice('fsrs'));
+  $('learn-review').addEventListener('click', () => openFsrsPractice('review'));
+  $('learn-article').addEventListener('click', openArticlePractice);
+  $('learn-struggling').addEventListener('click', handleHomeStrugglingTile);
+  $('learn-decks').addEventListener('click', handleLearnDecksClick);
+  $('exercise-close').addEventListener('click', closeExercise);
   $('known-check-chips').addEventListener('click', handleKnownCheckChipClick);
   $('known-check-all').addEventListener('click', handleKnownCheckAll);
   $('known-check-done').addEventListener('click', handleKnownCheckDone);
@@ -4377,7 +4480,6 @@ function bindEvents() {
     saveWordEdit();
   });
   $('achievements-groups').addEventListener('click', handleMedalClick);
-  $('profile-achievements-recent').addEventListener('click', handleMedalClick);
   $('achievement-dialog').addEventListener('click', event => {
     if (event.target === $('achievement-dialog')) $('achievement-dialog').close();
   });
@@ -4513,11 +4615,6 @@ function bindEvents() {
       });
     }
   }
-  $('practice-mode-chip').addEventListener('click', () => {
-    ui.practice.isModePickerOpen = true;
-    renderPractice();
-    $('practice-mode').focus();
-  });
   $('practice-skip-button').addEventListener('click', handlePracticeSkipClick);
   bindArticleBoard();
   $('practice-override-button').addEventListener('click', () => {
@@ -4968,6 +5065,7 @@ async function loadDeckList() {
     notice(error.message || 'Не вдалося завантажити колоди');
   }
   renderDecks();
+  if (ui.tab === 'learn') renderLearnDecks();
 }
 
 function handleDeckListClick(event) {

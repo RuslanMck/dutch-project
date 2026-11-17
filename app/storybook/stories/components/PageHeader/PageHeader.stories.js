@@ -15,6 +15,6 @@ const header = ({ title, subtitle }) => `
 </div>
 `;
 
-export const Overview = { render: () => header({ title: 'Статистика', subtitle: 'Як іде навчання' }) };
+export const Overview = { render: () => header({ title: 'Прогрес', subtitle: 'Як іде навчання' }) };
 export const LongText = { render: () => header({ title: 'Порядок слів', subtitle: 'Граматика з номерами правил і довгими поясненнями' }) };
-export const Playground = { args: { title: 'Практика', subtitle: 'Переклад слів за розкладом' }, render: header };
+export const Playground = { args: { title: 'Вчити', subtitle: 'Усі вправи в одному місці' }, render: header };
