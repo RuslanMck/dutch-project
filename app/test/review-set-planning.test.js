@@ -78,11 +78,26 @@ test('mapToReviewCandidate reads the difficulty and lapses of the card; a word w
     id: 9, priority: 2, fsrs_card: JSON.stringify(card), due_at: 1000, introduced_on: '2026-10-01',
   });
   assert.deepEqual(withCard, {
-    id: 9, priority: 2, difficulty: 6.5, lapses: 3, dueAt: 1000, introducedOn: '2026-10-01',
+    id: 9, priority: 2, difficulty: 6.5, lapses: 3, dueAt: 1000, introducedOn: '2026-10-01', isInDeck: false,
   });
   const withoutCard = mapToReviewCandidate({ id: 10, priority: 1, fsrs_card: null, due_at: null, introduced_on: null });
   assert.equal(withoutCard.difficulty, 0);
   assert.equal(withoutCard.lapses, 0);
   assert.equal(withoutCard.dueAt, 0);
   assert.equal(withoutCard.introducedOn, null);
+});
+
+test('compareReviewOrder: inside a priority a word still in the learning deck comes before a harder word', () => {
+  const deckWord = { id: 2, priority: 1, difficulty: 3, lapses: 0, dueAt: 0, isInDeck: true };
+  const hardWord = { id: 1, priority: 1, difficulty: 9, lapses: 4, dueAt: 0, isInDeck: false };
+  const lowDeckWord = { id: 3, priority: 2, difficulty: 9, lapses: 4, dueAt: 0, isInDeck: true };
+  assert.deepEqual([lowDeckWord, hardWord, deckWord].sort(compareReviewOrder).map(word => word.id), [2, 1, 3]);
+});
+
+test('mapToReviewCandidate: a word in either deck direction is a deck word', () => {
+  const row = { id: 5, priority: 1, fsrs_card: null, due_at: 0, introduced_on: null,
+    deck_required_correct: null, deck_correct_count: null, deck_entered_by_lapse: null,
+    deck_reverse_required_correct: 3, deck_reverse_correct_count: 1, deck_reverse_entered_by_lapse: 1 };
+  assert.equal(mapToReviewCandidate(row).isInDeck, true);
+  assert.equal(mapToReviewCandidate({ ...row, deck_reverse_required_correct: null }).isInDeck, false);
 });

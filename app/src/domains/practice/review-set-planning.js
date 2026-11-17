@@ -1,11 +1,13 @@
 // Pure ordering of the review set (kind 'review' of practice-set.js): the words already practised that are owed today,
-// most important first. Priority 1, then 2, then 3; inside a priority the harder word first (the FSRS difficulty, then
-// the lapses, both higher first); then the earlier due time; then the id. A word introduced today is not a review yet:
+// most important first. Priority 1, then 2, then 3; inside a priority a word still in the learning deck first (it was
+// answered wrong last time, so it is the hardest now), then the harder word (the FSRS difficulty, then the lapses, both
+// higher first); then the earlier due time; then the id. A word introduced today is not a review yet:
 // today's New words stay in the new set until tomorrow. Reads and writes nothing: the caller passes the candidates.
 import { parseCard } from './fsrs-scheduling.js';
+import { readDeckPositions } from './learning-deck.js';
 
 // The review candidate of a word row with a card: its priority, FSRS difficulty and lapses from the card, its due time
-// (ms), its introduction day ('YYYY-MM-DD' or null) and its id. A row without a card has no FSRS difficulty or lapses,
+// (ms), its introduction day ('YYYY-MM-DD' or null), whether it is in a deck direction and its id. A row without a card has no FSRS difficulty or lapses,
 // so both count as 0 for it.
 export function mapToReviewCandidate(wordRow) {
   const card = parseCard(wordRow.fsrs_card);
@@ -16,13 +18,15 @@ export function mapToReviewCandidate(wordRow) {
     lapses: card?.lapses ?? 0,
     dueAt: wordRow.due_at ?? 0,
     introducedOn: wordRow.introduced_on ?? null,
+    isInDeck: Object.values(readDeckPositions(wordRow)).some(position => position !== null),
   });
 }
 
-// Orders two review candidates: lower priority number first, then the harder word (higher difficulty, then more
+// Orders two review candidates: lower priority number first, then a deck word, then the harder word (higher difficulty, then more
 // lapses), then the earlier due time, then the lower id. Returns a negative, zero or positive number.
 export function compareReviewOrder(first, second) {
   return compareNumbers(first.priority, second.priority)
+    || compareNumbers(Number(second.isInDeck === true), Number(first.isInDeck === true))
     || compareNumbers(second.difficulty, first.difficulty)
     || compareNumbers(second.lapses, first.lapses)
     || compareNumbers(first.dueAt, second.dueAt)
