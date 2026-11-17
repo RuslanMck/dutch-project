@@ -13,6 +13,18 @@ import {
   formatDroppedNotice,
   formatUnsentLogoutText,
   buildLocalRoundSummary,
+  isFsrsMode,
+  fsrsKindForMode,
+  fsrsModeForKind,
+  practiceSnapshotKey,
+  spareSnapshotKey,
+  formatNewWordsTileLine,
+  formatReviewTileLine,
+  formatPracticeKindLine,
+  formatReviewDoneNote,
+  buildFsrsDoneScreen,
+  buildRoundRepeatButton,
+  formatRoundNextLabel,
   esc,
   normalise,
   normalizeAnswerText,
@@ -1298,7 +1310,7 @@ function functionBody(source, signature) {
 test('grading dispatch outside section 3b: custom and struggling modes never reach a grading call', () => {
   // submitPractice: only the FSRS mode grades (submitFsrsAnswer); the custom drill and its struggling mode take the drill.
   assert.match(functionBody(appSource, 'function submitPractice() {'),
-    /if \(ui\.practice\.mode === 'fsrs'\) submitFsrsAnswer\(\);\s*else if \(isCustomPracticeMode\(\)\) submitCustomAnswer\(\);/);
+    /if \(isFsrsMode\(ui\.practice\.mode\)\) submitFsrsAnswer\(\);\s*else if \(isCustomPracticeMode\(\)\) submitCustomAnswer\(\);/);
   // handlePracticeSkipClick: «Не знаю» in the drill reveals without a post.
   assert.match(functionBody(appSource, 'function handlePracticeSkipClick() {'),
     /if \(isCustomPracticeMode\(\)\) revealCustomAnswer\(\);\s*else revealFsrsAnswer\(\);/);
@@ -1310,10 +1322,12 @@ test('grading dispatch outside section 3b: custom and struggling modes never rea
 
 test('leaving the custom drill puts the daily practice back for every target, except onBack', () => {
   const body = functionBody(appSource, 'function leaveCustomDrill() {');
-  assert.ok(body.indexOf("if (onBack)") < body.indexOf("ui.practice.mode = 'fsrs'"), 'onBack runs before the mode is reset');
-  assert.ok(body.indexOf("ui.practice.mode = 'fsrs'") < body.indexOf("name === 'decks'"), 'the mode is reset before the decks tab');
+  assert.ok(body.indexOf("if (onBack)") < body.indexOf("ui.practice.mode = fsrsModeForKind(ui.fsrs.kind)"), 'onBack runs before the mode is reset');
+  assert.ok(body.indexOf("ui.practice.mode = fsrsModeForKind(ui.fsrs.kind)") < body.indexOf("name === 'decks'"),
+    'the mode is reset before the decks tab');
+  // The mode goes back to the set's own kind: a review round summary returns to Запам'ятовування, not Нові слова.
   assert.match(functionBody(appSource, 'function showTab(name) {'),
-    /if \(ui\.custom\.status === 'idle' && isCustomPracticeMode\(\)\) ui\.practice\.mode = 'fsrs';/);
+    /if \(ui\.custom\.status === 'idle' && isCustomPracticeMode\(\)\) ui\.practice\.mode = fsrsModeForKind\(ui\.fsrs\.kind\);/);
 });
 
 test('the struggling drill keeps its own name in the mode select; the other drills run as custom', () => {
@@ -1334,7 +1348,7 @@ test('async starts: a drill does not pull the learner back to another tab, and t
 
 test('advanceFsrsWord leaves the input alone when another mode is on screen after its await', () => {
   assert.match(functionBody(appSource, 'async function advanceFsrsWord() {'),
-    /await current\.post;\s*\/\/[^\n]*\n\s*if \(session\.current !== current \|\| ui\.practice\.mode !== 'fsrs'\) return;/);
+    /await current\.post;\s*\/\/[^\n]*\n\s*if \(session\.current !== current \|\| !isFsrsMode\(ui\.practice\.mode\)\) return;/);
 });
 
 test('the picker: «Додати слова» waits for the catalog, a new or edited deck starts with the default choice', () => {
@@ -1401,7 +1415,7 @@ test('every tab has a title, a header subtitle and belongs to one bottom-bar ite
 });
 
 test('a new set, a new round and a refill each start the practice progress bar from zero', () => {
-  assert.match(functionBody(appSource, 'async function loadFsrsBatch(sessionId) {'), /peakQueueLength: 0/);
+  assert.match(functionBody(appSource, 'async function loadFsrsBatch(sessionId, kind) {'), /peakQueueLength: 0/);
   assert.match(functionBody(appSource, 'function startNextRound(holder) {'), /holder\.peakQueueLength = 0/);
   assert.match(functionBody(appSource, "async function refillFsrsQueue(continueMessage = '') {"), /session\.peakQueueLength = 0/);
 });
@@ -1409,7 +1423,10 @@ test('a new set, a new round and a refill each start the practice progress bar f
 test('every tab is reachable: the bottom bar, the home tiles and the Профіль links name them all', () => {
   const html = fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8');
   const linked = new Set([...html.matchAll(/<button[^>]*data-tab="([\w-]+)"/g)].map(match => match[1]));
-  for (const tab of Object.keys(NAVIGATION_SECTION_FOR_TAB)) assert.ok(linked.has(tab), `a button opens ${tab}`);
+  // The Картки tab has no button since its home tile became «Нові слова» (the new words practice).
+  for (const tab of Object.keys(NAVIGATION_SECTION_FOR_TAB).filter(name => name !== 'cards')) {
+    assert.ok(linked.has(tab), `a button opens ${tab}`);
+  }
   assert.doesNotMatch(html, /drawer/);
 });
 
@@ -1699,4 +1716,80 @@ test('hasSameMeaningsInAnyOrder: one meaning is not reordered, many meanings are
   const many = 'а, б, в, г, ґ, д, е';
   assert.equal(hasSameMeaningsInAnyOrder(many, 'е, д, ґ, г, в, б, а'), true);
   assert.equal(hasSameMeaningsInAnyOrder(many, 'е, д, ґ, г, в, б'), false);
+});
+
+// ---------- Нові слова and Запам'ятовування (docs/NEW_AND_REVIEW_PRACTICE.md §2) ----------
+
+test('isFsrsMode: both practices are FSRS modes, the others are not; each mode has its set kind', () => {
+  assert.equal(isFsrsMode('fsrs'), true);
+  assert.equal(isFsrsMode('review'), true);
+  for (const mode of ['art', 'struggling', 'custom', '']) assert.equal(isFsrsMode(mode), false, mode);
+  assert.equal(fsrsKindForMode('fsrs'), 'new');
+  assert.equal(fsrsKindForMode('review'), 'review');
+  assert.equal(fsrsModeForKind('new'), 'fsrs');
+  assert.equal(fsrsModeForKind('review'), 'review');
+});
+
+test('the offline snapshots are kept per kind', () => {
+  assert.equal(practiceSnapshotKey('new'), 'practice-new');
+  assert.equal(practiceSnapshotKey('review'), 'practice-review');
+  assert.equal(spareSnapshotKey('new'), 'spare-new');
+  assert.equal(spareSnapshotKey('review'), 'spare-review');
+});
+
+test('the Нові слова tile counts today with the right form of «нове»', () => {
+  assert.equal(formatNewWordsTileLine(0), 'Сьогодні: 0 нових');
+  assert.equal(formatNewWordsTileLine(1), 'Сьогодні: 1 нове');
+  assert.equal(formatNewWordsTileLine(3), 'Сьогодні: 3 нові');
+  assert.equal(formatNewWordsTileLine(5), 'Сьогодні: 5 нових');
+  assert.equal(formatNewWordsTileLine(11), 'Сьогодні: 11 нових');
+  assert.equal(formatNewWordsTileLine(null), '', 'unknown gives no line');
+});
+
+test('the Запам\'ятовування tile: the reviews owed, or «Усе повторено» at 0', () => {
+  assert.equal(formatReviewTileLine(3), '3 на сьогодні');
+  assert.equal(formatReviewTileLine(0), 'Усе повторено');
+  assert.equal(formatReviewTileLine(undefined), '');
+});
+
+test('the line under the mode select names the count of its practice', () => {
+  const counts = { introducedToday: 4, reviewOwed: 17 };
+  assert.equal(formatPracticeKindLine('new', counts), 'Сьогодні нових: 4');
+  assert.equal(formatPracticeKindLine('review', counts), 'Залишилось на сьогодні: 17');
+  assert.equal(formatPracticeKindLine('new', null), '', 'no batch counts yet, no line');
+  assert.equal(formatPracticeKindLine('review', { introducedToday: 4, reviewOwed: null }), '');
+});
+
+test('the done note: the next words are due tomorrow, a count of them', () => {
+  assert.equal(formatReviewDoneNote(12), 'Наступні слова чекають на завтра: 12.');
+  assert.equal(formatReviewDoneNote(null), '');
+});
+
+test('buildFsrsDoneScreen: no new words left, and an empty review with nothing owed, each with its button', () => {
+  const noNew = buildFsrsDoneScreen({ kind: 'new', answeredCount: 0 });
+  assert.equal(noNew.question, 'Нових слів більше немає. Усі слова вже в повторенні.');
+  assert.deepEqual(noNew.action, { label: 'Перейти до запам\'ятовування', mode: 'review' });
+  assert.equal(buildFsrsDoneScreen({ kind: 'new', answeredCount: 5 }).question, noNew.question);
+
+  const emptyReview = buildFsrsDoneScreen({ kind: 'review', answeredCount: 0, dueTomorrow: 9 });
+  assert.equal(emptyReview.question, 'На сьогодні все повторено');
+  assert.equal(emptyReview.note, 'Наступні слова чекають на завтра: 9.');
+  assert.deepEqual(emptyReview.action, { label: 'Важкі слова', mode: 'struggling' });
+
+  const answeredReview = buildFsrsDoneScreen({ kind: 'review', answeredCount: 3, dueTomorrow: 9 });
+  assert.equal(answeredReview.question, 'Сесію завершено');
+  assert.equal(answeredReview.action, null);
+});
+
+test('buildRoundRepeatButton: a drill of every word of the set, in the set order; hidden for an empty set', () => {
+  const button = buildRoundRepeatButton([{ id: 3 }, { id: 1 }]);
+  assert.deepEqual(button, {
+    kind: 'all', title: 'Повторити ці слова', count: 2, wordIds: [3, 1], label: 'Повторити ці слова', hidden: false,
+  });
+  assert.equal(buildRoundRepeatButton([]).hidden, true);
+});
+
+test('formatRoundNextLabel: Нові слова asks for 10 new words, Запам\'ятовування for the next 10', () => {
+  assert.equal(formatRoundNextLabel('new'), 'Ще 10 нових');
+  assert.equal(formatRoundNextLabel('review'), 'Ще 10');
 });

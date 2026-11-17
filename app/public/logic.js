@@ -461,6 +461,21 @@ export function buildRoundDrillButtons(words) {
   ];
 }
 
+// The «Повторити ці слова» button under a Нові слова round: a drill of every word of the set, nothing graded. words: the
+// set's words (round.words, or the words kept on the phone). Hidden when the set has no words.
+export function buildRoundRepeatButton(words) {
+  const wordIds = words.map(word => word.id);
+  return {
+    kind: 'all', title: 'Повторити ці слова', count: wordIds.length, wordIds, label: 'Повторити ці слова',
+    hidden: wordIds.length === 0,
+  };
+}
+
+// The round summary's next-set button: Нові слова asks for 10 more new words, Запам'ятовування for the next 10.
+export function formatRoundNextLabel(kind) {
+  return kind === 'review' ? 'Ще 10' : 'Ще 10 нових';
+}
+
 // Ukrainian plural of "день" for a count of days: 1 день, 3 дні, 5 днів, 11 днів, 21 день.
 export function pluralizeDays(dayCount) {
   const lastTwoDigits = dayCount % 100;
@@ -1232,6 +1247,75 @@ export function formatWordTotal(count) {
 export function formatStrugglingTileLine(count) {
   if (count == null) return 'Тренування без оцінок';
   return count ? formatWordTotal(count) : 'Немає важких слів';
+}
+
+// ---------- Нові слова and Запам'ятовування: two FSRS practices (docs/NEW_AND_REVIEW_PRACTICE.md §2) ----------
+
+// The FSRS practices: Нові слова (the new set) and Запам'ятовування (the review set). Both run on the same session.
+export function isFsrsMode(mode) {
+  return mode === 'fsrs' || mode === 'review';
+}
+
+// The set kind a mode asks for: 'review' for Запам'ятовування, 'new' for Нові слова.
+export function fsrsKindForMode(mode) {
+  return mode === 'review' ? 'review' : 'new';
+}
+
+// The mode a set kind is shown in: Нові слова ('fsrs') or Запам'ятовування ('review').
+export function fsrsModeForKind(kind) {
+  return kind === 'review' ? 'review' : 'fsrs';
+}
+
+// The offline snapshots are kept per kind: the set on screen and the spare words for the next set.
+export function practiceSnapshotKey(kind) {
+  return `practice-${kind}`;
+}
+
+export function spareSnapshotKey(kind) {
+  return `spare-${kind}`;
+}
+
+// The Нові слова home tile: today's new words. Null (not read yet) gives no line.
+export function formatNewWordsTileLine(count) {
+  if (!Number.isFinite(count)) return '';
+  return `Сьогодні: ${count} ${pluralize(count, ['нове', 'нові', 'нових'])}`;
+}
+
+// The Запам'ятовування home tile: the reviews still owed today. Null (not read yet) gives no line.
+export function formatReviewTileLine(count) {
+  if (!Number.isFinite(count)) return '';
+  return count ? `${count} на сьогодні` : 'Усе повторено';
+}
+
+// The line under the mode select. counts: { introducedToday, reviewOwed } of the batch on screen, or null when unknown.
+// Нові слова shows today's new words, Запам'ятовування the reviews still to do.
+export function formatPracticeKindLine(kind, counts) {
+  if (!counts) return '';
+  if (kind === 'review') return Number.isFinite(counts.reviewOwed) ? `Залишилось на сьогодні: ${counts.reviewOwed}` : '';
+  return Number.isFinite(counts.introducedToday) ? `Сьогодні нових: ${counts.introducedToday}` : '';
+}
+
+// The note under the Запам'ятовування screen when nothing is owed today: when the next words are due.
+export function formatReviewDoneNote(dueTomorrow) {
+  return Number.isFinite(dueTomorrow) ? `Наступні слова чекають на завтра: ${dueTomorrow}.` : '';
+}
+
+// The screen of a finished FSRS practice: { question, note, action }. action is the button ({ label, mode } where mode is
+// the mode it opens) or null. kind: 'new' | 'review'; answeredCount: the answers given in this session.
+export function buildFsrsDoneScreen({ kind, answeredCount = 0, dueTomorrow = null }) {
+  if (kind !== 'review') {
+    return {
+      question: 'Нових слів більше немає. Усі слова вже в повторенні.',
+      note: '',
+      action: { label: 'Перейти до запам\'ятовування', mode: 'review' },
+    };
+  }
+  if (answeredCount) return { question: 'Сесію завершено', note: '', action: null };
+  return {
+    question: 'На сьогодні все повторено',
+    note: formatReviewDoneNote(dueTomorrow),
+    action: { label: 'Важкі слова', mode: 'struggling' },
+  };
 }
 
 // The word sheet on Словник: what its details show. word: one word of the list.

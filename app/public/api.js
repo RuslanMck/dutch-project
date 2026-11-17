@@ -121,11 +121,12 @@ export const answerRuleQuiz = (id, answer, skipped = false) => request('POST', `
 export const generateOrderSentences = count => request('POST', '/api/word-order/generate', { count });
 
 // The practice set must be live: a stored copy counts as offline unless allowOfflineCache is set (the read-only cards).
-export const getPracticeBatch = (sessionId, { allowOfflineCache = false } = {}) =>
-  request('GET', `/api/practice/batch?session_id=${enc(sessionId)}`, undefined, { rejectOfflineCache: !allowOfflineCache });
+// kind: 'new' (Нові слова, the default) or 'review' (Запам'ятовування).
+export const getPracticeBatch = (sessionId, { allowOfflineCache = false, kind = 'new' } = {}) =>
+  request('GET', `/api/practice/batch?session_id=${enc(sessionId)}&kind=${enc(kind)}`, undefined, { rejectOfflineCache: !allowOfflineCache });
 // The words the next set will probably draw from, kept on the phone for an offline next set. Always live.
-export const getSpareWords = sessionId =>
-  request('GET', `/api/practice/spare-words?session_id=${enc(sessionId)}`, undefined, { rejectOfflineCache: true });
+export const getSpareWords = (sessionId, kind = 'new') =>
+  request('GET', `/api/practice/spare-words?session_id=${enc(sessionId)}&kind=${enc(kind)}`, undefined, { rejectOfflineCache: true });
 export const getAppVersion = () => request('GET', '/api/version');
 // body: word_id, grade, answer, session_id, direction, and optionally client_answer_id, answered_at (queued answers only), set_word_ids and set_opened_at (offline sets only).
 export const gradePracticeWord = body => request('POST', '/api/practice/grades', body);
@@ -140,7 +141,8 @@ export const getDrillWords = ids => (ids.length
 // One checked answer of a custom drill, logged for the statistics only (the schedule never reads it). The body may carry
 // client_answer_id (a retried post is counted once) and, for a queued answer, answered_at (the time of the answer).
 export const postDrillAnswer = body => request('POST', '/api/practice/drill-answers', body);
-export const getRoundSummary = () => request('GET', '/api/practice/round-summary', undefined, { rejectOfflineCache: true });
+export const getRoundSummary = (kind = 'new') =>
+  request('GET', `/api/practice/round-summary?kind=${enc(kind)}`, undefined, { rejectOfflineCache: true });
 export const getStats = () => request('GET', '/api/stats');
 export const getActivity = period => request('GET', `/api/stats/activity?period=${enc(period)}`);
 // Головна and Профіль: the daily goal ({ goal, today: { date, answers } }).
