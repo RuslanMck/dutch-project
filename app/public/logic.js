@@ -2087,3 +2087,178 @@ export const DEFAULT_THEME = 'sad';
 export function pickTheme(saved, themeNames) {
   return themeNames.includes(saved) ? saved : DEFAULT_THEME;
 }
+
+// ---------- Головна (docs/NAVIGATION_REDESIGN.md §7) ----------
+
+const HOME_WEEKDAYS = Object.freeze(['Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота', 'Неділя']);
+const HOME_WEEKDAYS_SHORT = Object.freeze(['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']);
+const MONTHS_GENITIVE = Object.freeze(['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня',
+  'вересня', 'жовтня', 'листопада', 'грудня']);
+const WORD_COUNT_FORMS = ['слово', 'слова', 'слів'];
+const NEW_WORD_FORMS = ['нове', 'нові', 'нових'];
+
+// The Dutch greeting by the hour of the day: Goedemorgen from 5:00, Goedemiddag from 12:00, Goedenavond from 18:00.
+export function greetingForHour(hour) {
+  if (!Number.isFinite(hour)) return 'Hoi!';
+  if (hour >= 5 && hour < 12) return 'Goedemorgen!';
+  if (hour >= 12 && hour < 18) return 'Goedemiddag!';
+  return 'Goedenavond!';
+}
+
+// «Вівторок, 17 листопада»: the weekday capitalised, the day and the month in the genitive. Local date.
+export function formatHomeDate(date) {
+  const weekday = HOME_WEEKDAYS[(date.getDay() + 6) % 7];
+  return `${weekday}, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
+}
+
+// The streak chip: «12 днів»; no streak (0, or unknown) gives '' and the chip stays hidden.
+export function formatStreakChip(days) {
+  if (!Number.isFinite(days) || days <= 0) return '';
+  return `${days} ${pluralizeDays(days)}`;
+}
+
+// The local calendar day as «2026-11-17», the form the calendar days use.
+export function localIsoDate(date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+export const NEXT_STEP_SUBTITLES = Object.freeze({
+  review: 'Почнімо з повторення',
+  new: 'Час для нових слів',
+  done: 'На сьогодні все зроблено',
+});
+
+// The Далі card. counts: { reviewOwed, introducedToday, strugglingCount }; null or undefined means unknown, and an
+// unknown count never makes a suggestion. The suggestions keep this order: Запам'ятовування (words owed), Нові слова
+// (the daily set not full), Важкі слова (words to drill), Артикль (always). The first is the main one, the next
+// one the small «або …» link.
+export function pickNextStep({ reviewOwed, introducedToday, strugglingCount } = {}) {
+  const steps = [];
+  if (Number.isFinite(reviewOwed) && reviewOwed > 0) {
+    steps.push({ id: 'review', title: "Запам'ятовування", line: formatLearnReviewLine(reviewOwed), hint: formatWordTotal(reviewOwed) });
+  }
+  if (!Number.isFinite(introducedToday) || introducedToday < LEARN_SET_SIZE) {
+    const done = Number.isFinite(introducedToday) ? Math.min(introducedToday, LEARN_SET_SIZE) : '—';
+    steps.push({ id: 'new', title: 'Нові слова', line: `Сьогодні ${done} з ${LEARN_SET_SIZE}`, hint: `${done} з ${LEARN_SET_SIZE}` });
+  }
+  if (Number.isFinite(strugglingCount) && strugglingCount > 0) {
+    steps.push({ id: 'struggling', title: 'Важкі слова', line: `${formatWordTotal(strugglingCount)} для тренування`, hint: formatWordTotal(strugglingCount) });
+  }
+  steps.push({ id: 'article', title: 'Артикль', line: 'de чи het', hint: 'de чи het' });
+  const [main, second = null] = steps;
+  const subtitle = main.id === 'review' ? NEXT_STEP_SUBTITLES.review
+    : main.id === 'new' ? NEXT_STEP_SUBTITLES.new
+      : NEXT_STEP_SUBTITLES.done;
+  return {
+    subtitle,
+    main: { id: main.id, title: main.title, line: main.line },
+    second: second ? { id: second.id, title: second.title, label: `або ${second.title} · ${second.hint}` } : null,
+  };
+}
+
+// The week strip of Головна: the seven days of the current Monday-to-Sunday week, Monday first. days: the calendar
+// days { date, answers } (null when the read failed). Future days have no answers; a past day missing from the
+// list has none either. Also the line about last week, '' when the calendar is unknown.
+export function buildHomeWeek({ days = null, todayIso }) {
+  const todayIndex = isoDayNumber(todayIso);
+  const mondayNumber = todayIndex - ((new Date(todayIndex * 86400000).getUTCDay() + 6) % 7);
+  const byDate = new Map((days ?? []).map(day => [day.date, day.answers ?? 0]));
+  const cells = HOME_WEEKDAYS.map((name, index) => {
+    const dayNumber = mondayNumber + index;
+    const date = isoFromDayNumber(dayNumber);
+    const isFuture = dayNumber > todayIndex;
+    let answers = null;
+    if (days && !isFuture) answers = byDate.get(date) ?? 0;
+    const label = answers == null
+      ? `${name}: ${isFuture ? 'ще попереду' : 'немає даних'}`
+      : answers === 0 ? `${name}: без практики` : `${name}: ${answers} ${pluralize(answers, ANSWER_WORDS)}`;
+    return {
+      date,
+      name,
+      short: HOME_WEEKDAYS_SHORT[index],
+      answers,
+      level: answers == null ? 0 : calendarLevel(answers),
+      isToday: dayNumber === todayIndex,
+      isFuture,
+      label,
+    };
+  });
+  let previousLine = '';
+  if (days) {
+    const previous = days.filter(day => {
+      const number = isoDayNumber(day.date);
+      return number >= mondayNumber - 7 && number < mondayNumber;
+    });
+    const practisedDays = previous.filter(day => (day.answers ?? 0) > 0).length;
+    const total = previous.reduce((sum, day) => sum + (day.answers ?? 0), 0);
+    previousLine = `Минулого тижня: ${practisedDays} ${pluralizeDays(practisedDays)}, ${total} ${pluralize(total, ANSWER_WORDS)}`;
+  }
+  return { cells, previousLine };
+}
+
+// Days since the epoch for an ISO date, and back: the calendar arithmetic is done in UTC.
+function isoDayNumber(isoDate) {
+  const [year, month, day] = String(isoDate).split('-').map(Number);
+  return Math.round(Date.UTC(year, month - 1, day) / 86400000);
+}
+
+function isoFromDayNumber(dayNumber) {
+  return new Date(dayNumber * 86400000).toISOString().slice(0, 10);
+}
+
+// The three numbers of Головна: words in progress (learning + the FSRS review set), new words today, and the share
+// of right answers over 7 days. Unknown values show «—».
+export function buildHomeNumbers({ learning = null, fsrsReview = null, introducedToday = null, goodShare7Days = null } = {}) {
+  const inProgress = Number.isFinite(learning) ? learning + (Number.isFinite(fsrsReview) ? fsrsReview : 0) : null;
+  const shown = Number.isFinite(inProgress) ? inProgress : 0;
+  const newToday = Number.isFinite(introducedToday) ? introducedToday : null;
+  return [
+    {
+      key: 'learning',
+      value: Number.isFinite(inProgress) ? String(inProgress) : '—',
+      label: `${pluralize(shown, WORD_COUNT_FORMS)} вчу`,
+    },
+    {
+      key: 'new-today',
+      value: newToday == null ? '—' : String(newToday),
+      label: `${pluralize(newToday ?? 0, NEW_WORD_FORMS)} сьогодні`,
+    },
+    {
+      key: 'accuracy',
+      value: Number.isFinite(goodShare7Days) ? `${Math.round(goodShare7Days * 100)}%` : '—',
+      label: 'правильно за 7 днів',
+    },
+  ];
+}
+
+// «Ще 2 дні серії», «Ще 7 слів», «Ще 5 відповідей»; a group without its own wording gives «Ще N».
+export function formatNextAchievementLine(group, left) {
+  if (group === 'streak') return `Ще ${left} ${pluralizeDays(left)} серії`;
+  if (group === 'words') return `Ще ${left} ${pluralize(left, WORD_COUNT_FORMS)}`;
+  if (group === 'answers') return `Ще ${left} ${pluralize(left, ANSWER_WORDS)}`;
+  if (group === 'days') return `Ще ${left} ${pluralizeDays(left)} практики`;
+  return `Ще ${left}`;
+}
+
+// The medal Головна shows: the locked one with the highest share of its target reached (started, not finished).
+// Null when no locked medal has progress.
+export function pickNextAchievement(achievements = []) {
+  let best = null;
+  let bestShare = -1;
+  for (const achievement of achievements) {
+    if (achievement.unlocked) continue;
+    const { current = 0, target = 0 } = achievement.progress ?? {};
+    if (!(target > 0) || !(current > 0) || current >= target) continue;
+    const share = current / target;
+    if (share > bestShare) {
+      best = achievement;
+      bestShare = share;
+    }
+  }
+  if (!best) return null;
+  const { current, target } = best.progress;
+  const left = target - current;
+  return { id: best.id, title: best.title, line: formatNextAchievementLine(best.group, left) };
+}

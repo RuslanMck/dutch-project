@@ -13,7 +13,6 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `BottomNav/` | Navigation group. Stories and guidelines. |
 | `Button/` | Actions group. Stories and guidelines. |
 | `Calendar/` | Data group. Stories and guidelines. |
-| `ContinueCard/` | Study group. Stories and guidelines. |
 | `DeckCard/` | Content group. Stories and guidelines. |
 | `DeckForm/` | Forms group. Stories and guidelines. |
 | `Dialog/` | Feedback group. Stories and guidelines. |
@@ -26,6 +25,8 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `GoalForm/` | Forms group. Stories and guidelines. |
 | `HintButton/` | Actions group. Stories and guidelines. |
 | `HomeHeader/` | Navigation group. Stories and guidelines. |
+| `HomeNumbers/` | Data group. Stories and guidelines. |
+| `HomeWeek/` | Data group. Stories and guidelines. |
 | `IconButton/` | Actions group. Stories and guidelines. |
 | `KnownCheck/` | Study group. Stories and guidelines. |
 | `LearnCards/` | Study group. Stories and guidelines. |
@@ -34,6 +35,8 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `ListItem/` | Content group. Stories and guidelines. |
 | `Medal/` | Content group. Stories and guidelines. |
 | `Message/` | Feedback group. Stories and guidelines. |
+| `NextAchievement/` | Content group. Stories and guidelines. |
+| `NextStepCard/` | Study group. Stories and guidelines. |
 | `Notice/` | Feedback group. Stories and guidelines. |
 | `OfflineBanner/` | Feedback group. Stories and guidelines. |
 | `PageHeader/` | Navigation group. Stories and guidelines. |

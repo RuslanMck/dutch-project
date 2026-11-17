@@ -9,7 +9,14 @@ import {
 } from './motion.js';
 import { drawAchievementIcon } from './achievement-icons.js';
 import {
-  buildHomeSummary,
+  buildHomeNumbers,
+  buildHomeWeek,
+  formatHomeDate,
+  formatStreakChip,
+  greetingForHour,
+  localIsoDate,
+  pickNextAchievement,
+  pickNextStep,
   computeQueueProgressPercent,
   buildWordDetailView,
   buildWordEditPatch,
@@ -205,7 +212,9 @@ const ui = {
   },
   tab: 'home',
   // Вчити: the Важкі слова count, and the daily practices' counts ({ introducedToday, reviewOwed, phraseSetLeft }), null while unknown.
-  home: { strugglingCount: null, practiceCounts: null },
+  // Головна: the Важкі слова count, the daily counts, and the numbers read with the page: streak (days), the calendar
+  // days of two weeks, the vocabulary's learning and FSRS review counts. Each is null while unknown.
+  home: { strugglingCount: null, practiceCounts: null, streak: null, calendarDays: null, learning: null, fsrsReview: null },
   learnScrollY: 0,                   // where Вчити was scrolled when an exercise opened; ✕ goes back there
   // Medals (Досягнення tab): status loading | ready | failed; data is the last answer of GET /api/achievements.
   achievements: { status: 'loading', data: null },
@@ -486,7 +495,7 @@ function showTab(name) {
     if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = fsrsModeForKind(ui.fsrs.kind);
     ensureFsrsSession();
   }
-  if (ui.tab === 'home') loadGoal();
+  if (ui.tab === 'home') { loadGoal(); loadHome(); }
   if (ui.tab === 'learn') { loadHomeStrugglingCount(); loadHomePracticeCounts(); loadDeckList(); }
   if (ui.tab === 'profile') { loadGoal(); loadChapter(); }
   if (ui.tab === 'known-check') loadKnownCheck();
@@ -574,6 +583,7 @@ async function loadHomePracticeCounts() {
       introducedToday: stats.introduced_today,
       reviewOwed: stats.review_owed,
       phraseSetLeft: stats.phrases?.set_phrases_left,
+      goodShare: stats.good_share_7_days,
     };
   } catch {
     ui.home.practiceCounts = null;
@@ -586,13 +596,115 @@ function renderPracticeCounts() {
   if (ui.tab === 'home') renderHome();
 }
 
+// Everything Головна reads, each time it opens or the data is synced: the counts of the practice, the Важкі слова
+// count, the streak, the week and the numbers. The medal card is read by showTab with the other medal pages.
+function loadHome() {
+  loadHomeStrugglingCount();
+  loadHomePracticeCounts();
+  loadHomeOverview();
+}
+
+// A read that failed (Promise.allSettled) gives null.
+function settledValue(result) {
+  return result.status === 'fulfilled' ? result.value : null;
+}
+
+// The streak from the week's activity, the two weeks of the calendar, and the vocabulary counts of Статистика.
+async function loadHomeOverview() {
+  const [activity, calendar, stats] = await Promise.allSettled([api.getActivity('week'), api.getCalendar(14), api.getStats()]);
+  const overview = settledValue(stats);
+  ui.home.streak = settledValue(activity)?.streak?.current ?? null;
+  ui.home.calendarDays = settledValue(calendar)?.days ?? null;
+  ui.home.learning = overview?.words?.learning ?? null;
+  ui.home.fsrsReview = overview?.fsrs?.review ?? null;
+  renderHome();
+}
+
+// Головна: the greeting, the Далі card, the goal, the week, the numbers and the next medal. Unknown numbers show «—».
 function renderHome() {
+  const now = new Date();
+  $('home-greeting').textContent = greetingForHour(now.getHours());
+  $('home-date').textContent = formatHomeDate(now);
+  renderHomeStreak();
+  renderHomeNext();
   renderHomeGoal();
-  const summary = buildHomeSummary({ words: state.words, phraseCount: state.phrases.length, now: Date.now() });
-  $('home-continue-line').textContent = summary.line;
-  $('home-progress').setAttribute('aria-valuenow', String(summary.startedPercent));
-  $('home-progress-fill').style.width = `${summary.startedPercent}%`;
-  $('home-progress-label').textContent = summary.progressLabel;
+  renderHomeWeek(now);
+  renderHomeNumbers();
+  renderHomeAchievement();
+}
+
+function renderHomeStreak() {
+  const chip = formatStreakChip(ui.home.streak);
+  $('home-streak').hidden = !chip;
+  $('home-streak-text').textContent = chip;
+}
+
+// The Далі card: the subtitle under the greeting, the main suggestion and the small «або …» link.
+function renderHomeNext() {
+  const counts = ui.home.practiceCounts;
+  const step = pickNextStep({
+    reviewOwed: counts?.reviewOwed,
+    introducedToday: counts?.introducedToday,
+    strugglingCount: ui.home.strugglingCount,
+  });
+  $('home-subtitle').textContent = step.subtitle;
+  $('home-next-title').textContent = step.main.title;
+  $('home-next-line').textContent = step.main.line;
+  $('home-next-button').dataset.next = step.main.id;
+  const second = $('home-next-second');
+  second.hidden = !step.second;
+  if (step.second) {
+    second.textContent = step.second.label;
+    second.dataset.next = step.second.id;
+  }
+}
+
+// «Почати» and the «або …» link open the exercise as Вчити's cards and tiles do.
+function handleHomeNextClick(event) {
+  const button = event.target.closest('button[data-next]');
+  if (!button) return;
+  const id = button.dataset.next;
+  if (id === 'review') openFsrsPractice('review');
+  else if (id === 'new') openFsrsPractice('fsrs');
+  else if (id === 'struggling') handleHomeStrugglingTile();
+  else if (id === 'article') openArticlePractice();
+}
+
+// The week strip: seven cells, Monday first, shaded by the answers of each day; the line about last week.
+function renderHomeWeek(now) {
+  const week = buildHomeWeek({ days: ui.home.calendarDays, todayIso: localIsoDate(now) });
+  $('home-week-grid').innerHTML = week.cells.map(cell => `<li class="home-week__day${cell.isToday ? ' home-week__day--today' : ''}">
+      <span class="home-week__cell home-week__cell--l${cell.level}${cell.isFuture ? ' home-week__cell--future' : ''}" role="img"
+        aria-label="${esc(cell.label)}"></span>
+      <span class="home-week__name" aria-hidden="true">${esc(cell.short)}</span>
+    </li>`).join('');
+  $('home-week-prev').hidden = !week.previousLine;
+  $('home-week-prev').textContent = week.previousLine;
+}
+
+// The three numbers: words in progress, new words today, the right share of the last 7 days.
+function renderHomeNumbers() {
+  const counts = ui.home.practiceCounts;
+  const numbers = buildHomeNumbers({
+    learning: ui.home.learning,
+    fsrsReview: ui.home.fsrsReview,
+    introducedToday: counts?.introducedToday,
+    goodShare7Days: counts?.goodShare,
+  });
+  $('home-numbers').innerHTML = numbers.map(number => `<div class="stat-tile home-number">
+      <span class="stat-tile__value">${esc(number.value)}</span>
+      <span class="stat-tile__label">${esc(number.label)}</span>
+    </div>`).join('');
+}
+
+// The next medal: the locked one closest to done. Hidden when the medals are not read or none has progress.
+function renderHomeAchievement() {
+  const medals = ui.achievements.data?.achievements;
+  const next = medals ? pickNextAchievement(medals) : null;
+  $('home-achievement').hidden = !next;
+  if (!next) return;
+  $('home-achievement-title').textContent = `Наступне досягнення: «${next.title}»`;
+  $('home-achievement-line').textContent = next.line;
 }
 
 // ---------- Вчити (§4) ----------
@@ -677,20 +789,6 @@ function handleLearnDecksClick(event) {
     const deck = decks.list.find(item => item.id === Number(button.dataset.deckId));
     if (deck) practiceDeck(deck);
   }
-}
-
-// The home search opens Словник with the query in its search field.
-function handleHomeSearch(event) {
-  event.preventDefault();
-  const query = $('home-search-input').value.trim();
-  ui.table.q = query;
-  // A search from Головна looks through every word, whatever filter was left on.
-  ui.table.filter = 'all';
-  ui.table.category = '';
-  $('table-category').value = '';
-  $('table-q').value = query;
-  $('home-search-input').value = '';
-  showTab('table');
 }
 
 function handleHomeStrugglingTile() {
@@ -4315,6 +4413,7 @@ async function loadAchievements() {
     ui.achievements = { ...ui.achievements, status: 'failed' };
   }
   renderAchievementsPage();
+  if (ui.tab === 'home') renderHome();
 }
 
 function readSeenAchievements() {
@@ -4456,8 +4555,7 @@ function bindEvents() {
     // A home tile or a Профіль link is hidden by the switch: move focus to the new tab's heading.
     if (!button.closest('#bottom-nav')) focusTabHeading();
   });
-  $('home-search-form').addEventListener('submit', handleHomeSearch);
-  $('home-continue-button').addEventListener('click', () => showTab('practice'));
+  $('home-next').addEventListener('click', handleHomeNextClick);
   $('learn-resume').addEventListener('click', resumeLearnPractice);
   $('learn-new').addEventListener('click', () => openFsrsPractice('fsrs'));
   $('learn-review').addEventListener('click', () => openFsrsPractice('review'));
@@ -4822,7 +4920,7 @@ function flushOutboxNow() {
 function refreshAfterSync() {
   refresh(['words', 'topics']).catch(() => {});
   if (ui.tab === 'stats') loadStats();
-  if (ui.tab === 'home') loadHomeStrugglingCount();
+  if (ui.tab === 'home') loadHome();
 }
 
 // True when the server may be read for the practice: the phone is online and the outbox is empty (or was just sent).

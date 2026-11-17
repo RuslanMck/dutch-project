@@ -51,16 +51,22 @@
       <div class="home-header">
         <div class="home-header__title">
           <svg class="home-header__logo" viewBox="0 0 120 120" aria-hidden="true" focusable="false"><defs><linearGradient id="header-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6b676"/><stop offset="1" stop-color="#c39f5c"/></linearGradient><clipPath id="header-clip"><rect width="120" height="120" rx="27"/></clipPath></defs><g clip-path="url(#header-clip)"><rect width="120" height="120" fill="url(#header-bg)"/><path d="M0 100 C30 92 90 92 120 100 V120 H0z" fill="#3e5240"/><path d="M52 98 L56 52 H64 L68 98z" fill="#3b2216"/><path d="M54 52 L60 43 L66 52z" fill="#9b411c"/><rect x="57" y="84" width="6" height="14" rx="3" fill="#f3c7a7"/><g><g transform="rotate(20 60 48)"><rect x="58" y="16" width="4" height="30" rx="2" fill="#fffcf7"/><rect x="62" y="18" width="8" height="22" rx="2" fill="#fffcf7" opacity=".75"/></g><g transform="rotate(110 60 48)"><rect x="58" y="16" width="4" height="30" rx="2" fill="#fffcf7"/><rect x="62" y="18" width="8" height="22" rx="2" fill="#fffcf7" opacity=".75"/></g><g transform="rotate(200 60 48)"><rect x="58" y="16" width="4" height="30" rx="2" fill="#fffcf7"/><rect x="62" y="18" width="8" height="22" rx="2" fill="#fffcf7" opacity=".75"/></g><g transform="rotate(290 60 48)"><rect x="58" y="16" width="4" height="30" rx="2" fill="#fffcf7"/><rect x="62" y="18" width="8" height="22" rx="2" fill="#fffcf7" opacity=".75"/></g><circle cx="60" cy="48" r="4.5" fill="#e3922a"/></g><g transform="translate(21 110) scale(1.25)"><g><g><path d="M0 0 V-16" stroke="#3e5240" stroke-width="2.6" stroke-linecap="round"/><path d="M0 -4 C-6 -4 -9 -9 -9 -14 C-4 -13 0 -9 0 -4z" fill="#3e5240"/></g><g><path d="M0 -16 C-6 -16 -8 -22 -7 -29 C-4 -27 -2 -25 0 -22 C2 -25 4 -27 7 -29 C8 -22 6 -16 0 -16z" fill="#e3922a"/><path d="M0 -16 C-3 -16 -4 -23 -2 -29 L0 -31 L2 -29 C4 -23 3 -16 0 -16z" fill="#f3c7a7"/></g></g></g><g transform="translate(39 114) scale(1)"><g><g><path d="M0 0 V-16" stroke="#3e5240" stroke-width="2.6" stroke-linecap="round"/><path d="M0 -4 C-6 -4 -9 -9 -9 -14 C-4 -13 0 -9 0 -4z" fill="#3e5240"/></g><g><path d="M0 -16 C-6 -16 -8 -22 -7 -29 C-4 -27 -2 -25 0 -22 C2 -25 4 -27 7 -29 C8 -22 6 -16 0 -16z" fill="#9b411c"/><path d="M0 -16 C-3 -16 -4 -23 -2 -29 L0 -31 L2 -29 C4 -23 3 -16 0 -16z" fill="#e3922a"/></g></g></g><g transform="translate(81 114) scale(1)"><g><g><path d="M0 0 V-16" stroke="#3e5240" stroke-width="2.6" stroke-linecap="round"/><path d="M0 -4 C-6 -4 -9 -9 -9 -14 C-4 -13 0 -9 0 -4z" fill="#3e5240"/></g><g><path d="M0 -16 C-6 -16 -8 -22 -7 -29 C-4 -27 -2 -25 0 -22 C2 -25 4 -27 7 -29 C8 -22 6 -16 0 -16z" fill="#9b411c"/><path d="M0 -16 C-3 -16 -4 -23 -2 -29 L0 -31 L2 -29 C4 -23 3 -16 0 -16z" fill="#e3922a"/></g></g></g><g transform="translate(99 110) scale(1.25)"><g><g><path d="M0 0 V-16" stroke="#3e5240" stroke-width="2.6" stroke-linecap="round"/><path d="M0 -4 C-6 -4 -9 -9 -9 -14 C-4 -13 0 -9 0 -4z" fill="#3e5240"/></g><g><path d="M0 -16 C-6 -16 -8 -22 -7 -29 C-4 -27 -2 -25 0 -22 C2 -25 4 -27 7 -29 C8 -22 6 -16 0 -16z" fill="#e3922a"/><path d="M0 -16 C-3 -16 -4 -23 -2 -29 L0 -31 L2 -29 C4 -23 3 -16 0 -16z" fill="#f3c7a7"/></g></g></g></g></svg>
-          <h1 id="home-greeting" class="home-header__greeting" tabindex="-1">Hoi!</h1>
+          <h1 id="home-greeting" class="home-header__greeting" tabindex="-1">Goedemorgen!</h1>
         </div>
-        <p class="home-header__subtitle">Що вчимо сьогодні?</p>
+        <p id="home-subtitle" class="home-header__subtitle">Почнімо з повторення</p>
+        <div class="home-header__meta">
+          <p id="home-date" class="home-header__date"></p>
+          <p id="home-streak" class="home-streak" hidden><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3c.8 3 5 5 5 10a5 5 0 0 1-10 0c0-2.3 1-3.7 2.2-4.8.1 2 .9 3.1 2 3.3-.4-3.2.1-5.7.8-8.5z"/></svg><span id="home-streak-text"></span></p>
+        </div>
       </div>
-      <form id="home-search-form" class="home-search" role="search">
-        <label class="sr-only" for="home-search-input">Пошук слова</label>
-        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>
-        <input id="home-search-input" type="search" placeholder="Пошук слова…" autocomplete="off" autocapitalize="none"
-          spellcheck="false">
-      </form>
+
+      <section id="home-next" class="next-card" aria-labelledby="home-next-title">
+        <p class="next-card__label">Далі</p>
+        <h2 id="home-next-title" class="next-card__title"></h2>
+        <p id="home-next-line" class="next-card__line"></p>
+        <button id="home-next-button" class="next-card__start" type="button" data-next="review">Почати <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <button id="home-next-second" class="next-card__second" type="button" data-next="new" hidden></button>
+      </section>
 
       <section id="home-goal" class="goal-card" aria-labelledby="home-goal-title" hidden>
         <div class="goal-card__ring">
@@ -75,19 +81,27 @@
           <p id="home-goal-line" class="goal-card__line" role="status"></p>
         </div>
       </section>
-      <section class="continue-card" aria-labelledby="home-continue-title">
-        <div class="continue-card__top">
-          <span class="continue-card__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 4h9a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h9"/></svg></span>
-          <div class="continue-card__text">
-            <h2 id="home-continue-title" class="continue-card__title">Практика на сьогодні</h2>
-            <p id="home-continue-line" class="continue-card__line"></p>
-          </div>
-          <button id="home-continue-button" class="continue-card__button" type="button" aria-label="Відкрити практику"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <section id="home-week" class="stats-card home-week" aria-labelledby="home-week-title">
+        <div class="home-week__head">
+          <h2 id="home-week-title" class="stats-card__title">Цей тиждень</h2>
+          <button class="home-week__link" type="button" data-tab="week">Підсумок</button>
         </div>
-        <div class="progress-bar" role="progressbar" aria-labelledby="home-progress-label" aria-valuemin="0" aria-valuemax="100"
-          id="home-progress"><span id="home-progress-fill" class="progress-bar__fill"></span></div>
-        <p id="home-progress-label" class="continue-card__progress-label"></p>
+        <ol id="home-week-grid" class="home-week__days"></ol>
+        <p id="home-week-prev" class="home-week__prev muted" hidden></p>
       </section>
+
+      <section class="home-numbers" aria-label="Цифри">
+        <div id="home-numbers" class="home-numbers__tiles"></div>
+      </section>
+
+      <button id="home-achievement" class="home-achievement" type="button" data-tab="achievements" hidden>
+        <span class="home-achievement__icon"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="14.5" r="5.5"/><path d="M9 9.8L6.5 3h4l1.5 3.5L13.5 3h4L15 9.8"/></svg></span>
+        <span class="home-achievement__text">
+          <span id="home-achievement-title" class="home-achievement__title"></span>
+          <span id="home-achievement-line" class="home-achievement__line"></span>
+        </span>
+        <svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
 
     </section>
 

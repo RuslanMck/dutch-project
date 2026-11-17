@@ -151,12 +151,12 @@ test('the bottom bar: Головна, Словник, the Вчити hub in the 
   assert.match(nav, /<span>Прогрес<\/span>/);
 });
 
-test('Головна keeps its header, search, goal and continue card, and loses the practice tiles and their heading', () => {
+test('Головна keeps its header and goal card, has the Далі card in place of the search and the continue card, and loses the practice tiles', () => {
+  // The search moved to Словник's own field; the continue card's job is the Далі card (home-page.test.js).
   const home = sectionMarkup('tab-home');
-  assert.match(home, /id="home-search-form"/);
   assert.match(home, /id="home-goal"/);
-  assert.match(home, /id="home-continue-button"/);
-  assert.doesNotMatch(home, /practice-tile|home-section-title|Тренування</);
+  assert.match(home, /id="home-next-button"/);
+  assert.doesNotMatch(home, /home-search-form|home-continue-button|practice-tile|home-section-title|Тренування</);
   assert.doesNotMatch(html, /home-tile-/);
 });
 
@@ -254,7 +254,7 @@ test('app.js: the learn tab is in TABS and renders the hub; the old home tile li
 test('the Вчити styles use garden tokens and the light fills of §0 for the daily cards', () => {
   assert.match(css, /\.learn-card--new \{ background: var\(--garden-right-soft\); \}/);
   assert.match(css, /\.learn-card--review \{ background: var\(--garden-peach\); \}/);
-  assert.match(css, /\.bottom-nav__hub\[aria-current="page"\] \.bottom-nav__disc \{ outline: 2px solid var\(--garden-ink\); outline-offset: 2px; \}/);
+  assert.match(css, /\.bottom-nav__hub\[aria-current="page"\] \.bottom-nav__disc \{ outline: 2px solid var\(--garden-ink\); outline-offset: 0; \}/);
   assert.match(css, /@media \(max-width: 339px\) \{ \.learn-tiles \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \} \}/);
   // Every new block takes its colours from the tokens: no raw colour in the learn and exercise rules.
   const block = css.slice(css.indexOf('/* Вчити (§4)'));

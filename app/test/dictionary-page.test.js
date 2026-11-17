@@ -177,8 +177,9 @@ test('the page: add sheet, the list, filter chips, category select and suggestio
   assert.match(html, /<select name="category"[\s\S]*?<\/select>[\s\S]*?<span>Тема<\/span>/);
 });
 
-test('the page: home search still opens the list with the query; the list is one row per word, rendered once per data change', () => {
-  assert.match(functionSource(appSource, 'function handleHomeSearch(event) {'), /showTab\('table'\)/);
+test('the page: Головна has no search any more (Словник keeps its own); the list is one row per word, rendered once per data change', () => {
+  assert.doesNotMatch(appSource, /handleHomeSearch/);
+  assert.match(html, /id="table-q"/);
   const build = functionSource(appSource, 'function buildDictionaryRows() {');
   assert.match(build, /sort\(\(a, b\) => b\.added_at - a\.added_at\)/, 'newest first');
   assert.match(build, /<li class="dict-row">/);
