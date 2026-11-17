@@ -1604,11 +1604,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 
 .bottom-nav__disc {
   position: absolute;
-  top: -19px;
+  top: -24px;
   left: 50%;
   transform: translateX(-50%);
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1620,7 +1620,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 }
 
 .bottom-nav__hub[aria-current="page"] { color: var(--garden-ink); }
-.bottom-nav__hub[aria-current="page"] .bottom-nav__disc { outline: 2px solid var(--garden-ink); outline-offset: 2px; }
+.bottom-nav__hub[aria-current="page"] .bottom-nav__disc { outline: 2px solid var(--garden-ink); outline-offset: 0; }
 
 /* Головна */
 .home-header {
