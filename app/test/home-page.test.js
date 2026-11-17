@@ -201,7 +201,7 @@ test('buildHomeWeek: an empty calendar is a quiet week, with no days practised l
 test('buildHomeNumbers: words in progress (learning + review), new today, and the right share of 7 days', () => {
   const numbers = buildHomeNumbers({ learning: 78, fsrsReview: 88, introducedToday: 0, goodShare7Days: 0.484 });
   assert.deepEqual(numbers.map(number => number.value), ['166', '0', '48%']);
-  assert.deepEqual(numbers.map(number => number.label), ['слів вчу', 'нових сьогодні', 'правильно за 7 днів']);
+  assert.deepEqual(numbers.map(number => number.label), ['слів учу', 'нових сьогодні', 'правильно за 7 днів']);
 });
 
 test('buildHomeNumbers: the plural forms of the words and the new ones; a missing review set counts as none', () => {
@@ -211,13 +211,13 @@ test('buildHomeNumbers: the plural forms of the words and the new ones; a missin
   assert.equal(one[1].label, 'нове сьогодні');
   assert.equal(one[2].value, '100%');
   assert.equal(buildHomeNumbers({ learning: 2 })[0].label, 'слова вчу');
-  assert.equal(buildHomeNumbers({ learning: 5 })[0].label, 'слів вчу');
+  assert.equal(buildHomeNumbers({ learning: 5 })[0].label, 'слів учу');
 });
 
 test('buildHomeNumbers: unknown values show a dash, never undefined or NaN', () => {
   const numbers = buildHomeNumbers({});
   assert.deepEqual(numbers.map(number => number.value), ['—', '—', '—']);
-  assert.deepEqual(numbers.map(number => number.label), ['слів вчу', 'нових сьогодні', 'правильно за 7 днів']);
+  assert.deepEqual(numbers.map(number => number.label), ['слів учу', 'нових сьогодні', 'правильно за 7 днів']);
   assert.doesNotMatch(JSON.stringify(buildHomeNumbers({ learning: NaN, introducedToday: undefined, goodShare7Days: null })), /undefined|NaN/);
 });
 

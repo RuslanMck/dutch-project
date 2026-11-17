@@ -16,7 +16,7 @@ const numbers = (tiles) => `<div class="col"><section class="home-numbers" aria-
 
 export const Overview = {
   render: () => numbers([
-    tile('166', 'слів вчу'),
+    tile('166', 'слів учу'),
     tile('0', 'нових сьогодні'),
     tile('48%', 'правильно за 7 днів'),
   ]),
@@ -24,7 +24,7 @@ export const Overview = {
 
 export const Unknown = {
   render: () => numbers([
-    tile('—', 'слів вчу'),
+    tile('—', 'слів учу'),
     tile('—', 'нових сьогодні'),
     tile('—', 'правильно за 7 днів'),
   ]),

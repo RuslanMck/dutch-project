@@ -1,6 +1,6 @@
 Three numbers under the week on Головна, in the same tile look as the statistics page.
 
-- «N слів вчу»: words in progress, the learning words plus the FSRS review set.
+- «N слів учу»: words in progress, the learning words plus the FSRS review set.
 - «N нових сьогодні»: the new words of today; the noun agrees with the count («нове», «нові», «нових»).
 - «N% правильно за 7 днів»: the share of right answers over the last seven days, rounded.
 

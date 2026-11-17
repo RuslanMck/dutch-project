@@ -2218,7 +2218,8 @@ export function buildHomeNumbers({ learning = null, fsrsReview = null, introduce
     {
       key: 'learning',
       value: Number.isFinite(inProgress) ? String(inProgress) : '—',
-      label: `${pluralize(shown, WORD_COUNT_FORMS)} вчу`,
+      // «у» after a consonant, «в» after a vowel: «слів учу», but «слово вчу», «слова вчу».
+      label: /[аеєиіїоуюя]$/.test(pluralize(shown, WORD_COUNT_FORMS)) ? `${pluralize(shown, WORD_COUNT_FORMS)} вчу` : `${pluralize(shown, WORD_COUNT_FORMS)} учу`,
     },
     {
       key: 'new-today',
