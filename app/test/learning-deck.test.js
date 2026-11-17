@@ -185,7 +185,7 @@ test('yesterday 9 wrong and 1 right: today the 10 deck words come back and no ne
   }));
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
-  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day-2' });
+  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day-2', kind: 'review' });
 
   assert.equal(nextDay.reviews.length, 10, 'the session goes on: all 10 words are owed in both directions');
   assert.equal(nextDay.new_words.length, 0);
@@ -224,11 +224,11 @@ test('the set lasts until all its words are learned in both directions; then the
   }
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
-  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day-2' });
+  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day-2', kind: 'review' });
   assert.equal(nextDay.reviews.length, 10, 'the session\'s words come back the next day, progress kept');
   assert.equal(nextDay.new_words.length, 0);
   for (const word of nextDay.reviews.slice(0, 9)) finishWord(context, word.id, 'day-2');
-  const oneLeft = context.practiceService.getPracticeBatch({ sessionId: 'day-2' });
+  const oneLeft = context.practiceService.getPracticeBatch({ sessionId: 'day-2', kind: 'review' });
   assert.equal(oneLeft.reviews.length, 1, 'only the word not learned yet');
   assert.equal(oneLeft.new_words.length, 0, 'no new words while a word of the session is not learned');
 
@@ -243,13 +243,13 @@ test('a review answered wrong stays in its set until learned; the new words come
   const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
   for (const word of firstBatch.new_words) finishWord(context, word.id, 's1');
   context.clock.moveTo('2026-11-20T09:00:00+01:00');
-  const later = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+  const later = context.practiceService.getPracticeBatch({ sessionId: 's2', kind: 'review' });
   assert.equal(later.reviews.length, 10, 'learned words are due again: the set is 10 reviews');
   context.practiceService.gradeWord({ wordId: later.reviews[0].id, grade: 'again', answer: 'x', sessionId: 's2' });
 
   for (const word of later.reviews.slice(1)) finishWord(context, word.id, 's2');
 
-  const afterLapse = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+  const afterLapse = context.practiceService.getPracticeBatch({ sessionId: 's2', kind: 'review' });
   assert.equal(afterLapse.reviews[0].id, later.reviews[0].id, 'the lapse is in the session');
   assert.equal(afterLapse.reviews[0].deck.uk_nl.times_left, 3);
   assert.equal(afterLapse.reviews.length, 1, 'the other reviews are finished');

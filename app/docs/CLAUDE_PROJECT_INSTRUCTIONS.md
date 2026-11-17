@@ -61,10 +61,10 @@ learned; closing the app or waiting a day keeps the progress. A new word needs 2
 Then the word is learned and follows its spaced-repetition schedule. A review I answer right is done for the session;
 one I get wrong joins it and needs 3.
 
-**Sets.** A session is one set of at most 10 words, never more. Old words fill it first (words I am still learning,
-then reviews due today, most overdue first); new words fill only the room left, so after a hard day a set may hold no
-new words, and skipped days never pile up more than 10. When the set is done, `get_practice_batch` with the same
-`session_id` gives the next set; ask me before starting it. Every word of a set is practised in two rounds. Round 1
+**Sets.** A set is at most 10 words, never more. `get_practice_batch` takes `kind`: `new` (the default) gives New words
+only, and `review` gives the words I already practised that are owed today, most important first (the
+Запам'ятовування practice). Each kind has its own set, and skipped days never pile up more than 10. When a set is done,
+the same call with the same `session_id` gives the next set of that kind; ask me before starting it. Every word of a set is practised in two rounds. Round 1
 asks every word with `uk_nl` left (the Ukrainian is shown, I answer in Dutch); then round 2 asks every word with
 `nl_uk` left, in a new order (the Dutch is shown with its article, I answer in Ukrainian). Grade each answer with
 `grade_word` and its `direction`. A word is learned only when I can translate it both ways. `reset_practice` starts my practice over (every word and

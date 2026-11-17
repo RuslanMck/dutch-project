@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import { PRACTICE_DIRECTIONS, UK_TO_NL_DIRECTION } from '../domains/practice/practice-direction.js';
+import { NEW_SET_KIND, SET_KINDS } from '../domains/practice/practice-set.js';
 import {
   createNonEmptyTextSchema,
   createOptionalTextSchema,
@@ -51,6 +52,20 @@ export const practiceBatchToolInputSchema = z.object({
 export const practiceBatchQuerySchema = practiceBatchToolInputSchema.extend({
   max_reviews: z.coerce.number().int().min(1).max(MAXIMUM_REVIEWS_PER_BATCH).optional()
     .describe(REVIEW_LIMIT_DESCRIPTION),
+}).strict();
+
+// The practice set of the words: 'new' (New words, the default) or 'review' (the words already practised that are owed
+// today). Used by the word batch, the spare words and the round summary; the phrases have one set.
+export const practiceSetKindSchema = z.enum(SET_KINDS).default(NEW_SET_KIND).describe(
+  "set to practise: 'new' the New words (default); 'review' the words already practised that are owed today",
+);
+
+export const wordBatchToolInputSchema = practiceBatchToolInputSchema.extend({
+  kind: practiceSetKindSchema,
+}).strict();
+
+export const wordBatchQuerySchema = practiceBatchQuerySchema.extend({
+  kind: practiceSetKindSchema,
 }).strict();
 
 const gradeWordFieldsSchema = z.object({
@@ -120,6 +135,12 @@ export const drillAnswerInputSchema = z.object({
 // The spare words for the phone's offline sets: the practice session the words are for.
 export const spareWordsQuerySchema = z.object({
   session_id: practiceSessionIdSchema,
+  kind: practiceSetKindSchema,
+}).strict();
+
+// The round summary of one set kind (REST query).
+export const roundSummaryQuerySchema = z.object({
+  kind: practiceSetKindSchema,
 }).strict();
 
 // The quick known check: how many New words to list (REST query, 1 to 50, default 20), and the answers posted back: the

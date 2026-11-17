@@ -1,8 +1,27 @@
-// The practice set: the cards (words or phrases) of one session, at most the set size (new_per_day, 10). Old cards
-// come first: the unfinished ones (still in the learning deck), then the reviews due today, most overdue first. New
-// cards fill only the room that is left, so a hard day gives fewer new cards, or none. A set is pinned when its batch
-// is shown and stays the session's cards until each one is finished, on that calendar day only; then the next set is
-// planned the same way. Pure.
+import { ValidationError } from '../../errors/domain-errors.js';
+
+// The practice set: the cards (words or phrases) of one session, at most the set size (new_per_day, 10). A word set has
+// a kind: 'new' (New words only, the Нові слова practice) or 'review' (words already practised and owed today, the
+// Запам'ятовування practice). Both kinds are kept apart and each is at most the set size. Phrases have one set with
+// the old cards first (the unfinished ones, then the reviews due today) and new cards only in the room left. A set is
+// pinned when its batch is shown and stays the session's cards until each one is finished, on that calendar day only;
+// then the next set is planned the same way. Pure.
+
+export const NEW_SET_KIND = 'new';
+export const REVIEW_SET_KIND = 'review';
+export const SET_KINDS = Object.freeze([NEW_SET_KIND, REVIEW_SET_KIND]);
+
+// Throws a ValidationError for a set kind that is neither 'new' nor 'review'.
+export function assertSetKind(kind) {
+  if (!SET_KINDS.includes(kind)) throw new ValidationError(`kind must be one of ${SET_KINDS.join(', ')}`);
+}
+
+// The stored set of the given kind in the practice settings (readSettings): the new set (wordSet) or the review set
+// (reviewSet), each null when none is stored.
+export function readSetOfKind(settings, kind) {
+  assertSetKind(kind);
+  return kind === REVIEW_SET_KIND ? settings.reviewSet : settings.wordSet;
+}
 
 // The set as it is saved in the practice settings: { opened_on, opened_at, item_ids }, or null.
 export function mapFromStoredSet(storedSet) {

@@ -1,7 +1,8 @@
 // Starts the practice over: every word and phrase goes back to New (no card, not due, not introduced, out of the
-// learning decks in both directions), the practice sets are cleared and every review log, deck answer and phrase answer
-// that still counts is superseded, so sessions start over and the next batch is a set of new words. Review logs,
-// deck answers and word errors are kept as history. Publishes 'words' and 'phrases' after the commit of a real reset.
+// learning decks in both directions), both practice sets (the New words set and the review set) are cleared and every
+// review log, deck answer and phrase answer that still counts is superseded, so sessions start over and the next batch
+// is a set of new words. Review logs, deck answers and word errors are kept as history. Publishes 'words' and 'phrases'
+// after the commit of a real reset.
 const NEW_LEARNING_STATUS = 'new';
 
 export function createPracticeResetService({
@@ -34,6 +35,7 @@ export function createPracticeResetService({
       phrasePracticeRepository.markPhraseReviewLogsSuperseded(timestamp);
       phrasePracticeRepository.markPhraseAnswersSuperseded(timestamp);
       practiceSettings.saveWordSet(null);
+      practiceSettings.saveReviewSet(null);
       practiceSettings.savePhraseSet(null);
       // Every word is new again, so the quick check may ask about all of them.
       practiceSettings.saveKnownCheckSeen([]);

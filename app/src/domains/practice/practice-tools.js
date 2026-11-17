@@ -10,6 +10,7 @@ import {
   resetPracticeInputSchema,
   setCurrentChapterInputSchema,
   setWordPriorityInputSchema,
+  wordBatchToolInputSchema,
 } from '../../contracts/practice-contracts.js';
 import {
   DESTRUCTIVE_TOOL_ANNOTATIONS,
@@ -28,10 +29,11 @@ export function registerPracticeTools({
 }) {
   registerJsonTool(mcpServer, 'get_practice_batch', {
     title: 'Get practice batch',
-    description: 'Words to practise now: one set of at most 10 words (counts.set_size). Old words fill it first: '
-      + 'words still being learned, then reviews due today (most overdue first); new words fill only the room '
-      + 'left, so a set can be 10 new, 6 new and 4 old, or 10 old. Every card of the set is practised in two '
-      + 'rounds. Round 1, direction uk_nl: show each card whose directions_left has uk_nl by its uk and ask for the '
+    description: 'Words to practise now: one set of at most 10 words (counts.set_size) of the given kind. kind "new" '
+      + '(the default) is New words only, by priority quota; kind "review" is the words already practised that are '
+      + 'owed today, most important first (counts.review_owed is how many are owed in all), without the words '
+      + 'introduced today. The two sets are kept apart: the set of one kind stays until it is finished. Every card '
+      + 'of the set is practised in two rounds. Round 1, direction uk_nl: show each card whose directions_left has uk_nl by its uk and ask for the '
       + 'Dutch. Round 2, direction nl_uk, once round 1 is done: show each card whose directions_left has nl_uk by '
       + 'its nl with the article and ask for the Ukrainian, in a new order (not the order of round 1, and not the '
       + 'card just answered). Grade each answer with grade_word and its direction, repeats too, and ask a word '
@@ -40,10 +42,11 @@ export function registerPracticeTools({
       + 'reviews, new_words, counts (with deck_size)}, each word {id, uk, nl, article, kind, state, priority, '
       + 'directions_left (uk_nl and/or nl_uk still to answer in this set), deck {in_deck, times_left, uk_nl: '
       + '{in_deck, required_correct, correct_count, times_left}, nl_uk: {same fields}}}.',
-    inputSchema: practiceBatchToolInputSchema.shape,
-  }, ({ session_id: sessionId, max_reviews: maxReviews }) => practiceService.getPracticeBatch({
+    inputSchema: wordBatchToolInputSchema.shape,
+  }, ({ session_id: sessionId, max_reviews: maxReviews, kind }) => practiceService.getPracticeBatch({
     sessionId,
     maxReviews,
+    kind,
   }));
 
   registerJsonTool(mcpServer, 'grade_word', {

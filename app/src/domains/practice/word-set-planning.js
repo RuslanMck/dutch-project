@@ -1,27 +1,32 @@
-// Plans the word set of the session (practice-set.js): the open set's words still to finish, or the next set: the
-// learning deck's words, then the reviews due today (most overdue first), up to the set size, and New words by
-// priority quota in the room that is left. A word is finished in an open set once it is in neither deck and has been
-// answered in both directions since the set opened (19.3). Also the spare words the phone keeps offline. Reads the
-// words through the practice repository and writes nothing.
+// Plans the word sets of the session (practice-set.js), one per kind. The 'new' set: the open set's words still to
+// finish, or the next set of New words by priority quota (7, 2, 1 per 10) in the room of the set size. The 'review'
+// set: the open set's words still to finish, or the next set of the words already practised that are owed today
+// (the learning deck's words and the reviews due before tomorrow, without today's New words and the words graded in
+// this session), most important first (review-set-planning.js). A word is finished in an open set once it is in
+// neither deck and has been answered in both directions since the set opened (19.3). Also the spare words the phone
+// keeps offline. Reads the words through the practice repository and writes nothing.
 import { PRACTICE_DIRECTIONS } from './practice-direction.js';
-import { findOpenSet, planSetRoom } from './practice-set.js';
+import { NEW_SET_KIND, REVIEW_SET_KIND, assertSetKind, findOpenSet, readSetOfKind } from './practice-set.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
 import { addDaysToCalendarDate, findStartOfDay } from './practice-calendar.js';
 import { calculateEffectiveRank, compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
 import { readDeckPositions } from './learning-deck.js';
+import { mapToReviewCandidate, orderReviewCandidates } from './review-set-planning.js';
 
 const NO_INTRODUCTIONS_BY_PRIORITY = Object.freeze({ 1: 0, 2: 0, 3: 0 });
 
 export function createWordSetPlanner({ practiceRepository }) {
-  // The words of the set, old ones first, for the batch, grading (which pins a planned set) and the statistics.
-  // gradedWordIds (graded in this session) leaves those due reviews out of a planned set. isOpen says the set is
-  // pinned already; wordIds are then its words not finished yet. overdueCount counts the words due before today.
-  function planWordSet({ settings, today, gradedWordIds }) {
-    const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
+  // The words of the set of the given kind, in pinned order, for the batch, grading (which pins a planned set) and the
+  // statistics. gradedWordIds (graded in this session) leaves those due reviews out of a planned review set. isOpen
+  // says the set is pinned already; wordIds are then its words not finished yet. overdueCount counts the words due
+  // before today. kind defaults to 'new'.
+  function planWordSet({ settings, today, gradedWordIds, kind = NEW_SET_KIND }) {
+    assertSetKind(kind);
+    const storedSet = readSetOfKind(settings, kind);
     const overdueCount = practiceRepository.countWordsDueBefore(findStartOfDay(today, settings.timeZone));
-    const answeredDirections = readAnsweredDirectionsOfOpenSet({ storedSet: settings.wordSet, today });
+    const answeredDirections = readAnsweredDirectionsOfOpenSet({ storedSet, today });
     const openSet = findOpenSet({
-      storedSet: settings.wordSet,
+      storedSet,
       today,
       isPending: wordId => isWordPending(
         practiceRepository.findPracticeWordById(wordId),
@@ -29,26 +34,18 @@ export function createWordSetPlanner({ practiceRepository }) {
       ),
     });
     if (openSet) {
-      return Object.freeze({ isOpen: true, practiceSet: openSet, wordIds: openSet.pendingIds, overdueCount });
+      return Object.freeze({ isOpen: true, practiceSet: openSet, wordIds: openSet.pendingIds, overdueCount, kind });
     }
-    const dueWordIds = practiceRepository.listDueWordIds(tomorrowStart).filter(wordId => !gradedWordIds.has(wordId));
-    const { oldIds, room } = planSetRoom({
-      oldIds: [...practiceRepository.listDeckWordIds(), ...dueWordIds],
-      setSize: settings.newPerDay,
-    });
-    const newCandidates = room > 0
-      ? allocateSetCandidates({
-        settings,
-        candidatesByPriority: groupCandidatesByPriority(listNewWordRows(), settings.currentChapter),
-        room,
-      })
-      : [];
-    return Object.freeze({
-      isOpen: false,
-      practiceSet: null,
-      wordIds: Object.freeze([...oldIds, ...newCandidates.map(candidate => candidate.id)]),
-      overdueCount,
-    });
+    const wordIds = kind === REVIEW_SET_KIND
+      ? planReviewWordIds({ settings, today, excludedIds: gradedWordIds, count: settings.newPerDay })
+      : planNewWordIds({ settings, newRows: listNewWordRows(), count: settings.newPerDay });
+    return Object.freeze({ isOpen: false, practiceSet: null, wordIds: Object.freeze(wordIds), overdueCount, kind });
+  }
+
+  // The review words owed today (the deck's words and the reviews due before tomorrow's start), the ones introduced
+  // today and the excluded ones left out: all of them, open review set included. Read only.
+  function countReviewWordsOwed({ settings, today }) {
+    return orderReviewCandidates({ candidates: listReviewCandidates({ settings, today }), today }).length;
   }
 
   // New words waiting outside the given set, per priority.
@@ -63,6 +60,35 @@ export function createWordSetPlanner({ practiceRepository }) {
     return practiceRepository.listPracticeWords().filter(word => word.fsrs_card === null);
   }
 
+  // The review candidates owed today: the learning deck's words and the reviews due before tomorrow's start, which
+  // the deck and due queries keep apart. Read only.
+  function listReviewCandidates({ settings, today }) {
+    const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
+    const reviewWordIds = [...new Set([
+      ...practiceRepository.listDeckWordIds(),
+      ...practiceRepository.listDueWordIds(tomorrowStart),
+    ])];
+    return practiceRepository.findPracticeWordsByIds(reviewWordIds).map(mapToReviewCandidate);
+  }
+
+  // The first count review words in review order, without the excluded ones and those introduced today.
+  function planReviewWordIds({ settings, today, excludedIds, count }) {
+    const candidates = listReviewCandidates({ settings, today });
+    return orderReviewCandidates({ candidates, today, excludedIds }).slice(0, count).map(candidate => candidate.id);
+  }
+
+  // The first count New words of the set: by priority quota in queue order (the room is the whole set, so no old word
+  // takes a place).
+  function planNewWordIds({ settings, newRows, count }) {
+    if (count <= 0) return [];
+    const candidates = allocateSetCandidates({
+      settings,
+      candidatesByPriority: groupCandidatesByPriority(newRows, settings.currentChapter),
+      room: count,
+    });
+    return candidates.map(candidate => candidate.id);
+  }
+
   // The directions answered since the open set opened, by word id; empty when no set of today is open.
   function readAnsweredDirectionsOfOpenSet({ storedSet, today }) {
     if (!storedSet || storedSet.openedOn !== today || !storedSet.itemIds.length) return new Map();
@@ -73,29 +99,20 @@ export function createWordSetPlanner({ practiceRepository }) {
     return mapAnsweredDirections(answerRows);
   }
 
-  // The words the next set will most likely draw from, for the phone to keep: the deck's words and the reviews due
-  // before tomorrow's start (most overdue first), then New words in queue order by the priority quota, up to count
-  // words in all. excludeIds (the current set and the words graded in this session) are left out. Read only.
-  function planSpareWords({ settings, today, excludeIds, count }) {
+  // The words the set of the given kind will most likely draw from next, for the phone to keep: for 'new' the New words
+  // in queue order by the priority quota; for 'review' the review words owed today in review order. Both up to count
+  // words, without excludeIds (the current set and the words graded in this session). Read only.
+  function planSpareWords({ settings, today, excludeIds, count, kind = NEW_SET_KIND }) {
+    assertSetKind(kind);
     const excludedIdSet = new Set(excludeIds);
-    const tomorrowStart = findStartOfDay(addDaysToCalendarDate(today, 1), settings.timeZone);
-    const oldCandidateIds = [
-      ...practiceRepository.listDeckWordIds(),
-      ...practiceRepository.listDueWordIds(tomorrowStart),
-    ].filter(wordId => !excludedIdSet.has(wordId));
-    const { oldIds, room } = planSetRoom({ oldIds: oldCandidateIds, setSize: count });
+    if (kind === REVIEW_SET_KIND) {
+      return Object.freeze(planReviewWordIds({ settings, today, excludedIds: excludeIds, count }));
+    }
     const newRows = listNewWordRows().filter(wordRow => !excludedIdSet.has(wordRow.id));
-    const newCandidates = room > 0
-      ? allocateSetCandidates({
-        settings,
-        candidatesByPriority: groupCandidatesByPriority(newRows, settings.currentChapter),
-        room,
-      })
-      : [];
-    return Object.freeze([...oldIds, ...newCandidates.map(candidate => candidate.id)]);
+    return Object.freeze(planNewWordIds({ settings, newRows, count }));
   }
 
-  return Object.freeze({ planWordSet, countNewWordsOutside, planSpareWords });
+  return Object.freeze({ planWordSet, countNewWordsOutside, countReviewWordsOwed, planSpareWords });
 }
 
 // A word of the set is not finished while it is New, in a deck direction, or not yet answered in both directions. A

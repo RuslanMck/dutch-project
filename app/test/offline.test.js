@@ -404,18 +404,20 @@ test('spare words: the next set\'s words outside the open set, up to new_per_day
   });
 });
 
-test('spare words leave out the words graded in this session, but not in another session', () => {
+test('spare words leave out the words graded in this session, but not in another session; each kind has its own', () => {
   const context = createOfflineContext();
   const [first, second] = addWords(context, '6.1', ['eerste', 'tweede']);
   context.practiceService.migrateToFsrs({ isDryRun: false });
   return withServer(context, async base => {
     assert.equal((await postJson(base, '/api/practice/grades', { word_id: first, grade: 'good', session_id: 's1' })).status, 200);
-    // The next day the set of the first day is no longer open: the word graded in s1 is still in the deck.
+    // The next day the first word is owed as a review (it is in the deck); the second one is still New.
     context.clock.moveTo('2026-10-25T12:00:00+01:00');
-    const fromSessionOne = await (await getJson(base, '/api/practice/spare-words?session_id=s1')).json();
-    const fromSessionTwo = await (await getJson(base, '/api/practice/spare-words?session_id=s2')).json();
-    assert.deepEqual(fromSessionOne.words.map(word => word.id), [second]);
-    assert.deepEqual(fromSessionTwo.words.map(word => word.id), [first, second]);
+    const newFromSessionOne = await (await getJson(base, '/api/practice/spare-words?session_id=s1')).json();
+    const reviewFromSessionOne = await (await getJson(base, '/api/practice/spare-words?session_id=s1&kind=review')).json();
+    const reviewFromSessionTwo = await (await getJson(base, '/api/practice/spare-words?session_id=s2&kind=review')).json();
+    assert.deepEqual(newFromSessionOne.words.map(word => word.id), [second]);
+    assert.deepEqual(reviewFromSessionOne.words.map(word => word.id), []);
+    assert.deepEqual(reviewFromSessionTwo.words.map(word => word.id), [first]);
   });
 });
 

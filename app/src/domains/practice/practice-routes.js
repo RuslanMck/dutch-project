@@ -11,19 +11,23 @@ import {
   previewPrioritiesQuerySchema,
   knownCheckInputSchema,
   knownCheckQuerySchema,
+  roundSummaryQuerySchema,
   setCurrentChapterInputSchema,
   spareWordsQuerySchema,
+  wordBatchQuerySchema,
 } from '../../contracts/practice-contracts.js';
 import { readRequestBody, removeBlankQueryValues } from '../../http/request-input.js';
 
 export function createPracticeRoutes({ practiceService, priorityService, phrasePracticeService, knownCheckService }) {
   const practiceRouter = express.Router();
 
+  // The set of the given kind: 'new' (New words, the default) or 'review' (the words owed today).
   practiceRouter.get('/practice/batch', (request, response) => {
-    const batchInput = practiceBatchQuerySchema.parse(removeBlankQueryValues(request.query));
+    const batchInput = wordBatchQuerySchema.parse(removeBlankQueryValues(request.query));
     response.json(practiceService.getPracticeBatch({
       sessionId: batchInput.session_id,
       maxReviews: batchInput.max_reviews,
+      kind: batchInput.kind,
     }));
   });
 
@@ -60,9 +64,10 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
     }));
   });
 
-  // Read only: the summary of the current set.
+  // Read only: the summary of the current set of the given kind (default 'new').
   practiceRouter.get('/practice/round-summary', (request, response) => {
-    response.json(practiceService.getRoundSummary());
+    const summaryInput = roundSummaryQuerySchema.parse(removeBlankQueryValues(request.query));
+    response.json(practiceService.getRoundSummary({ kind: summaryInput.kind }));
   });
 
   practiceRouter.get('/practice/stats', (request, response) => {
@@ -80,10 +85,10 @@ export function createPracticeRoutes({ practiceService, priorityService, phraseP
     response.json(practiceService.getDrillWords({ wordIds: drillInput.ids }));
   });
 
-  // Read only: the words the next set will most likely draw from, for the phone to keep offline.
+  // Read only: the words the next set of the given kind will most likely draw from, for the phone to keep offline.
   practiceRouter.get('/practice/spare-words', (request, response) => {
     const spareInput = spareWordsQuerySchema.parse(removeBlankQueryValues(request.query));
-    response.json(practiceService.getSpareWords({ sessionId: spareInput.session_id }));
+    response.json(practiceService.getSpareWords({ sessionId: spareInput.session_id, kind: spareInput.kind }));
   });
 
   // A checked answer of a custom drill: logged for the statistics, the schedule does not move.

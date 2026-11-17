@@ -6,6 +6,7 @@ import { mapFromStoredSet } from './practice-set.js';
 
 const FSRS_MIGRATED_AT_SETTING_NAME = 'fsrs_migrated_at';
 const WORD_SET_SETTING_NAME = 'word_set';
+const REVIEW_SET_SETTING_NAME = 'review_set';
 const PHRASE_SET_SETTING_NAME = 'phrase_set';
 const DAILY_GOAL_SETTING_NAME = 'daily_goal';
 const KNOWN_CHECK_SEEN_SETTING_NAME = 'known_check_seen';
@@ -16,7 +17,8 @@ const FSRS_NOT_SET_UP_MESSAGE = 'FSRS practice is not set up yet: run migrate_to
 export function createPracticeSettings({ practiceRepository }) {
   // fsrsMigratedAt is null until migrate_to_fsrs has run for real. newPerDay is the set size, for words and phrases.
   // dailyGoal is the answers per day the learner aims for (DAILY_GOAL_DEFAULT until it is saved).
-  // wordSet and phraseSet are the pinned sets ({ openedOn, openedAt, itemIds }), null when none is stored.
+  // wordSet (the New words set), reviewSet (the review set) and phraseSet are the pinned sets ({ openedOn, openedAt,
+  // itemIds }), null when none is stored.
   // knownCheckSeen: the ids of the words the learner marked unknown in the quick known check (none when not stored).
   // priorityRulesVersion is 1 until the priorities were recalculated with the current rules (priority-service).
   function readSettings() {
@@ -31,6 +33,7 @@ export function createPracticeSettings({ practiceRepository }) {
       dailyGoal: settingByName[DAILY_GOAL_SETTING_NAME] ?? DAILY_GOAL_DEFAULT,
       fsrsMigratedAt: settingByName[FSRS_MIGRATED_AT_SETTING_NAME] ?? null,
       wordSet: mapFromStoredSet(settingByName[WORD_SET_SETTING_NAME]),
+      reviewSet: mapFromStoredSet(settingByName[REVIEW_SET_SETTING_NAME]),
       phraseSet: mapFromStoredSet(settingByName[PHRASE_SET_SETTING_NAME]),
       knownCheckSeen: settingByName[KNOWN_CHECK_SEEN_SETTING_NAME] ?? [],
       knownCheckKnown: settingByName[KNOWN_CHECK_KNOWN_SETTING_NAME] ?? [],
@@ -56,6 +59,11 @@ export function createPracticeSettings({ practiceRepository }) {
   // storedSet: { opened_on, opened_at, item_ids } (see mapToStoredSet in practice-set.js), or null to clear it.
   function saveWordSet(storedSet) {
     practiceRepository.saveSetting(WORD_SET_SETTING_NAME, storedSet);
+  }
+
+  // The review set (kind 'review'): the same shape as the word set, saved apart from it.
+  function saveReviewSet(storedSet) {
+    practiceRepository.saveSetting(REVIEW_SET_SETTING_NAME, storedSet);
   }
 
   function savePhraseSet(storedSet) {
@@ -92,6 +100,7 @@ export function createPracticeSettings({ practiceRepository }) {
     saveCurrentChapter,
     savePriorityRulesVersion,
     saveWordSet,
+    saveReviewSet,
     savePhraseSet,
     saveDailyGoal,
     saveKnownCheckSeen,

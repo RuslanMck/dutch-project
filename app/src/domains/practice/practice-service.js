@@ -20,7 +20,14 @@ import {
 } from './learning-deck.js';
 import { planMigration, summarizeMigration } from './migration-planning.js';
 import { mapPriorityOverrideToTag } from './priority-calculation.js';
-import { mapToStoredSet, openPracticeSet } from './practice-set.js';
+import {
+  NEW_SET_KIND,
+  REVIEW_SET_KIND,
+  assertSetKind,
+  mapToStoredSet,
+  openPracticeSet,
+  readSetOfKind,
+} from './practice-set.js';
 import { PRACTICE_DIRECTIONS, UK_TO_NL_DIRECTION, findWorseGrade } from './practice-direction.js';
 import { addDaysToCalendarDate, findStartOfDay, formatCalendarDateInTimeZone } from './practice-calendar.js';
 import { summarizeRound } from './round-summary.js';
@@ -51,17 +58,19 @@ export function createPracticeService({
   changeEventBus,
   clock,
 }) {
-  // The words to practise now: the session's set (practice-set.js), at most new_per_day words. The open set's words
-  // not finished yet, or the next set: the learning deck's words, then reviews due today (most overdue first, the ones
-  // graded in this session left out), then New words in the room left. reviews are the words with a card, new_words
-  // the New ones. Each word carries directions_left: the directions it still needs in the set. A planned set is pinned
-  // at once, so the words shown are the set. maxReviews limits the reviews returned.
-  function getPracticeBatch({ sessionId, maxReviews }) {
+  // The words to practise now: the session's set of the given kind (practice-set.js), at most new_per_day words. The
+  // 'new' set is New words only, by priority quota in the room of the set size. The 'review' set is the words already
+  // practised that are owed today, most important first (review-set-planning.js), the ones graded in this session left
+  // out. The open set's words not finished yet, or the next set, is pinned at once, so the words shown are the set.
+  // reviews are the words with a card, new_words the New ones. Each word carries directions_left: the directions it
+  // still needs in the set. maxReviews limits the reviews returned. kind defaults to 'new'.
+  function getPracticeBatch({ sessionId, maxReviews, kind = NEW_SET_KIND }) {
+    assertSetKind(kind);
     const settings = practiceSettings.readActiveSettings();
     const timestamp = clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
-    const plan = runInTransaction(() => pinWordSet({ settings, today, gradedWordIds, timestamp }));
+    const plan = runInTransaction(() => pinWordSet({ settings, today, gradedWordIds, timestamp, kind }));
     const setWordRows = plan.wordIds.map(getPracticeWordRowOrThrow);
     const answeredDirections = mapAnsweredDirections(practiceRepository.listAnsweredDirectionsSince({
       wordIds: plan.wordIds,
@@ -79,6 +88,8 @@ export function createPracticeService({
         set_words: setWordRows.length,
         set_new_words: newRows.length,
         is_set_open: plan.isOpen,
+        kind,
+        review_owed: wordSetPlanner.countReviewWordsOwed({ settings, today }),
         due: listWordIdsDueToday(today, settings.timeZone).length,
         deck_words: practiceRepository.countDeckWords(),
         overdue: plan.overdueCount,
@@ -148,8 +159,11 @@ export function createPracticeService({
     settings, word, grade, answer, sessionId, direction, timestamp, today, setWordIds, setOpenedAt,
   }) {
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
+    // The word's set: a word without a card before this answer is a New word (the 'new' set), any other is a review.
+    const kind = word.fsrs_card === null ? NEW_SET_KIND : REVIEW_SET_KIND;
     const plan = pinWordSet({
       settings, today, gradedWordIds, timestamp, preferredWordIds: setWordIds, gradedWordId: word.id, setOpenedAt,
+      kind,
     });
     // A set is 10 words at most: a New word outside the open set waits for a later set.
     if (plan.isOpen && word.fsrs_card === null && !plan.wordIds.includes(word.id)) {
@@ -464,31 +478,36 @@ export function createPracticeService({
     return response;
   }
 
-  // The spare words of the next set, for the phone to keep offline (planSpareWords). The current set (when one is
-  // open today) and the words graded in this session are left out. Read only: nothing is pinned or written.
-  function getSpareWords({ sessionId }) {
+  // The spare words of the next set of the given kind, for the phone to keep offline (planSpareWords). The current set
+  // of that kind (when one is open today) and the words graded in this session are left out. Read only: nothing is
+  // pinned or written. kind defaults to 'new'.
+  function getSpareWords({ sessionId, kind = NEW_SET_KIND }) {
+    assertSetKind(kind);
     const settings = practiceSettings.readActiveSettings();
     const timestamp = clock.now();
     const today = formatCalendarDateInTimeZone(timestamp, settings.timeZone);
     const gradedWordIds = new Set(practiceRepository.listWordIdsReviewedInSession({ sessionId }));
-    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds });
+    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds, kind });
     const currentSetWordIds = plan.isOpen ? plan.practiceSet.itemIds : [];
     const spareWordIds = wordSetPlanner.planSpareWords({
       settings,
       today,
       excludeIds: [...currentSetWordIds, ...gradedWordIds],
       count: settings.newPerDay,
+      kind,
     });
     const words = spareWordIds.map(getPracticeWordRowOrThrow)
       .map(wordRow => mapToPracticeWordWithDirections(wordRow, new Map()));
     return { words };
   }
 
-  // The current round: the words of the pinned set, each with its answers since the set opened and its mistakes, and
-  // the time from the first answer to the last. Null when no set was pinned or nothing was answered.
-  function getRoundSummary() {
+  // The current round of the given kind: the words of its pinned set, each with its answers since the set opened and
+  // its mistakes, and the time from the first answer to the last. Null when no set was pinned or nothing was answered.
+  // kind defaults to 'new'.
+  function getRoundSummary({ kind = NEW_SET_KIND } = {}) {
+    assertSetKind(kind);
     const settings = practiceSettings.readActiveSettings();
-    const practiceSet = settings.wordSet;
+    const practiceSet = readSetOfKind(settings, kind);
     if (!practiceSet || !practiceSet.itemIds.length) return { round: null };
     const words = practiceSet.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId)).filter(Boolean)
       .map(mapToPracticeWord);
@@ -519,6 +538,7 @@ export function createPracticeService({
     }
     const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds: new Set() });
     return {
+      review_owed: wordSetPlanner.countReviewWordsOwed({ settings, today }),
       due_today: listWordIdsDueToday(today, settings.timeZone).length,
       due_tomorrow: words.filter(word => word.due_at !== null && word.due_at >= tomorrowStart
         && word.due_at < dayAfterTomorrowStart).length,
@@ -536,19 +556,21 @@ export function createPracticeService({
     };
   }
 
-  // The open set, or the next set pinned now (when it has words). isOpen says it was open already. preferredWordIds
-  // (the set practised offline) is pinned instead of the planned set: its words that exist, in order, without repeats,
-  // up to the set size; when none is left the planned set is pinned. A set pinned from preferredWordIds counts as
-  // open. Runs inside a transaction.
+  // The open set of the given kind, or the next set of that kind pinned now (when it has words). isOpen says it was open
+  // already. preferredWordIds (the set practised offline) is pinned instead of the planned set: its words that exist,
+  // in order, without repeats, up to the set size; when none is left the planned set is pinned.
+  // A set pinned from preferredWordIds counts as open. Runs inside a transaction.
   // preferredWordIds (offline): the set the phone practised. It is pinned when no set is open, and also when one is
   // open but the graded word belongs to the phone's set and not to the open one: offline the phone cannot see the
   // learning deck, so it may finish a set the server still holds open. The words left in that set stay in the learning
   // deck, and the deck comes first in a later set. A set that is the same as the open one is not pinned again.
   // setOpenedAt: the time the phone's set started (see resolvePinnedOpenedAt); the set opens then.
+  // kind: the set of the word being graded ('new' for a New word, 'review' for a word with a card); the pinned set is
+  // saved under that kind only.
   function pinWordSet({
-    settings, today, gradedWordIds, timestamp, preferredWordIds = [], gradedWordId = null, setOpenedAt,
+    settings, today, gradedWordIds, timestamp, preferredWordIds = [], gradedWordId = null, setOpenedAt, kind,
   }) {
-    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds });
+    const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds, kind });
     const preferredExistingWordIds = keepExistingWordIds(preferredWordIds, settings.newPerDay);
     const hasPhoneMovedOn = plan.isOpen && preferredExistingWordIds.includes(gradedWordId)
       && !plan.wordIds.includes(gradedWordId) && !plan.practiceSet.itemIds.includes(gradedWordId)
@@ -557,14 +579,20 @@ export function createPracticeService({
     if (preferredExistingWordIds.length) {
       const openedAt = resolvePinnedOpenedAt(setOpenedAt, timestamp);
       const practiceSet = openPracticeSet({ today, openedAt, itemIds: preferredExistingWordIds });
-      practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
+      saveSetOfKind(kind, mapToStoredSet(practiceSet));
       return Object.freeze({ ...plan, isOpen: true, practiceSet, wordIds: practiceSet.itemIds });
     }
     if (plan.wordIds.length) {
       const practiceSet = openPracticeSet({ today, openedAt: timestamp, itemIds: plan.wordIds });
-      practiceSettings.saveWordSet(mapToStoredSet(practiceSet));
+      saveSetOfKind(kind, mapToStoredSet(practiceSet));
     }
     return plan;
+  }
+
+  // Saves a pinned set under its kind: the New words set (word set) or the review set.
+  function saveSetOfKind(kind, storedSet) {
+    if (kind === REVIEW_SET_KIND) practiceSettings.saveReviewSet(storedSet);
+    else practiceSettings.saveWordSet(storedSet);
   }
 
   // The opened_at of a set pinned from the phone's set: its set_opened_at when given, not older than 7 days before the

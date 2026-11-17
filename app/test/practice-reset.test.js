@@ -62,7 +62,7 @@ test('a dry run reports the counts and writes nothing', () => {
 
 test('after a reset every word and phrase is New, history is kept, and today holds exactly the 10 new words', () => {
   const context = createMigratedContext();
-  const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   const [firstReview] = firstBatch.reviews;
   context.practiceService.gradeWord({ wordId: firstReview.id, grade: 'again', answer: 'x', sessionId: 's1' });
   const errorCountBefore = countRows(context, 'SELECT COUNT(*) FROM word_errors');
@@ -94,10 +94,12 @@ test('after a reset, skipping days never makes the list grow beyond the words ac
     context.practiceService.gradeWord({ wordId: word.id, grade: 'again', answer: 'x', sessionId: 'later' });
   }
   context.clock.moveTo('2026-10-31T10:00:00+01:00');
-  const afterSkippedDays = context.practiceService.getPracticeBatch({ sessionId: 'much-later' });
-  assert.equal(afterSkippedDays.reviews.length, 10, 'only the 10 started words come back');
-  assert.equal(afterSkippedDays.new_words.length, 0, 'no new words while the 10 started words fill the deck');
+  const afterSkippedDays = context.practiceService.getPracticeBatch({ sessionId: 'much-later', kind: 'review' });
+  assert.equal(afterSkippedDays.reviews.length, 10, 'only the 10 started words come back, as the review set');
+  assert.equal(afterSkippedDays.new_words.length, 0, 'the review set holds no New words');
   assert.equal(afterSkippedDays.counts.set_words, 10);
+  const newSet = context.practiceService.getPracticeBatch({ sessionId: 'much-later' });
+  assert.equal(newSet.new_words.length, 10, 'the started words do not hold back the next 10 New words');
 });
 
 test('a reset takes every word out of the learning deck in both directions and supersedes its deck answers', () => {
@@ -135,9 +137,24 @@ test('a reset clears the pinned word set', () => {
   assert.equal(context.practiceSettings.readSettings().wordSet, null);
 });
 
+test('a reset clears the pinned review set as well as the New words set', () => {
+  const context = createMigratedContext();
+  context.clock.moveTo(MORNING_IN_AMSTERDAM);
+  const reviewBatch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
+  context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.ok(reviewBatch.reviews.length > 0, 'some reviews are owed before the reset');
+  assert.equal(context.practiceSettings.readSettings().reviewSet.itemIds.length, reviewBatch.reviews.length);
+  assert.ok(context.practiceSettings.readSettings().wordSet, 'the New words set is pinned too');
+
+  context.practiceResetService.resetPractice({ isDryRun: false });
+
+  assert.equal(context.practiceSettings.readSettings().reviewSet, null);
+  assert.equal(context.practiceSettings.readSettings().wordSet, null);
+});
+
 test('reset mid-session: words and phrases graded earlier in session S are offered again and can be graded', () => {
   const context = createMigratedContext();
-  const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const firstBatch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   const gradedWords = firstBatch.reviews.slice(0, 3);
   for (const word of gradedWords) {
     context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });

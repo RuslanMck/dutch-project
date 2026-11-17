@@ -454,11 +454,11 @@ test('a word due at 23:30 Amsterdam time today is in the batch, one due at 00:30
   scheduleWord(context, dueTodayId, '2026-10-24T23:30:00+02:00');
   scheduleWord(context, dueTomorrowId, '2026-10-25T00:30:00+02:00');
 
-  const batch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const batch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   assert.deepEqual(batch.reviews.map(word => word.id), [dueTodayId]);
   assert.equal(batch.counts.due, 1);
 
-  const limitedBatch = context.practiceService.getPracticeBatch({ sessionId: 's2', maxReviews: 1 });
+  const limitedBatch = context.practiceService.getPracticeBatch({ sessionId: 's2', kind: 'review', maxReviews: 1 });
   assert.deepEqual(limitedBatch.reviews.map(word => word.id), [dueTodayId]);
 });
 
@@ -469,7 +469,7 @@ test('on 2026-10-25, the 25-hour day when the clocks go back, the day still ends
   scheduleWord(context, lateId, '2026-10-25T23:30:00+01:00');
   scheduleWord(context, nextDayId, '2026-10-26T00:30:00+01:00');
 
-  const batch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const batch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   assert.deepEqual(batch.reviews.map(word => word.id), [lateId]);
 });
 

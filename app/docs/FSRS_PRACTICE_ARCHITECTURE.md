@@ -503,6 +503,8 @@ finished, and reviews join the session.
 
 ## 18. Practice sets: at most 10 cards a session (28.10.2026)
 
+> Since 17.11.2026 a word set has a kind; see section 21. The rules above still hold for each kind.
+
 Replaces the backlog gate (10.1), the intake blocks (12, 13.2) and the extra new words. The learner's rule: one
 session is one set of at most 10 cards, never 11 or 14, and skipped days never pile up more.
 
@@ -752,3 +754,31 @@ count toward them.
 `PUT /api/words/:id/priority { tag: 'first' | 'later' | null }` sets the override (first → 1, later → 3, null → auto)
 and returns the word. Every word shape (REST words, grade answers, the MCP compact word) carries `priority_tag`:
 'first', 'later' or null (override 2 gives null, and `priority_override` keeps the 2).
+
+## 21. Two practices: «Нові слова» and «Запам'ятовування» (17.11.2026)
+
+The learner saw mostly old hard words: one set held the learning deck and every due review first, so New words came in
+late. The practice is split into two, each with its own set of at most `new_per_day` (10) words, pinned and kept
+open on its calendar day the same way as before (section 18).
+
+- **Kinds.** `SET_KINDS` in `practice-set.js`: `'new'` and `'review'`. The `new` set is the setting `word_set`
+  (`settings.wordSet`, `saveWordSet`), the `review` set the setting `review_set` (`settings.reviewSet`,
+  `saveReviewSet`). The practice reset clears both. No migration: settings are key/value rows.
+- **new (Нові слова).** New words only (no card), by the priority quota 7, 2, 1 and the topic caps, in the room of the
+  set size. No deck words and no reviews. There is no catch-up after skipped days: a finished set is followed by the
+  next 10 New words at once.
+- **review (Запам'ятовування).** The words with a card that are owed today: the learning deck's words and the reviews
+  due before tomorrow's start, without the words introduced today (today's New words stay in «Нові слова» until
+  tomorrow) and without the words graded in this session. Order (`review-set-planning.js`, `compareReviewOrder`):
+  priority 1, 2, 3; then the harder word first (FSRS `difficulty` descending, then `lapses` descending); then the
+  earlier `due_at`; then the id. The first 10 make the set. Deck words are ordered with the reviews, not first.
+- **Which set a grade belongs to.** A first answer of the day pins the set of the word's kind: no card before the
+  answer is `new`, otherwise `review` (`pinWordSet` with `kind`). A New word outside the open `new` set is still
+  refused (409). The offline `set_word_ids` pins the set of the same kind as the graded word.
+- **REST and MCP.** `GET /api/practice/batch?kind=new|review` (default `new`, any other value 400) returns `counts.kind`,
+  `counts.review_owed` (the review words owed today, the open review set included) and `counts.introduced_today`.
+  `GET /api/practice/spare-words?kind=` and `GET /api/practice/round-summary?kind=` read the set of that kind;
+  `GET /api/practice/stats` adds `review_owed`. MCP `get_practice_batch` takes the same optional `kind`.
+- **Phrases.** Unchanged: one phrase set, due phrases first, then New phrases in the room left.
+- **Deploy caveat.** A `word_set` pinned before this change (opened today, not yet finished) may still hold review
+  words; it is served as the `new` set until it is finished or the day ends.

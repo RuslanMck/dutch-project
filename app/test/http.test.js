@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 import { once } from 'node:events';
 
 import { parseEnvironmentConfiguration } from '../src/configuration/environment-configuration.js';
+import { buildMigrationCard, serializeCard } from '../src/domains/practice/fsrs-scheduling.js';
+import { createPracticeRepository } from '../src/domains/practice/practice-repository.js';
 import { createApplication } from '../src/server/create-application.js';
 import { createTestContext } from './database-test-helpers.js';
 
@@ -289,6 +291,36 @@ test('practice REST after the migration: batch, grade, repeat, unknown field, st
   const [listedWord] = await (await fetch(`${base}/api/words?state=new&limit=1`, { headers: BEARER })).json();
   assert.equal(Object.hasOwn(listedWord, 'fsrs_card'), false, 'the card JSON is internal');
   assert.equal(typeof listedWord.state, 'string');
+});
+
+test('practice REST: kind picks the set (new by default, review for the words owed), any other kind is 400', async () => {
+  const dueYesterday = Date.now() - 2 * 24 * 3600_000;
+  const [owedWord] = context.wordService.createWords([{ nl: 'kaas', uk: 'сир', article: 'de', section: '6.1' }]).added;
+  createPracticeRepository({ database: context.database }).updateWordSchedule(owedWord.id, {
+    fsrsCard: serializeCard(buildMigrationCard({ group: 'learning', dueAt: dueYesterday, timestamp: dueYesterday })),
+    dueAt: dueYesterday,
+    introducedOn: '2026-01-01',
+    learningStatus: 'learning',
+    updatedAt: dueYesterday,
+  });
+
+  const reviewBody = await (await fetch(`${base}/api/practice/batch?session_id=http-kind&kind=review`, { headers: BEARER })).json();
+  assert.equal(reviewBody.counts.kind, 'review');
+  assert.ok(reviewBody.reviews.some(word => word.id === owedWord.id));
+  assert.deepEqual(reviewBody.new_words, []);
+  assert.ok(reviewBody.counts.review_owed >= 1);
+
+  const newBody = await (await fetch(`${base}/api/practice/batch?session_id=http-kind`, { headers: BEARER })).json();
+  assert.equal(newBody.counts.kind, 'new');
+  assert.ok(![...newBody.reviews, ...newBody.new_words].some(word => word.id === owedWord.id));
+
+  const refused = await fetch(`${base}/api/practice/batch?session_id=http-kind&kind=mixed`, { headers: BEARER });
+  assert.equal(refused.status, 400);
+  assert.equal((await fetch(`${base}/api/practice/round-summary?kind=review`, { headers: BEARER })).status, 200);
+  assert.equal((await fetch(`${base}/api/practice/round-summary?kind=mixed`, { headers: BEARER })).status, 400);
+  assert.equal((await fetch(`${base}/api/practice/spare-words?session_id=http-kind&kind=mixed`, { headers: BEARER })).status, 400);
+  const spare = await (await fetch(`${base}/api/practice/spare-words?session_id=http-kind&kind=review`, { headers: BEARER })).json();
+  assert.ok(!spare.words.some(word => word.id === owedWord.id), 'the open review set is left out of the spare words');
 });
 
 test('practice REST word grades take a direction: uk_nl by default, nl_uk accepted, other values refused', async () => {

@@ -117,22 +117,31 @@ test('a first set is 10 new words, split 7, 2 and 1 by priority', () => {
   assert.equal(batch.counts.is_set_open, false);
 });
 
-test('4 reviews due today leave room for 6 new words: the set is 10, never 14', () => {
+
+test('4 reviews due today are the review set; the New words set is 10 New words, never mixed with the reviews', () => {
   const context = createPracticeContext();
   const reviewIds = addWords(context, '6.1', makeNames('oud', 4));
   addWords(context, '6.1', makeNames('nieuw', 20));
   migrate(context);
   reviewIds.forEach((wordId, index) => scheduleWord(context, wordId, `2026-10-2${index}T09:00:00+02:00`));
 
-  const batch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const reviewBatch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
 
-  assert.deepEqual(batch.reviews.map(word => word.id), reviewIds, 'most overdue first');
-  assert.equal(batch.new_words.length, 6);
-  assert.equal(batch.counts.set_words, 10);
-  assert.equal(batch.counts.set_new_words, 6);
+  assert.deepEqual(reviewBatch.reviews.map(word => word.id), reviewIds, 'most overdue first');
+  assert.deepEqual(reviewBatch.new_words, []);
+  assert.equal(reviewBatch.counts.kind, 'review');
+  assert.equal(reviewBatch.counts.set_words, 4);
+  assert.equal(reviewBatch.counts.review_owed, 4);
+
+  const newBatch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.deepEqual(newBatch.reviews, [], 'the New words set holds no review');
+  assert.equal(newBatch.new_words.length, 10);
+  assert.equal(newBatch.counts.set_words, 10);
+  assert.equal(newBatch.counts.set_new_words, 10);
 });
 
-test('15 reviews due: the set takes the 10 most overdue and no new word; the other 5 come in the next set', () => {
+
+test('15 reviews due: the review set takes the 10 most overdue; the other 5 come in the next review set', () => {
   const context = createPracticeContext();
   const reviewIds = addWords(context, '6.1', makeNames('oud', 15));
   addWords(context, '6.1', makeNames('nieuw', 20));
@@ -140,14 +149,15 @@ test('15 reviews due: the set takes the 10 most overdue and no new word; the oth
   reviewIds.forEach((wordId, index) => scheduleWord(context, wordId,
     new Date(Date.parse('2026-10-20T09:00:00+02:00') + index * 3600_000).toISOString()));
 
-  const firstSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const firstSet = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   assert.deepEqual(firstSet.reviews.map(word => word.id), reviewIds.slice(0, 10));
   assert.deepEqual(firstSet.new_words, []);
+  assert.equal(firstSet.counts.review_owed, 15);
 
   finishSet(context, firstSet, 's1');
-  const nextSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const nextSet = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   assert.deepEqual(nextSet.reviews.map(word => word.id), reviewIds.slice(10));
-  assert.equal(nextSet.new_words.length, 5, 'the room left after 5 old words');
+  assert.deepEqual(nextSet.new_words, [], 'a review set holds no New words');
 });
 
 test('a pinned set stays the same words while it is practised: no word joins it, a word added later waits', () => {
@@ -190,7 +200,8 @@ test('a finished word leaves the set; the set closes when all are finished and t
   assert.equal(new Set([...batchIds(firstSet), ...batchIds(nextSet)]).size, 20, 'ten other words');
 });
 
-test('the next day an unfinished set gives way: its deck words first, then today\'s reviews, new words fill', () => {
+
+test('the next day an unfinished set gives way: its started words and today\'s reviews are the review set; New words start again', () => {
   const context = createPracticeContext();
   const [reviewId] = addWords(context, '6.1', ['oud']);
   addWords(context, '6.1', makeNames('nieuw', 20));
@@ -202,14 +213,18 @@ test('the next day an unfinished set gives way: its deck words first, then today
   scheduleWord(context, reviewId, '2026-10-25T09:00:00+01:00');
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
-  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day2' });
+  const nextDayReviews = context.practiceService.getPracticeBatch({ sessionId: 'day2', kind: 'review' });
 
-  assert.deepEqual(nextDay.reviews.map(word => word.id), [...startedIds, reviewId]);
-  assert.equal(nextDay.new_words.length, 6);
-  assert.equal(nextDay.counts.is_set_open, false);
+  assert.deepEqual(new Set(nextDayReviews.reviews.map(word => word.id)), new Set([...startedIds, reviewId]));
+  assert.equal(nextDayReviews.new_words.length, 0);
+  assert.equal(nextDayReviews.counts.is_set_open, false);
+  const nextDayNew = context.practiceService.getPracticeBatch({ sessionId: 'day2' });
+  assert.equal(nextDayNew.new_words.length, 10, 'the New words set is not held back by yesterday\'s set');
+  assert.equal(nextDayNew.counts.is_set_open, false);
 });
 
-test('yesterday 9 wrong and 1 right: today the 10 started words are all still owed, and no new word joins', () => {
+
+test('yesterday 9 wrong and 1 right: today the 10 started words are all still owed as reviews, and the New set is not held back', () => {
   const context = createPracticeContext();
   addWords(context, '6.1', makeNames('nieuw', 20));
   migrate(context);
@@ -221,13 +236,38 @@ test('yesterday 9 wrong and 1 right: today the 10 started words are all still ow
   context.practiceService.gradeWord({ wordId: firstGood.id, grade: 'good', sessionId: 'day1' });
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
-  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day2' });
+  const reviews = context.practiceService.getPracticeBatch({ sessionId: 'day2', kind: 'review' });
 
-  assert.equal(nextDay.reviews.length, 10);
-  assert.equal(nextDay.new_words.length, 0, 'the set is full of unfinished words');
+  assert.equal(reviews.reviews.length, 10);
+  assert.equal(reviews.new_words.length, 0);
   // The set of today opened after yesterday's answers: every card owes both directions in it, even the learned one.
-  const owedFirstGood = nextDay.reviews.find(word => word.id === firstGood.id);
+  const owedFirstGood = reviews.reviews.find(word => word.id === firstGood.id);
   assert.deepEqual(owedFirstGood.directions_left, ['uk_nl', 'nl_uk']);
+  const newWords = context.practiceService.getPracticeBatch({ sessionId: 'day2' });
+  assert.equal(newWords.new_words.length, 10, 'the New words set starts at once, the started words do not fill it');
+  assert.deepEqual(newWords.reviews, []);
+});
+
+test('a New word introduced today is not owed as a review until tomorrow; the New words set keeps it open', () => {
+  const context = createPracticeContext();
+  addWords(context, '6.1', makeNames('nieuw', 12));
+  migrate(context);
+  const [word] = context.practiceService.getPracticeBatch({ sessionId: 's1' }).new_words;
+  context.practiceService.gradeWord({ wordId: word.id, grade: 'good', sessionId: 's1' });
+
+  const reviewsToday = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
+  assert.deepEqual(reviewsToday.reviews, []);
+  assert.equal(reviewsToday.counts.review_owed, 0);
+  const newToday = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.ok(batchIds(newToday).includes(word.id), 'the New words set still holds it');
+  const settings = context.practiceSettings.readSettings();
+  assert.ok(settings.wordSet.itemIds.includes(word.id));
+  assert.equal(settings.reviewSet, null, 'no review set is pinned while no review is owed');
+
+  context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
+  const reviewsTomorrow = context.practiceService.getPracticeBatch({ sessionId: 's2', kind: 'review' });
+  assert.deepEqual(reviewsTomorrow.reviews.map(card => card.id), [word.id]);
+  assert.ok(context.practiceSettings.readSettings().reviewSet.itemIds.includes(word.id));
 });
 
 test('a word leaves the set only when both directions are answered since it opened; directions_left says what is owed', () => {
@@ -252,19 +292,21 @@ test('a word leaves the set only when both directions are answered since it open
   assert.equal(bothDone.counts.is_set_open, true);
 });
 
-test('a card answered in one direction only, and not owed in the other, stays in the set until answered there', () => {
+
+test('a card answered in one direction only, and not owed in the other, stays in the review set until answered there', () => {
   const context = createPracticeContext();
   const [reviewId] = addWords(context, '6.1', ['oud']);
   addWords(context, '6.1', makeNames('nieuw', 12));
   migrate(context);
   scheduleWord(context, reviewId, '2026-10-24T09:00:00+02:00');
-  const firstSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const firstSet = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   assert.deepEqual(firstSet.reviews.find(card => card.id === reviewId).directions_left, ['uk_nl', 'nl_uk']);
 
   context.practiceService.gradeWord({ wordId: reviewId, grade: 'good', sessionId: 's1' });
-  const afterUk = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  const afterUk = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
   assert.deepEqual(afterUk.reviews.find(card => card.id === reviewId).directions_left, ['nl_uk']);
 });
+
 
 test('the round summary counts only the answers given since the set opened', () => {
   const context = createPracticeContext();
@@ -276,12 +318,12 @@ test('the round summary counts only the answers given since the set opened', () 
   context.practiceService.gradeWord({ wordId: hardWord.id, grade: 'again', sessionId: 'day1' });
 
   context.clock.moveTo(NEXT_MORNING_IN_AMSTERDAM);
-  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day2' });
-  assert.equal(batchIds(nextDay)[0], hardWord.id);
+  const nextDay = context.practiceService.getPracticeBatch({ sessionId: 'day2', kind: 'review' });
+  assert.deepEqual(batchIds(nextDay), [hardWord.id]);
   finishSet(context, nextDay, 'day2');
-  const { round } = context.practiceService.getRoundSummary();
+  const { round } = context.practiceService.getRoundSummary({ kind: 'review' });
 
-  assert.equal(round.total_count, 10);
+  assert.equal(round.total_count, 1);
   assert.equal(round.is_complete, true);
   assert.equal(round.finished_in_session_id, 'day2');
   assert.equal(round.words.find(word => word.id === hardWord.id).mistake_count, 0, 'yesterday\'s mistakes stay out');
