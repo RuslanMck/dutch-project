@@ -1301,8 +1301,9 @@ export function formatReviewDoneNote(dueTomorrow) {
 }
 
 // The screen of a finished FSRS practice: { question, note, action }. action is the button ({ label, mode } where mode is
-// the mode it opens) or null. kind: 'new' | 'review'; answeredCount: the answers given in this session.
-export function buildFsrsDoneScreen({ kind, answeredCount = 0, dueTomorrow = null }) {
+// the mode it opens) or null. kind: 'new' | 'review'. An empty batch ends the practice: Нові слова has no New word left,
+// Запам'ятовування has nothing owed today.
+export function buildFsrsDoneScreen({ kind, dueTomorrow = null }) {
   if (kind !== 'review') {
     return {
       question: 'Нових слів більше немає. Усі слова вже в повторенні.',
@@ -1310,7 +1311,6 @@ export function buildFsrsDoneScreen({ kind, answeredCount = 0, dueTomorrow = nul
       action: { label: 'Перейти до запам\'ятовування', mode: 'review' },
     };
   }
-  if (answeredCount) return { question: 'Сесію завершено', note: '', action: null };
   return {
     question: 'На сьогодні все повторено',
     note: formatReviewDoneNote(dueTomorrow),

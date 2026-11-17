@@ -6,7 +6,9 @@
 // neither deck and has been answered in both directions since the set opened (19.3). Also the spare words the phone
 // keeps offline. Reads the words through the practice repository and writes nothing.
 import { PRACTICE_DIRECTIONS } from './practice-direction.js';
-import { NEW_SET_KIND, REVIEW_SET_KIND, assertSetKind, findOpenSet, readSetOfKind } from './practice-set.js';
+import {
+  NEW_SET_KIND, REVIEW_SET_KIND, assertSetKind, findOpenSet, isWordOfSetKind, readSetOfKind,
+} from './practice-set.js';
 import { allocateNewWords, calculateNewWordAllowance } from './new-word-allocation.js';
 import { addDaysToCalendarDate, findStartOfDay } from './practice-calendar.js';
 import { calculateEffectiveRank, compareQueueOrder, parseChapterNumber } from './priority-calculation.js';
@@ -28,10 +30,12 @@ export function createWordSetPlanner({ practiceRepository }) {
     const openSet = findOpenSet({
       storedSet,
       today,
-      isPending: wordId => isWordPending(
-        practiceRepository.findPracticeWordById(wordId),
-        answeredDirections.get(wordId) ?? new Set(),
-      ),
+      // A word of the other kind (a set saved before the split, or a mixed offline set) is not pending in this one.
+      isPending: wordId => {
+        const wordRow = practiceRepository.findPracticeWordById(wordId);
+        if (wordRow && !isWordOfSetKind(wordRow, kind, storedSet.openedOn)) return false;
+        return isWordPending(wordRow, answeredDirections.get(wordId) ?? new Set());
+      },
     });
     if (openSet) {
       return Object.freeze({ isOpen: true, practiceSet: openSet, wordIds: openSet.pendingIds, overdueCount, kind });

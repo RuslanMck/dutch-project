@@ -24,6 +24,7 @@ import {
   NEW_SET_KIND,
   REVIEW_SET_KIND,
   assertSetKind,
+  isWordOfSetKind,
   mapToStoredSet,
   openPracticeSet,
   readSetOfKind,
@@ -509,7 +510,8 @@ export function createPracticeService({
     const settings = practiceSettings.readActiveSettings();
     const practiceSet = readSetOfKind(settings, kind);
     if (!practiceSet || !practiceSet.itemIds.length) return { round: null };
-    const words = practiceSet.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId)).filter(Boolean)
+    const words = practiceSet.itemIds.map(wordId => practiceRepository.findPracticeWordById(wordId))
+      .filter(wordRow => isWordOfSetKind(wordRow, kind, practiceSet.openedOn))
       .map(mapToPracticeWord);
     const answers = practiceRepository.listDeckAnswersForWords(words.map(word => word.id))
       .filter(answer => answer.answered_at >= practiceSet.openedAt);
@@ -571,7 +573,7 @@ export function createPracticeService({
     settings, today, gradedWordIds, timestamp, preferredWordIds = [], gradedWordId = null, setOpenedAt, kind,
   }) {
     const plan = wordSetPlanner.planWordSet({ settings, today, gradedWordIds, kind });
-    const preferredExistingWordIds = keepExistingWordIds(preferredWordIds, settings.newPerDay);
+    const preferredExistingWordIds = keepExistingWordIds(preferredWordIds, settings.newPerDay, { kind, today });
     const hasPhoneMovedOn = plan.isOpen && preferredExistingWordIds.includes(gradedWordId)
       && !plan.wordIds.includes(gradedWordId) && !plan.practiceSet.itemIds.includes(gradedWordId)
       && !areSameWordIds(preferredExistingWordIds, plan.practiceSet.itemIds);
@@ -610,10 +612,12 @@ export function createPracticeService({
       && firstWordIds.every((wordId, index) => wordId === secondWordIds[index]);
   }
 
-  // The ids (without repeats, in the given order) of the words that exist, at most limit.
-  function keepExistingWordIds(wordIds, limit) {
+  // The ids (without repeats, in the given order) of the words that exist and belong in a set of the kind opened
+  // today (isWordOfSetKind), at most limit.
+  function keepExistingWordIds(wordIds, limit, { kind, today }) {
     const uniqueWordIds = [...new Set(wordIds)];
-    const existingWordIds = new Set(practiceRepository.findPracticeWordsByIds(uniqueWordIds).map(row => row.id));
+    const existingWordIds = new Set(practiceRepository.findPracticeWordsByIds(uniqueWordIds)
+      .filter(row => isWordOfSetKind(row, kind, today)).map(row => row.id));
     return uniqueWordIds.filter(wordId => existingWordIds.has(wordId)).slice(0, limit);
   }
 

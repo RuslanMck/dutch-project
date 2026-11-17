@@ -1776,9 +1776,8 @@ test('buildFsrsDoneScreen: no new words left, and an empty review with nothing o
   assert.equal(emptyReview.note, 'Наступні слова чекають на завтра: 9.');
   assert.deepEqual(emptyReview.action, { label: 'Важкі слова', mode: 'struggling' });
 
-  const answeredReview = buildFsrsDoneScreen({ kind: 'review', answeredCount: 3, dueTomorrow: 9 });
-  assert.equal(answeredReview.question, 'Сесію завершено');
-  assert.equal(answeredReview.action, null);
+  // The last review set finished in this session ends on the same screen.
+  assert.deepEqual(buildFsrsDoneScreen({ kind: 'review', answeredCount: 3, dueTomorrow: 9 }), emptyReview);
 });
 
 test('buildRoundRepeatButton: a drill of every word of the set, in the set order; hidden for an empty set', () => {

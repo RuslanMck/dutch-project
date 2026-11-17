@@ -23,6 +23,15 @@ export function readSetOfKind(settings, kind) {
   return kind === REVIEW_SET_KIND ? settings.reviewSet : settings.wordSet;
 }
 
+// Whether a word belongs in a set of the kind opened on openedOn ('YYYY-MM-DD'). A New words set holds New words and the
+// words introduced that day (they got their card in it); a review set holds the other words with a card. A set saved
+// before the two kinds existed, or a phone's offline set, may mix them: the words of the other kind are left out.
+export function isWordOfSetKind(wordRow, kind, openedOn) {
+  if (!wordRow) return false;
+  const isNewOfThatDay = wordRow.fsrs_card === null || wordRow.introduced_on === openedOn;
+  return kind === REVIEW_SET_KIND ? !isNewOfThatDay : isNewOfThatDay;
+}
+
 // The set as it is saved in the practice settings: { opened_on, opened_at, item_ids }, or null.
 export function mapFromStoredSet(storedSet) {
   if (!storedSet || !Array.isArray(storedSet.item_ids)) return null;

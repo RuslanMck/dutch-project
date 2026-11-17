@@ -382,3 +382,40 @@ test('the set is pinned when the batch is shown: words added before the first an
   const nextSet = context.practiceService.getPracticeBatch({ sessionId: 's1' });
   assert.ok(nextSet.new_words.some(word => laterIds.includes(word.id)), 'they come in the next set');
 });
+
+test('a set saved before the split that mixes reviews and New words: each kind keeps only its own words', () => {
+  const context = createPracticeContext();
+  const reviewIds = addWords(context, '6.1', makeNames('oud', 3));
+  const newIds = addWords(context, '6.1', makeNames('nieuw', 12));
+  migrate(context);
+  reviewIds.forEach(wordId => scheduleWord(context, wordId, '2026-10-23T09:00:00+02:00'));
+  const openedAt = Date.parse(MORNING_IN_AMSTERDAM) - 60_000;
+  createPracticeRepository({ database: context.database }).saveSetting('word_set', {
+    opened_on: '2026-10-24', opened_at: openedAt, item_ids: [...reviewIds, ...newIds.slice(0, 7)],
+  });
+
+  const newBatch = context.practiceService.getPracticeBatch({ sessionId: 's1' });
+  assert.deepEqual(newBatch.reviews, [], 'no old word in Нові слова');
+  assert.deepEqual(newBatch.new_words.map(word => word.id), newIds.slice(0, 7));
+
+  const reviewBatch = context.practiceService.getPracticeBatch({ sessionId: 's1', kind: 'review' });
+  assert.deepEqual(reviewBatch.reviews.map(word => word.id), reviewIds);
+  assert.deepEqual(reviewBatch.new_words, []);
+});
+
+test('an offline set mixing kinds is pinned with the graded word\'s kind only', () => {
+  const context = createPracticeContext();
+  const reviewIds = addWords(context, '6.1', makeNames('oud', 2));
+  const newIds = addWords(context, '6.1', makeNames('nieuw', 3));
+  migrate(context);
+  reviewIds.forEach(wordId => scheduleWord(context, wordId, '2026-10-23T09:00:00+02:00'));
+
+  context.practiceService.gradeWord({
+    wordId: reviewIds[0], grade: 'good', sessionId: 's1', setWordIds: [...newIds, ...reviewIds],
+  });
+
+  const reviewBatch = context.practiceService.getPracticeBatch({ sessionId: 's2', kind: 'review' });
+  assert.ok(batchIds(reviewBatch).every(wordId => reviewIds.includes(wordId)), 'no New word in the review set');
+  const newBatch = context.practiceService.getPracticeBatch({ sessionId: 's2' });
+  assert.deepEqual(newBatch.new_words.map(word => word.id), newIds);
+});

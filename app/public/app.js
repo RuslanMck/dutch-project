@@ -1722,9 +1722,10 @@ function ensureFsrsSession() {
   if (ui.fsrs.kind !== kind || FSRS_LOAD_STATUSES.includes(ui.fsrs.status)) loadFsrsBatch(readSessionId(), kind);
 }
 
-// The FSRS session still on screen is the one a request was made for: the same session id and the same kind.
-function isSameFsrsSession(sessionId, kind) {
-  return ui.fsrs.sessionId === sessionId && ui.fsrs.kind === kind;
+// The FSRS session still on screen is the one a request was made for: the same session id, the same kind and the same
+// batch load (switching to the other practice and back starts a new load, so an old reply is dropped).
+function isSameFsrsSession(sessionId, kind, loadToken) {
+  return ui.fsrs.sessionId === sessionId && ui.fsrs.kind === kind && ui.fsrs.loadToken === loadToken;
 }
 
 // "Почати знову": a fresh batch under a new session id, of the same kind.
@@ -1839,10 +1840,11 @@ async function showRoundSummaryOrRefill() {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
   const kind = session.kind;
+  const loadToken = session.loadToken;
   session.status = 'loading';
   renderPractice();
   await Promise.allSettled([...session.pendingGradePosts]);
-  if (!isSameFsrsSession(sessionId, kind)) return;
+  if (!isSameFsrsSession(sessionId, kind, loadToken)) return;
   let round = null;
   let isOffline = false;
   try {
@@ -1851,7 +1853,7 @@ async function showRoundSummaryOrRefill() {
   } catch (error) {
     isOffline = !!error.offline;     // other errors: no summary, the session goes on
   }
-  if (!isSameFsrsSession(sessionId, kind)) return;
+  if (!isSameFsrsSession(sessionId, kind, loadToken)) return;
   // Offline the summary comes from the answers on the phone.
   if (isOffline && session.answered.size > 0) {
     showLocalRoundSummary();
@@ -1917,18 +1919,19 @@ async function refillFsrsQueue(continueMessage = '') {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
   const kind = session.kind;
+  const loadToken = session.loadToken;
   session.current = null;
   session.status = 'loading';
   session.peakQueueLength = 0;       // the next set fills its own progress bar
   renderPractice();
   // The last answer must be stored first: the set is planned from the store.
   await Promise.allSettled([...session.pendingGradePosts]);
-  if (!isSameFsrsSession(sessionId, kind)) return false;
+  if (!isSameFsrsSession(sessionId, kind, loadToken)) return false;
   let batch;
   try {
     batch = await fetchLiveBatch(sessionId, kind);
   } catch (error) {
-    if (!isSameFsrsSession(sessionId, kind)) return false;
+    if (!isSameFsrsSession(sessionId, kind, loadToken)) return false;
     if (error.offline) return startOfflineNextSet(continueMessage);
     if (error.status === 409) {
       session.status = 'unconfigured';
@@ -1939,7 +1942,7 @@ async function refillFsrsQueue(continueMessage = '') {
     renderPractice();
     return false;
   }
-  if (!isSameFsrsSession(sessionId, kind)) return false;
+  if (!isSameFsrsSession(sessionId, kind, loadToken)) return false;
   // A card answered in this session in a direction never comes back in that direction, even if the batch still lists it.
   startFsrsSet({ words: [...batch.reviews, ...batch.new_words], setSize: batch.counts?.set_size });
   session.counts = readBatchCounts(batch);
@@ -2241,6 +2244,9 @@ function renderPractice() {
   $('practice-input').hidden = mode === 'art';
   $('practice-board').hidden = true;
   $('practice-q').hidden = false;
+  // The done screen's note and button belong to the FSRS practice; renderFsrsPractice shows them again.
+  $('practice-done-note').hidden = true;
+  $('practice-done-action-button').hidden = true;
   if (isFsrs) renderFsrsPractice();
   else if (mode === 'art') renderArticlePractice();
   else renderCustomPractice();
@@ -2557,10 +2563,9 @@ function renderFsrsPractice() {
   const session = ui.fsrs;
   const current = session.current;
   const isReady = session.status === 'ready' && !!current;
-  const answeredCount = session.tally.again + session.tally.hard + session.tally.good;
   // A finished practice has its own screen: the Нові слова and Запам'ятовування texts, with their button.
   const doneScreen = session.status === 'done'
-    ? buildFsrsDoneScreen({ kind: session.kind, answeredCount, dueTomorrow: session.dueTomorrow })
+    ? buildFsrsDoneScreen({ kind: session.kind, dueTomorrow: session.dueTomorrow })
     : null;
   const questionByStatus = {
     idle: '',
@@ -2597,7 +2602,8 @@ function renderFsrsPractice() {
   $('practice-summary').hidden = session.status !== 'done';
   $('practice-restart-button').hidden = session.status !== 'done' && session.status !== 'failed';
   const strugglingButton = $('practice-struggling-button');
-  strugglingButton.hidden = session.status !== 'done' || !session.strugglingCount;
+  // The Запам'ятовування done screen has its own «Важкі слова» button.
+  strugglingButton.hidden = session.status !== 'done' || !session.strugglingCount || session.kind === 'review';
   if (session.strugglingCount) strugglingButton.textContent = formatStrugglingDrillButton(session.strugglingCount);
   const fsrsDiff = isReady && current.checked && current.direction === 'uk_nl' && current.grade !== 'good'
     ? buildAnswerLetterDiff(current.word, current.answer ?? '') : null;
@@ -2629,7 +2635,8 @@ function renderPracticeSummary() {
     ['Важко', session.tally.hard],
     ['Добре', session.tally.good],
     ['Нових слів', session.introducedCount],
-    ['Завтра повторити', session.dueTomorrow ?? '…'],
+    // Запам'ятовування says it in its done note.
+    ...(session.kind === 'review' ? [] : [['Завтра повторити', session.dueTomorrow ?? '…']]),
   ];
   renderSummaryItems($('practice-summary-list'), items);
 }
@@ -2690,6 +2697,9 @@ async function fetchLiveBatch(sessionId, kind) {
 
 // The offline snapshots kept before the two practices: the old set was the Нові слова set, so its snapshot becomes the
 // new kind's (the existing one wins), and the old spare words are dropped (they are asked again online).
+// The move started at boot; the first offline restore waits for it, so it finds the moved snapshot.
+let legacySnapshotsMoved = Promise.resolve();
+
 async function moveLegacyPracticeSnapshots() {
   try {
     const legacy = await offlineStore.loadSnapshot('practice');
@@ -2730,6 +2740,7 @@ async function loadSpareWords(sessionId, kind) {
 async function restoreFsrsFromSnapshot(kind) {
   const session = ui.fsrs;
   let snapshot = null;
+  await legacySnapshotsMoved;
   try { snapshot = await offlineStore.loadSnapshot(practiceSnapshotKey(kind)); } catch { /* none */ }
   const calendarDate = formatTodayInAmsterdam();
   const restored = restorePracticeSnapshot({ snapshot, calendarDate });
@@ -2762,9 +2773,10 @@ async function startOfflineNextSet(continueMessage = '') {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
   const kind = session.kind;
+  const loadToken = session.loadToken;
   let spareSnapshot = null;
   try { spareSnapshot = await offlineStore.loadSnapshot(spareSnapshotKey(kind)); } catch { /* none */ }
-  if (!isSameFsrsSession(sessionId, kind)) return false;
+  if (!isSameFsrsSession(sessionId, kind, loadToken)) return false;
   const spare = spareSnapshot?.calendarDate === formatTodayInAmsterdam() ? spareSnapshot.words : [];
   const words = buildOfflineSet({
     stillLearning: session.setWords.filter(word => session.hardWordIds.has(word.id)),
@@ -4449,7 +4461,7 @@ function bindEvents() {
   // Практика
   $('practice-mode').addEventListener('change', event => {
     // 'custom' is not a choice (its option is disabled, iOS can still send it): an idle drill means the daily practice.
-    const choice = event.target.value === 'custom' && ui.custom.status === 'idle' ? 'fsrs' : event.target.value;
+    const choice = event.target.value === 'custom' && ui.custom.status === 'idle' ? fsrsModeForKind(ui.fsrs.kind) : event.target.value;
     if (choice === 'custom') {
       renderPractice();
       return;
@@ -5356,7 +5368,7 @@ function init() {
   bindDeckEvents();
   renderShuffleButton();
   bindOfflineSupport();
-  moveLegacyPracticeSnapshots();
+  legacySnapshotsMoved = moveLegacyPracticeSnapshots();
   let saved = 'home';
   try { saved = localStorage.getItem('tab') || 'home'; } catch { /* storage unavailable */ }
   showTab(saved);

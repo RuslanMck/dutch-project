@@ -80,10 +80,10 @@ test('a mode switch loads the batch of the chosen kind, and a stale load does no
 });
 
 test('a finished set refills only for the same session and kind', () => {
-  assert.match(functionBody(appSource, 'function isSameFsrsSession(sessionId, kind) {'), /ui\.fsrs\.sessionId === sessionId && ui\.fsrs\.kind === kind/);
+  assert.match(functionBody(appSource, 'function isSameFsrsSession(sessionId, kind, loadToken) {'), /ui\.fsrs\.sessionId === sessionId && ui\.fsrs\.kind === kind && ui\.fsrs\.loadToken === loadToken/);
   const refill = functionBody(appSource, "async function refillFsrsQueue(continueMessage = '') {");
   assert.ok(refill.includes('fetchLiveBatch(sessionId, kind)'), 'the next set asks for the kind on screen');
-  assert.equal((refill.match(/isSameFsrsSession\(sessionId, kind\)/g) || []).length, 3);
+  assert.equal((refill.match(/isSameFsrsSession\(sessionId, kind, loadToken\)/g) || []).length, 3);
 });
 
 test('the offline snapshots are per kind; the old practice and spare keys are read once and dropped', () => {
@@ -96,7 +96,7 @@ test('the offline snapshots are per kind; the old practice and spare keys are re
   assert.match(legacy, /saveSnapshot\(practiceSnapshotKey\('new'\), legacy\)/);
   assert.match(legacy, /deleteSnapshot\('practice'\)/);
   assert.match(legacy, /deleteSnapshot\('spare'\)/);
-  assert.match(appSource, /bindOfflineSupport\(\);\s*moveLegacyPracticeSnapshots\(\);/);
+  assert.match(appSource, /bindOfflineSupport\(\);\s*legacySnapshotsMoved = moveLegacyPracticeSnapshots\(\);/);
   // No other code reads the old single key.
   assert.doesNotMatch(appSource.replace(legacy, ''), /Snapshot\('practice'\)|Snapshot\('spare'\)/);
 });
@@ -112,7 +112,6 @@ test('the Ukrainian texts of the spec are in the page exactly', () => {
     'Перейти до запам\'ятовування',
     'На сьогодні все повторено',
     'Наступні слова чекають на завтра: ',
-    'Сесію завершено',
     'Повторити ці слова',
     'Ще 10 нових',
     'Ще 10',
