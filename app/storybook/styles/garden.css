@@ -558,6 +558,17 @@ table.words td.w {
   font-size: 0.9rem;
 }
 
+/* The line under the mode select: today's new words, or the reviews still to do. */
+.practice-kind-line {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+}
+
+/* The finished Запам'ятовування or Нові слова screen: the note about the next words, then its button. */
+.practice-done-note {
+  margin: 0 0 8px;
+}
+
 .difficulty-badge {
   align-self: start;
   padding: 2px 8px;
@@ -1745,6 +1756,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .practice-tile__name { font-size: 15px; font-weight: var(--garden-weight-heavy); }
 .practice-tile__line { font-size: 12px; font-weight: var(--garden-weight-regular); }
 .practice-tile--cards { background: var(--garden-periwinkle); }
+.practice-tile--review { background: var(--garden-line); }
 .practice-tile--word-order { background: var(--garden-sand); }
 .practice-tile--phrases { background: var(--garden-peach); }
 .practice-tile--struggling { background: var(--garden-blush); }

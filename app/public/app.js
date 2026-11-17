@@ -18,6 +18,17 @@ import {
   pickLoadingPhrase,
   chooseStreakRollStart,
   formatStrugglingTileLine,
+  isFsrsMode,
+  fsrsKindForMode,
+  fsrsModeForKind,
+  practiceSnapshotKey,
+  spareSnapshotKey,
+  formatNewWordsTileLine,
+  formatReviewTileLine,
+  formatPracticeKindLine,
+  formatRoundNextLabel,
+  buildRoundRepeatButton,
+  buildFsrsDoneScreen,
   WORD_CATEGORIES,
   foldSearchText,
   buildDictionaryEntry,
@@ -186,7 +197,8 @@ const ui = {
     error: '', isAnswering: false,
   },
   tab: 'home',
-  home: { strugglingCount: null },  // Головна: the Важкі слова tile's count, null while unknown
+  // Головна: the Важкі слова tile's count, and the two practice tiles' counts ({ introducedToday, reviewOwed }), null while unknown.
+  home: { strugglingCount: null, practiceCounts: null },
   // Medals (Профіль card, Досягнення tab): status loading | ready | failed; data is the last answer of GET /api/achievements.
   achievements: { status: 'loading', data: null },
   isShuffleOn: true,                 // shuffle mode: batches and returning words come in random order
@@ -249,6 +261,11 @@ const ui = {
   fsrs: {
     status: 'idle',
     sessionId: '',
+    // kind: the set on screen, 'new' (Нові слова) or 'review' (Запам'ятовування). loadToken: the newest batch load.
+    kind: 'new',
+    loadToken: null,
+    // counts: { introducedToday, reviewOwed } of the batch on screen, shown under the mode select.
+    counts: null,
     direction: 'uk_nl',
     queue: [],
     waiting: { uk_nl: [], nl_uk: [] },
@@ -446,10 +463,10 @@ function showTab(name) {
   window.scrollTo(0, 0);
   if (ui.tab === 'practice') {
     // An idle custom drill (none running, or one that was left) never shows here: the daily practice does.
-    if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = 'fsrs';
+    if (ui.custom.status === 'idle' && isCustomPracticeMode()) ui.practice.mode = fsrsModeForKind(ui.fsrs.kind);
     ensureFsrsSession();
   }
-  if (ui.tab === 'home') { loadHomeStrugglingCount(); loadGoal(); }
+  if (ui.tab === 'home') { loadHomeStrugglingCount(); loadHomePracticeCounts(); loadGoal(); }
   if (ui.tab === 'profile') { loadGoal(); loadChapter(); }
   if (ui.tab === 'known-check') loadKnownCheck();
   if (ui.tab === 'cards') ensureCardsBatch();
@@ -480,6 +497,17 @@ async function loadHomeStrugglingCount() {
   if (ui.tab === 'home') renderHome();
 }
 
+// The counts of the two practice tiles (Нові слова, Запам'ятовування) read each time Головна opens; null when unknown.
+async function loadHomePracticeCounts() {
+  try {
+    const stats = await api.getPracticeStats();
+    ui.home.practiceCounts = { introducedToday: stats.introduced_today, reviewOwed: stats.review_owed };
+  } catch {
+    ui.home.practiceCounts = null;
+  }
+  if (ui.tab === 'home') renderHome();
+}
+
 function renderHome() {
   renderHomeGoal();
   const summary = buildHomeSummary({ words: state.words, phraseCount: state.phrases.length, now: Date.now() });
@@ -487,7 +515,8 @@ function renderHome() {
   $('home-progress').setAttribute('aria-valuenow', String(summary.startedPercent));
   $('home-progress-fill').style.width = `${summary.startedPercent}%`;
   $('home-progress-label').textContent = summary.progressLabel;
-  $('home-tile-cards').textContent = summary.cardsLine;
+  $('home-tile-new-line').textContent = formatNewWordsTileLine(ui.home.practiceCounts?.introducedToday);
+  $('home-tile-review-line').textContent = formatReviewTileLine(ui.home.practiceCounts?.reviewOwed);
   $('home-tile-word-order').textContent = formatRuleFilterSummary(wordOrder.rules);
   $('home-tile-phrases').textContent = summary.phrasesLine;
   $('home-tile-struggling').textContent = formatStrugglingTileLine(ui.home.strugglingCount);
@@ -678,6 +707,14 @@ function openArticlePractice() {
   ui.practice.mode = 'art';
   $('practice-input').value = '';
   pickArticleQuestion();
+  showTab('practice');
+}
+
+// Practice in one of the FSRS modes: Головна's Нові слова and Запам'ятовування tiles.
+function openFsrsPractice(mode) {
+  ui.practice.mode = mode;
+  ui.practice.isModePickerOpen = false;
+  $('practice-input').value = '';
   showTab('practice');
 }
 
@@ -1638,7 +1675,7 @@ function pickArticleQuestion(excludedWordId = null) {
 // The custom drill has none: it is not a word the schedule is about.
 function findCurrentPracticeWord() {
   if (ui.practice.mode === 'art') return ui.practice.current?.word ?? null;
-  if (ui.practice.mode !== 'fsrs' || ui.fsrs.status !== 'ready' || !ui.fsrs.current) return null;
+  if (!isFsrsMode(ui.practice.mode) || ui.fsrs.status !== 'ready' || !ui.fsrs.current) return null;
   return ui.fsrs.current.word;
 }
 
@@ -1677,25 +1714,42 @@ function readSessionId() {
   return sessionId;
 }
 
-// Opens the FSRS practice on the first visit; a failed or not yet configured practice is tried again on a visit.
+// Opens the FSRS practice of the mode on screen: on the first visit, after a failed or not yet configured load, and when
+// the mode's kind differs from the loaded one (Нові слова and Запам'ятовування each load their own batch).
 function ensureFsrsSession() {
-  if (ui.practice.mode === 'fsrs' && FSRS_LOAD_STATUSES.includes(ui.fsrs.status)) {
-    loadFsrsBatch(readSessionId());
-  }
+  if (!isFsrsMode(ui.practice.mode)) return;
+  const kind = fsrsKindForMode(ui.practice.mode);
+  if (ui.fsrs.kind !== kind || FSRS_LOAD_STATUSES.includes(ui.fsrs.status)) loadFsrsBatch(readSessionId(), kind);
 }
 
-// "Почати знову": a fresh batch under a new session id.
+// The FSRS session still on screen is the one a request was made for: the same session id and the same kind.
+function isSameFsrsSession(sessionId, kind) {
+  return ui.fsrs.sessionId === sessionId && ui.fsrs.kind === kind;
+}
+
+// "Почати знову": a fresh batch under a new session id, of the same kind.
 function restartFsrsSession() {
   const sessionId = createSessionId();
   saveSession(sessionId);
-  loadFsrsBatch(sessionId);
+  loadFsrsBatch(sessionId, ui.fsrs.kind);
 }
 
-async function loadFsrsBatch(sessionId) {
+// The counts the mode select's line shows, read from a batch; null for a batch without them.
+function readBatchCounts(batch) {
+  if (!batch.counts) return null;
+  return { introducedToday: batch.counts.introduced_today, reviewOwed: batch.counts.review_owed };
+}
+
+// Loads the batch of a kind ('new' | 'review') under a session id. A load that a later one overtakes (another mode, a
+// restart) does nothing when it arrives: loadToken tells the loads apart.
+async function loadFsrsBatch(sessionId, kind) {
   const session = ui.fsrs;
+  const loadToken = {};
   Object.assign(session, {
+    loadToken,
     status: 'loading',
     sessionId,
+    kind,
     direction: 'uk_nl',
     queue: [],
     peakQueueLength: 0,
@@ -1717,19 +1771,25 @@ async function loadFsrsBatch(sessionId) {
     dueTomorrow: null,
     round: null,
     strugglingCount: null,
+    counts: null,
   });
   renderPractice();
   try {
-    const batch = await fetchLiveBatch(sessionId);
+    const batch = await fetchLiveBatch(sessionId, kind);
+    if (session.loadToken !== loadToken) return;
     startFsrsSet({ words: [...batch.reviews, ...batch.new_words], setSize: batch.counts?.set_size });
+    session.counts = readBatchCounts(batch);
     session.status = 'ready';
     showNextFsrsWord();
     saveFsrsSnapshot();
-    loadSpareWords(sessionId);
+    loadSpareWords(sessionId, kind);
   } catch (error) {
+    if (session.loadToken !== loadToken) return;
     if (error.offline) {
       // The set kept on the phone continues; without one the practice waits for the connection.
-      if (!(await restoreFsrsFromSnapshot())) session.status = 'offline';
+      const restored = await restoreFsrsFromSnapshot(kind);
+      if (session.loadToken !== loadToken) return;
+      if (!restored) session.status = 'offline';
     } else if (error.status === 409) {
       session.status = 'unconfigured';
     } else {
@@ -1775,24 +1835,23 @@ function showNextFsrsWord() {
   showRoundSummaryOrRefill();
 }
 
-// The queue ran out. When this session finished the last word of the set, the congratulation screen shows first and
-// its button asks for the next set; otherwise the batch is asked again at once.
 async function showRoundSummaryOrRefill() {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
+  const kind = session.kind;
   session.status = 'loading';
   renderPractice();
   await Promise.allSettled([...session.pendingGradePosts]);
-  if (ui.fsrs.sessionId !== sessionId) return;
+  if (!isSameFsrsSession(sessionId, kind)) return;
   let round = null;
   let isOffline = false;
   try {
     if (!(await isReadyForLiveRead())) throw api.createOfflineError();
-    round = (await api.getRoundSummary()).round;
+    round = (await api.getRoundSummary(kind)).round;
   } catch (error) {
     isOffline = !!error.offline;     // other errors: no summary, the session goes on
   }
-  if (ui.fsrs.sessionId !== sessionId) return;
+  if (!isSameFsrsSession(sessionId, kind)) return;
   // Offline the summary comes from the answers on the phone.
   if (isOffline && session.answered.size > 0) {
     showLocalRoundSummary();
@@ -1822,6 +1881,7 @@ function handleRoundFinishClick() {
 
 function renderRoundSummary() {
   const isLocal = ui.fsrs.round.isLocal === true;
+  $('practice-round-next-button').textContent = formatRoundNextLabel(ui.fsrs.kind);
   $('practice-round-hardest').hidden = isLocal;
   $('practice-round-words-box').hidden = isLocal;
   if (isLocal) {
@@ -1853,23 +1913,22 @@ function renderRoundSummary() {
   renderRoundDrillButtons(ui.fsrs.round);
 }
 
-// Asks the batch again with the same session id for the next set. Its words continue the session, with continueMessage
-// when given; without any the session ends and the summary shows. Resolves to true when the session continued.
 async function refillFsrsQueue(continueMessage = '') {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
+  const kind = session.kind;
   session.current = null;
   session.status = 'loading';
   session.peakQueueLength = 0;       // the next set fills its own progress bar
   renderPractice();
   // The last answer must be stored first: the set is planned from the store.
   await Promise.allSettled([...session.pendingGradePosts]);
-  if (ui.fsrs.sessionId !== sessionId) return false;
+  if (!isSameFsrsSession(sessionId, kind)) return false;
   let batch;
   try {
-    batch = await fetchLiveBatch(sessionId);
+    batch = await fetchLiveBatch(sessionId, kind);
   } catch (error) {
-    if (ui.fsrs.sessionId !== sessionId) return false;
+    if (!isSameFsrsSession(sessionId, kind)) return false;
     if (error.offline) return startOfflineNextSet(continueMessage);
     if (error.status === 409) {
       session.status = 'unconfigured';
@@ -1880,9 +1939,10 @@ async function refillFsrsQueue(continueMessage = '') {
     renderPractice();
     return false;
   }
-  if (ui.fsrs.sessionId !== sessionId) return false;
+  if (!isSameFsrsSession(sessionId, kind)) return false;
   // A card answered in this session in a direction never comes back in that direction, even if the batch still lists it.
   startFsrsSet({ words: [...batch.reviews, ...batch.new_words], setSize: batch.counts?.set_size });
+  session.counts = readBatchCounts(batch);
   if (!ROUND_DIRECTIONS.some(direction => session.waiting[direction].length)) {
     finishFsrsSession();
     return false;
@@ -1892,7 +1952,7 @@ async function refillFsrsQueue(continueMessage = '') {
   saveSession(sessionId);
   showNextFsrsWord();
   saveFsrsSnapshot();
-  loadSpareWords(sessionId);
+  loadSpareWords(sessionId, kind);
   // The message says a set was finished, so it shows only when the batch is a new set, not the rest of an open one.
   const isNewSet = batch.counts?.is_set_open !== true;
   if (continueMessage && isNewSet) session.feedback = { text: continueMessage, ok: true };
@@ -1900,13 +1960,11 @@ async function refillFsrsQueue(continueMessage = '') {
   return true;
 }
 
-// Nothing is left to answer: the summary shows. The stored session id is replaced, so the next visit gets a fresh
-// batch.
 function finishFsrsSession() {
   const session = ui.fsrs;
   session.current = null;
   session.status = 'done';
-  offlineStore.deleteSnapshot('practice').catch(() => {});
+  offlineStore.deleteSnapshot(practiceSnapshotKey(session.kind)).catch(() => {});
   saveSession(createSessionId());
   loadDueTomorrow();
   loadStrugglingCount();
@@ -1970,7 +2028,7 @@ function renderPracticeFocus(isQuestionOnScreen) {
 }
 
 function submitPractice() {
-  if (ui.practice.mode === 'fsrs') submitFsrsAnswer();
+  if (isFsrsMode(ui.practice.mode)) submitFsrsAnswer();
   else if (isCustomPracticeMode()) submitCustomAnswer();
   else submitArticleAnswer();
 }
@@ -2133,7 +2191,7 @@ async function advanceFsrsWord() {
   if (!current.post) recordFsrsAnswer(current);
   await current.post;
   // Another mode may be on screen by now: its input is not this word's to clear or focus.
-  if (session.current !== current || ui.practice.mode !== 'fsrs') return;
+  if (session.current !== current || !isFsrsMode(ui.practice.mode)) return;
   const isStillInSession = current.schedule
     ? current.schedule.deck[current.direction]?.in_deck
     : current.grade !== 'good';
@@ -2150,10 +2208,25 @@ function submitArticleAnswer() {
   else $('article-chip').focus();
 }
 
+// Switches the practice to a mode: from the mode select, or a finished screen's button. The FSRS modes load their batch.
+function choosePracticeMode(mode) {
+  ui.practice.mode = mode;
+  ui.practice.isModePickerOpen = false;
+  if (mode === 'art') pickArticleQuestion();
+  $('practice-input').value = '';
+  if (mode === 'struggling') startStrugglingDrill();
+  else ensureFsrsSession();
+  renderPractice();
+}
+
 function renderPractice() {
   const mode = ui.practice.mode;
-  const isFsrs = mode === 'fsrs';
+  const isFsrs = isFsrsMode(mode);
   $('practice-mode').value = mode;
+  // The line under the mode select: today's new words (Нові слова) or the reviews still to do (Запам'ятовування).
+  const kindLine = isFsrs ? formatPracticeKindLine(fsrsKindForMode(mode), ui.fsrs.counts) : '';
+  $('practice-kind-line').textContent = kindLine;
+  $('practice-kind-line').hidden = !kindLine;
   $('practice-progress-hint-button').hidden = !isFsrs;
   if (!isFsrs) setHintOpen($('practice-progress-hint-button'), false);
   $('practice-delete-button').hidden = !findCurrentPracticeWord();
@@ -2485,17 +2558,29 @@ function renderFsrsPractice() {
   const current = session.current;
   const isReady = session.status === 'ready' && !!current;
   const answeredCount = session.tally.again + session.tally.hard + session.tally.good;
+  // A finished practice has its own screen: the Нові слова and Запам'ятовування texts, with their button.
+  const doneScreen = session.status === 'done'
+    ? buildFsrsDoneScreen({ kind: session.kind, answeredCount, dueTomorrow: session.dueTomorrow })
+    : null;
   const questionByStatus = {
     idle: '',
     loading: 'Завантаження…',
     ready: isReady ? formatFsrsQuestion(session, current) : '',
-    done: answeredCount ? 'Сесію завершено' : 'На сьогодні слів немає',
+    done: doneScreen?.question ?? '',
     'round-done': '',
     unconfigured: 'Практика FSRS ще не налаштована',
     failed: 'Не вдалося завантажити слова',
     offline: OFFLINE_PRACTICE_MESSAGE,
   };
   $('practice-q').textContent = questionByStatus[session.status];
+  const doneAction = doneScreen?.action ?? null;
+  $('practice-done-note').textContent = doneScreen?.note ?? '';
+  $('practice-done-note').hidden = !doneScreen?.note;
+  $('practice-done-action-button').hidden = !doneAction;
+  if (doneAction) {
+    $('practice-done-action-button').textContent = doneAction.label;
+    $('practice-done-action-button').dataset.mode = doneAction.mode;
+  }
   $('practice-form').hidden = !isReady;
   $('practice-skip-button').hidden = !isReady || current.checked;
   $('practice-override-button').hidden = !isReady || !current.canOverride;
@@ -2598,18 +2683,28 @@ function startFsrsSet({ words, isOfflineSet = false, setSize, setOpenedAt = Date
   });
 }
 
-// The batch from the server, only when the answers on the phone have reached it first (the set is planned from the
-// stored answers). Throws an offline error when the phone is offline or some answers could not be sent.
-async function fetchLiveBatch(sessionId) {
+async function fetchLiveBatch(sessionId, kind) {
   if (!(await isReadyForLiveRead())) throw api.createOfflineError();
-  return api.getPracticeBatch(sessionId);
+  return api.getPracticeBatch(sessionId, { kind });
 }
 
-// Keeps the set on screen on the phone, so a reload offline can continue it.
+// The offline snapshots kept before the two practices: the old set was the Нові слова set, so its snapshot becomes the
+// new kind's (the existing one wins), and the old spare words are dropped (they are asked again online).
+async function moveLegacyPracticeSnapshots() {
+  try {
+    const legacy = await offlineStore.loadSnapshot('practice');
+    if (legacy && !(await offlineStore.loadSnapshot(practiceSnapshotKey('new')))) {
+      await offlineStore.saveSnapshot(practiceSnapshotKey('new'), legacy);
+    }
+    if (legacy) await offlineStore.deleteSnapshot('practice');
+    await offlineStore.deleteSnapshot('spare');
+  } catch { /* storage unavailable: the snapshots stay as they are */ }
+}
+
 function saveFsrsSnapshot() {
   const session = ui.fsrs;
   if (!session.sessionId || !session.setWords.length) return;
-  offlineStore.saveSnapshot('practice', {
+  offlineStore.saveSnapshot(practiceSnapshotKey(session.kind), {
     sessionId: session.sessionId,
     calendarDate: session.calendarDate,
     words: session.setWords,
@@ -2620,23 +2715,22 @@ function saveFsrsSnapshot() {
     offlineSet: session.isOfflineSet,
     setOpenedAt: session.setOpenedAt,
     setSize: session.setSize,
+    counts: session.counts,
   }).catch(() => {});
 }
 
-// After a batch loaded online: the words the next set will probably draw from are kept for an offline next set.
-async function loadSpareWords(sessionId) {
+async function loadSpareWords(sessionId, kind) {
   if (isDeviceOffline()) return;
   try {
-    const { words } = await api.getSpareWords(sessionId);
-    await offlineStore.saveSnapshot('spare', { words, calendarDate: formatTodayInAmsterdam(), sessionId });
+    const { words } = await api.getSpareWords(sessionId, kind);
+    await offlineStore.saveSnapshot(spareSnapshotKey(kind), { words, calendarDate: formatTodayInAmsterdam(), sessionId });
   } catch { /* the spare words stay as they were */ }
 }
 
-// The batch could not be loaded offline: continues the set kept on the phone for today. Resolves to false when there is none.
-async function restoreFsrsFromSnapshot() {
+async function restoreFsrsFromSnapshot(kind) {
   const session = ui.fsrs;
   let snapshot = null;
-  try { snapshot = await offlineStore.loadSnapshot('practice'); } catch { /* none */ }
+  try { snapshot = await offlineStore.loadSnapshot(practiceSnapshotKey(kind)); } catch { /* none */ }
   const calendarDate = formatTodayInAmsterdam();
   const restored = restorePracticeSnapshot({ snapshot, calendarDate });
   if (!restored) return false;
@@ -2644,11 +2738,13 @@ async function restoreFsrsFromSnapshot() {
   saveSession(restored.sessionId);
   Object.assign(session, {
     sessionId: restored.sessionId,
+    kind,
     calendarDate,
     answered: restored.answered,
     tally: restored.tally,
     introducedCount: restored.introducedCount,
     hardWordIds: restored.hardWordIds,
+    counts: snapshot.counts ?? null,
   });
   // A set restored from the phone's snapshot sends its ids (and when the phone opened it) with its grades, like an offline set.
   startFsrsSet({
@@ -2662,14 +2758,13 @@ async function restoreFsrsFromSnapshot() {
   return true;
 }
 
-// «Наступний набір» without the server: the words of the finished set that are still learning, then the spare words kept
-// on the phone. It is practised like a normal set; its grades carry the set's ids. Resolves to true when a set started.
 async function startOfflineNextSet(continueMessage = '') {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
+  const kind = session.kind;
   let spareSnapshot = null;
-  try { spareSnapshot = await offlineStore.loadSnapshot('spare'); } catch { /* none */ }
-  if (ui.fsrs.sessionId !== sessionId) return false;
+  try { spareSnapshot = await offlineStore.loadSnapshot(spareSnapshotKey(kind)); } catch { /* none */ }
+  if (!isSameFsrsSession(sessionId, kind)) return false;
   const spare = spareSnapshot?.calendarDate === formatTodayInAmsterdam() ? spareSnapshot.words : [];
   const words = buildOfflineSet({
     stillLearning: session.setWords.filter(word => session.hardWordIds.has(word.id)),
@@ -2688,7 +2783,7 @@ async function startOfflineNextSet(continueMessage = '') {
   }
   const usedIds = new Set(words.map(word => word.id));
   if (spareSnapshot) {
-    offlineStore.saveSnapshot('spare', { ...spareSnapshot, words: spare.filter(word => !usedIds.has(word.id)) })
+    offlineStore.saveSnapshot(spareSnapshotKey(kind), { ...spareSnapshot, words: spare.filter(word => !usedIds.has(word.id)) })
       .catch(() => {});
   }
   startFsrsSet({ words, isOfflineSet: true });
@@ -2700,14 +2795,17 @@ async function startOfflineNextSet(continueMessage = '') {
   return true;
 }
 
-// The set is finished and the server cannot say how it went: the summary shows the local tally.
 function showLocalRoundSummary() {
   const session = ui.fsrs;
-  session.round = buildLocalRoundSummary({
-    tally: session.tally,
-    introducedCount: session.introducedCount,
-    hardWords: session.setWords.filter(word => session.hardWordIds.has(word.id)),
-  });
+  session.round = {
+    ...buildLocalRoundSummary({
+      tally: session.tally,
+      introducedCount: session.introducedCount,
+      hardWords: session.setWords.filter(word => session.hardWordIds.has(word.id)),
+    }),
+    // The whole set, for the repeat button: the summary keeps only the hard words.
+    allWords: session.setWords,
+  };
   session.status = 'round-done';
   session.peakQueueLength = 0;
   renderPractice();
@@ -2807,7 +2905,7 @@ function leaveCustomDrill() {
     onBack();
     return;
   }
-  ui.practice.mode = 'fsrs';
+  ui.practice.mode = fsrsModeForKind(ui.fsrs.kind);
   if (name === 'decks') {
     showTab('decks');
     return;
@@ -3040,7 +3138,22 @@ async function startStrugglingDrill() {
 
 // The round summary's drill buttons (buildRoundDrillButtons): the rendering shows the counts and hides a button with
 // no words, and the whole row when both are hidden.
-const ROUND_DRILL_BUTTON_IDS = { hard: 'practice-round-hard-button', 'hard-medium': 'practice-round-hard-medium-button' };
+const ROUND_DRILL_BUTTON_IDS = {
+  hard: 'practice-round-hard-button',
+  'hard-medium': 'practice-round-hard-medium-button',
+  all: 'practice-round-repeat-button',
+};
+
+// The words of a round's set. A round finished offline keeps only its hard words in round.words, so its whole set
+// (allWords, set by showLocalRoundSummary) is the one the repeat button drills.
+function roundSetWords(round) {
+  return round.isLocal ? round.allWords : round.words;
+}
+
+// Every drill button of a round summary: the difficulty drills, then the repeat of the whole set.
+function buildRoundButtons(round) {
+  return [...buildRoundDrillButtons(round.words), buildRoundRepeatButton(roundSetWords(round))];
+}
 
 function renderRoundDrillButtons(round) {
   const buttons = buildRoundDrillButtons(round.words);
@@ -3053,6 +3166,12 @@ function renderRoundDrillButtons(round) {
   // A set finished offline knows only its hard words: the second button would repeat the first.
   if (round.isLocal) $(ROUND_DRILL_BUTTON_IDS['hard-medium']).hidden = true;
   $('practice-round-drills').hidden = buttons.every(button => button.hidden || (round.isLocal && button.kind !== 'hard'));
+  // «Повторити ці слова» belongs to the Нові слова summary: the whole set again, nothing graded.
+  const repeat = buildRoundRepeatButton(roundSetWords(round));
+  const repeatButton = $(ROUND_DRILL_BUTTON_IDS.all);
+  repeatButton.textContent = repeat.label;
+  repeatButton.hidden = repeat.hidden || ui.fsrs.kind !== 'new';
+  repeatButton.disabled = roundDrillBusy;
 }
 
 // True while a round-summary drill's words are being fetched: both buttons wait (a second tap does nothing).
@@ -3063,18 +3182,16 @@ function setRoundDrillsBusy(isBusy) {
   for (const id of Object.values(ROUND_DRILL_BUTTON_IDS)) $(id).disabled = isBusy;
 }
 
-// A round-summary drill button: its words, fetched in the round's order (hardest first), start a custom drill. «Назад»
-// returns to the round summary.
 async function handleRoundDrillClick(kind) {
   const round = ui.fsrs.round;
-  const button = round && buildRoundDrillButtons(round.words).find(candidate => candidate.kind === kind);
+  const button = round && buildRoundButtons(round).find(candidate => candidate.kind === kind);
   if (!button || !button.count || roundDrillBusy) return;
   const startTab = ui.tab;
   let words;
   setRoundDrillsBusy(true);
   try {
     words = round.isLocal
-      ? round.words.filter(word => button.wordIds.includes(word.id))
+      ? roundSetWords(round).filter(word => button.wordIds.includes(word.id))
       : (await api.getDrillWords(button.wordIds)).words;
   } catch (error) {
     notice(error.message || 'Помилка');
@@ -4199,6 +4316,8 @@ function bindEvents() {
   $('home-continue-button').addEventListener('click', () => showTab('practice'));
   $('home-tile-struggling-button').addEventListener('click', handleHomeStrugglingTile);
   $('home-tile-article').addEventListener('click', openArticlePractice);
+  $('home-tile-new').addEventListener('click', () => openFsrsPractice('fsrs'));
+  $('home-tile-review').addEventListener('click', () => openFsrsPractice('review'));
   $('known-check-chips').addEventListener('click', handleKnownCheckChipClick);
   $('known-check-all').addEventListener('click', handleKnownCheckAll);
   $('known-check-done').addEventListener('click', handleKnownCheckDone);
@@ -4335,13 +4454,7 @@ function bindEvents() {
       renderPractice();
       return;
     }
-    ui.practice.mode = choice;
-    ui.practice.isModePickerOpen = false;
-    if (ui.practice.mode === 'art') pickArticleQuestion();
-    $('practice-input').value = '';
-    if (ui.practice.mode === 'struggling') startStrugglingDrill();
-    else ensureFsrsSession();
-    renderPractice();
+    choosePracticeMode(choice);
   });
   $('practice-form').addEventListener('submit', event => {
     event.preventDefault();
@@ -4384,6 +4497,8 @@ function bindEvents() {
   $('practice-shuffle-button').addEventListener('click', toggleShuffle);
   $('practice-round-hard-button').addEventListener('click', () => handleRoundDrillClick('hard'));
   $('practice-round-hard-medium-button').addEventListener('click', () => handleRoundDrillClick('hard-medium'));
+  $('practice-round-repeat-button').addEventListener('click', () => handleRoundDrillClick('all'));
+  $('practice-done-action-button').addEventListener('click', event => choosePracticeMode(event.currentTarget.dataset.mode));
   $('practice-round-next-button').addEventListener('click', handleRoundNextClick);
   $('practice-round-finish-button').addEventListener('click', handleRoundFinishClick);
 
@@ -5241,6 +5356,7 @@ function init() {
   bindDeckEvents();
   renderShuffleButton();
   bindOfflineSupport();
+  moveLegacyPracticeSnapshots();
   let saved = 'home';
   try { saved = localStorage.getItem('tab') || 'home'; } catch { /* storage unavailable */ }
   showTab(saved);
