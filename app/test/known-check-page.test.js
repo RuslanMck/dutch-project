@@ -80,7 +80,7 @@ test('Вчити has the «Артикль» tile, then «Що я знаю» in t
   const article = html.indexOf('id="learn-article"');
   const knownTile = html.indexOf('<button class="learn-tile" type="button" data-tab="known-check">');
   assert.ok(article > 0 && knownTile > article);
-  assert.match(html, /<span class="learn-tile__name">Що я знаю<\/span>\s*<span class="learn-tile__line">Пропусти знайомі слова/);
+  assert.match(html, /<span class="learn-tile__name">Що я знаю<\/span>\s*<span class="learn-tile__line">Пропусти знайомі</);
   assert.match(html, /<span class="learn-tile__name">Артикль<\/span>\s*<span class="learn-tile__line">de чи het/);
 });
 

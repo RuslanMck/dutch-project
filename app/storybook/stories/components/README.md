@@ -59,7 +59,6 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `WeekRecap/` | Data group. Stories and guidelines. |
 | `WordSheet/` | Content group. Stories and guidelines. |
 | `WordSheetEdit/` | Forms group. Stories and guidelines. |
-| `WordTable/` | Data group. Stories and guidelines. |
 | `WordTiles/` | Study group. Stories and guidelines. |
 
 

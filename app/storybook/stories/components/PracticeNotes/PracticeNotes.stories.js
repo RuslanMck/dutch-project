@@ -5,8 +5,8 @@ export default {
   parameters: { docs: { description: { component: readme } } },
 };
 
-// The small lines of the practice screen: the example of the word, the kind of set, the schedule, the notes of a
-// drill or a finished set, and the link to the known-words check.
+// The small lines of the practice screen: the example of the word, the kind of set, the schedule and the notes of a
+// drill or a finished set.
 export const Overview = {
   render: () => `
 <div class="col" style="max-width:460px">
@@ -15,7 +15,6 @@ export const Overview = {
   <p class="muted practice-schedule">Наступне повторення: через 3 дні</p>
   <p class="muted practice-custom-note">Тренування — розклад слів не змінюється.</p>
   <p class="muted practice-done-note">Наступні слова чекають на завтра: 6.</p>
-  <button class="practice-known-link" type="button">Перевірити, що я вже знаю</button>
 </div>
 `,
 };
@@ -35,7 +34,3 @@ export const DrillNote = {
   render: () => `<p class="muted practice-custom-note" style="max-width:460px">Тренування — розклад слів не змінюється.</p>`,
 };
 
-// The link under the mode line, to the known-words check.
-export const KnownLink = {
-  render: () => `<button class="practice-known-link" type="button">Перевірити, що я вже знаю</button>`,
-};

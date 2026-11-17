@@ -4,7 +4,6 @@ A round achievement badge with a line icon: gold when the achievement is unlocke
 - `.medal--locked` — a `garden-sand` disc with a `garden-line` border, icon in `garden-ink-soft` at half opacity.
 - `.medal--small` — 44 px, for lists, the recent row and toasts.
 - `.medal--large` — 88 px, centred above the title in the dialog.
-- `.medal-row` — a wrapping row of small medals (`.medal-row__item` is the tap target).
 
 Use it wherever one achievement is shown by its icon. Don't use it for the count of achievements (use StatTile) or for a whole group of medals (AchievementGroup).
 

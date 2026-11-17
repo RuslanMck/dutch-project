@@ -9,8 +9,6 @@ import {
   TAB_TITLES,
   TAB_SUBTITLES,
   NAVIGATION_SECTION_FOR_TAB,
-  summarizeAchievements,
-  pickRecentAchievements,
   groupAchievements,
   achievementProgressPercent,
   formatAchievementProgress,
@@ -18,7 +16,6 @@ import {
   findNewUnlocks,
   markUnlockedSeen,
   formatAchievementToast,
-  ACHIEVEMENT_RECENT_COUNT,
 } from '../public/logic.js';
 import { ACHIEVEMENT_ICON_NAMES, achievementIconParts } from '../public/achievement-icons.js';
 
@@ -39,21 +36,6 @@ const achievements = [
   { id: 'streak-7', group: 'streak', title: '7 днів поспіль', description: 'Практикуй 7 днів без пропусків', icon: 'flame',
     unlocked: false, progress: { current: 3, target: 7 } },
 ];
-
-test('summarizeAchievements gives «Отримано 12 з 87»', () => {
-  assert.deepEqual(summarizeAchievements(achievements), { unlocked: 2, total: 4, text: 'Отримано 2 з 4' });
-  const many = Array.from({ length: 87 }, (_, index) => ({ id: `a${index}`, unlocked: index < 12 }));
-  assert.equal(summarizeAchievements(many).text, 'Отримано 12 з 87');
-  assert.equal(summarizeAchievements([]).text, 'Отримано 0 з 0');
-});
-
-test('pickRecentAchievements: only unlocked medals, the later ones of the list first, at most six', () => {
-  assert.deepEqual(pickRecentAchievements(achievements).map(a => a.id), ['streak-3', 'words-10']);
-  const many = Array.from({ length: 9 }, (_, index) => ({ id: `a${index}`, unlocked: true }));
-  assert.equal(pickRecentAchievements(many).length, ACHIEVEMENT_RECENT_COUNT);
-  assert.equal(ACHIEVEMENT_RECENT_COUNT, 6);
-  assert.deepEqual(pickRecentAchievements([{ id: 'x', unlocked: false }]), []);
-});
 
 test('groupAchievements keeps the server group order and leaves out empty groups', () => {
   const grouped = groupAchievements([groups[1], { id: 'empty', title: 'Порожня' }, groups[0]], achievements);

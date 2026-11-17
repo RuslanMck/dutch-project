@@ -2804,17 +2804,6 @@ button.calendar__cell { cursor: pointer; }
 }
 .calendar__legend .calendar__cell { width: 14px; height: 14px; }
 /* ---------- Досягнення (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §5) ---------- */
-.achievements-card {
-  margin: 0 0 16px;
-  padding: 14px 16px;
-  background: var(--garden-raised);
-  border: 1px solid var(--garden-line);
-  border-radius: var(--garden-radius);
-}
-.achievements-card .stats-card__title { margin: 0 0 4px; }
-.achievements-card > p { margin: 0 0 8px; }
-.achievements-card > button { width: 100%; min-height: 44px; }
-
 /* A medal: round, gold when unlocked, muted with the icon greyed when locked. */
 .medal {
   position: relative;
@@ -2901,19 +2890,6 @@ button.calendar__cell { cursor: pointer; }
 }
 .medal-cell .medal-bar { width: 100%; }
 .medal-cell__count { font-size: 11px; color: var(--garden-ink-soft); }
-
-/* The Profile card's row of the latest medals: each one is a 44px tap target. */
-.medal-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
-.medal-row__item {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  background: none;
-  border: 0;
-  border-radius: 50%;
-}
 
 .achievement-dialog__left { margin: 0 0 8px; font-weight: var(--garden-weight-strong); text-align: center; }
 .achievement-dialog .medal-bar { margin: 0 0 6px; }

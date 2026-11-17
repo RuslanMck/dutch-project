@@ -18,8 +18,6 @@ import {
   fsrsModeForKind,
   practiceSnapshotKey,
   spareSnapshotKey,
-  formatNewWordsTileLine,
-  formatReviewTileLine,
   formatPracticeKindLine,
   formatReviewDoneNote,
   buildFsrsDoneScreen,
@@ -113,11 +111,9 @@ import {
   TAB_TITLES,
   TAB_SUBTITLES,
   NAVIGATION_SECTION_FOR_TAB,
-  buildHomeSummary,
   buildWordDetailView,
   computeQueueProgressPercent,
   findNavigationSection,
-  formatStrugglingTileLine,
   formatWordTotal,
 } from '../public/logic.js';
 
@@ -1332,7 +1328,7 @@ test('leaving the custom drill puts the daily practice back for every target, ex
 
 test('the struggling drill keeps its own name in the mode select; the other drills run as custom', () => {
   assert.match(functionBody(appSource, 'function startCustomDrill('), /mode = 'custom'[^}]*}\) \{/);
-  assert.match(functionBody(appSource, 'async function startStrugglingDrill() {'), /mode: 'struggling'/);
+  assert.match(functionBody(appSource, 'async function startStrugglingDrill('), /mode: 'struggling'/);
   assert.match(fs.readFileSync(path.join(here, '..', 'public', 'index.html'), 'utf8'), /<option value="custom" hidden disabled>/);
 });
 
@@ -1388,7 +1384,7 @@ test('every decks element id used by app.js exists in index.html, and Вчити
   assert.ok(used.size > 15, 'the section uses many ids');
   for (const id of used) assert.match(html, new RegExp(`id="${id}"`), `index.html has #${id}`);
   assert.match(html, /<section id="tab-decks" class="tab" data-tab="decks"/);
-  assert.match(html, /<button class="learn-section-link" type="button" data-tab="decks">Усі<\/button>/);
+  assert.match(html, /<button class="learn-section-link" type="button" data-tab="decks" aria-label="Усі колоди">Усі<\/button>/);
 });
 
 test('api.js exports the deck calls with the REST paths of §2.2–2.3', () => {
@@ -1430,29 +1426,10 @@ test('every tab is reachable: the bottom bar, the home tiles and the Профі�
   assert.doesNotMatch(html, /drawer/);
 });
 
-test('buildHomeSummary counts due, learning and started words', () => {
-  const now = 1_000;
-  const words = [
-    { status: 'learning', due_at: 500 },
-    { status: 'learned', due_at: 900 },
-    { status: 'learned', due_at: 5_000 },
-    { status: 'new', due_at: null },
-  ];
-  const summary = buildHomeSummary({ words, phraseCount: 3, now });
-  assert.equal(summary.line, 'До повторення: 2 · вчу: 1');
-  assert.equal(summary.startedPercent, 75);
-  assert.equal(summary.progressLabel, 'Почато 3 з 4 слів · 75%');
-  assert.equal(summary.cardsLine, '4 слова');
-  assert.equal(summary.phrasesLine, '3 фрази');
-  assert.equal(buildHomeSummary({ now }).startedPercent, 0);
-});
-
-test('formatWordTotal and formatStrugglingTileLine use Ukrainian plurals', () => {
+test('formatWordTotal uses Ukrainian plurals', () => {
   assert.equal(formatWordTotal(1), '1 слово');
   assert.equal(formatWordTotal(12), '12 слів');
-  assert.equal(formatStrugglingTileLine(null), 'Тренування без оцінок');
-  assert.equal(formatStrugglingTileLine(0), 'Немає важких слів');
-  assert.equal(formatStrugglingTileLine(22), '22 слова');
+  assert.equal(formatWordTotal(22), '22 слова');
 });
 
 test('buildWordDetailView lists status, next review, errors and the optional chapter and topic', () => {
@@ -1735,21 +1712,6 @@ test('the offline snapshots are kept per kind', () => {
   assert.equal(practiceSnapshotKey('review'), 'practice-review');
   assert.equal(spareSnapshotKey('new'), 'spare-new');
   assert.equal(spareSnapshotKey('review'), 'spare-review');
-});
-
-test('the Нові слова tile counts today with the right form of «нове»', () => {
-  assert.equal(formatNewWordsTileLine(0), 'Сьогодні: 0 нових');
-  assert.equal(formatNewWordsTileLine(1), 'Сьогодні: 1 нове');
-  assert.equal(formatNewWordsTileLine(3), 'Сьогодні: 3 нові');
-  assert.equal(formatNewWordsTileLine(5), 'Сьогодні: 5 нових');
-  assert.equal(formatNewWordsTileLine(11), 'Сьогодні: 11 нових');
-  assert.equal(formatNewWordsTileLine(null), '', 'unknown gives no line');
-});
-
-test('the Запам\'ятовування tile: the reviews owed, or «Усе повторено» at 0', () => {
-  assert.equal(formatReviewTileLine(3), '3 на сьогодні');
-  assert.equal(formatReviewTileLine(0), 'Усе повторено');
-  assert.equal(formatReviewTileLine(undefined), '');
 });
 
 test('the line under the mode select names the count of its practice', () => {

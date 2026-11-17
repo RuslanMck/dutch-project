@@ -18,14 +18,6 @@ const icon = name => `<svg class="achievement-icon" viewBox="0 0 24 24" fill="no
 const medal = ({ name = 'star', unlocked = true, size = '' }) =>
   `<span class="medal ${unlocked ? 'medal--unlocked' : 'medal--locked'}${size ? ` medal--${size}` : ''}" aria-hidden="true">${icon(name)}</span>`;
 
-// The row of the latest medals (Досягнення page and Головна summary), each one a tap target with its name.
-const medalRow = () => `
-<div class="medal-row">
-  <button class="medal-row__item" type="button" aria-label="Перша серія">${medal({ name: 'flame', size: 'small' })}</button>
-  <button class="medal-row__item" type="button" aria-label="Сто відповідей">${medal({ name: 'trophy', size: 'small' })}</button>
-  <button class="medal-row__item" type="button" aria-label="Перші 10 слів">${medal({ name: 'star', size: 'small' })}</button>
-</div>`;
-
 export const Overview = {
   render: () => `
 <div class="r" style="align-items:flex-end">
@@ -34,7 +26,6 @@ export const Overview = {
   ${medal({ name: 'trophy', unlocked: true })}
   ${medal({ name: 'trophy', unlocked: false })}
 </div>
-${medalRow()}
 `,
 };
 
@@ -50,11 +41,6 @@ export const Large = {
 
 export const Locked = {
   render: () => `<div style="max-width:320px">${medal({ name: 'trophy', unlocked: false, size: 'large' })}</div>`,
-};
-
-// The row on Досягнення: the latest unlocked medals, each with its name for a screen reader.
-export const RecentRow = {
-  render: () => medalRow(),
 };
 
 export const Playground = {

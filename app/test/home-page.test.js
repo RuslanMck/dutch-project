@@ -121,14 +121,31 @@ test('pickNextStep: all done leaves the Артикль alone and no second link'
   assert.equal(step.second, null);
 });
 
-test('pickNextStep: unknown counts make no suggestion and never print undefined or NaN', () => {
-  const none = pickNextStep();
-  assert.equal(none.main.id, 'new');
-  assert.equal(none.main.line, 'Сьогодні — з 10');
-  assert.equal(none.second.id, 'article');
-  const partial = pickNextStep({ reviewOwed: null, introducedToday: NaN, strugglingCount: undefined });
-  assert.equal(partial.main.id, 'new');
-  for (const value of [none, partial]) assert.doesNotMatch(JSON.stringify(value), /undefined|NaN/);
+test('pickNextStep: both owed and introduced unknown give the neutral card: «Вчити», no link', () => {
+  const neutral = { subtitle: 'Що вчимо сьогодні?', main: { id: 'learn', title: 'Вчити', line: 'Обери вправу' }, second: null };
+  assert.deepEqual(pickNextStep(), neutral);
+  assert.deepEqual(pickNextStep({ reviewOwed: null, introducedToday: NaN, strugglingCount: 4 }), neutral);
+  assert.doesNotMatch(JSON.stringify(pickNextStep()), /undefined|NaN|—/);
+});
+
+test('pickNextStep: an unknown introducedToday never yields «Сьогодні — з 10»; the known counts still suggest', () => {
+  const owed = pickNextStep({ reviewOwed: 0, introducedToday: undefined, strugglingCount: 0 });
+  assert.equal(owed.main.id, 'article');
+  assert.equal(owed.subtitle, 'Що вчимо сьогодні?');
+  assert.equal(owed.second, null);
+  assert.doesNotMatch(JSON.stringify([owed, pickNextStep({ reviewOwed: 3, introducedToday: NaN })]), /—|з 10/);
+  const review = pickNextStep({ reviewOwed: 3, introducedToday: null, strugglingCount: 0 });
+  assert.equal(review.main.id, 'review');
+  assert.equal(review.second.id, 'article');
+  const struggling = pickNextStep({ reviewOwed: 0, introducedToday: null, strugglingCount: 2 });
+  assert.equal(struggling.main.id, 'struggling');
+});
+
+test('pickNextStep: the daily set size from the server is used in the lines', () => {
+  const step = pickNextStep({ reviewOwed: 0, introducedToday: 4, strugglingCount: 0, setSize: 12 });
+  assert.equal(step.main.line, 'Сьогодні 4 з 12');
+  assert.equal(step.second.label, 'або Артикль · de чи het');
+  assert.equal(pickNextStep({ reviewOwed: 0, introducedToday: 12, strugglingCount: 0, setSize: 12 }).subtitle, 'На сьогодні все зроблено');
 });
 
 test('pickNextStep: a single owed word is «1 слово», and review is the main card when owed', () => {
@@ -198,14 +215,14 @@ test('buildHomeWeek: an empty calendar is a quiet week, with no days practised l
 
 // ---------- the numbers ----------
 
-test('buildHomeNumbers: words in progress (learning + review), new today, and the right share of 7 days', () => {
-  const numbers = buildHomeNumbers({ learning: 78, fsrsReview: 88, introducedToday: 0, goodShare7Days: 0.484 });
-  assert.deepEqual(numbers.map(number => number.value), ['166', '0', '48%']);
+test('buildHomeNumbers: the words with status learning only, new today, and the right share of 7 days', () => {
+  const numbers = buildHomeNumbers({ learning: 78, introducedToday: 0, goodShare7Days: 0.484 });
+  assert.deepEqual(numbers.map(number => number.value), ['78', '0', '48%']);
   assert.deepEqual(numbers.map(number => number.label), ['слів учу', 'нових сьогодні', 'правильно за 7 днів']);
 });
 
-test('buildHomeNumbers: the plural forms of the words and the new ones; a missing review set counts as none', () => {
-  const one = buildHomeNumbers({ learning: 1, fsrsReview: null, introducedToday: 1, goodShare7Days: 1 });
+test('buildHomeNumbers: the plural forms of the words and the new ones; learned words and reviews are not counted', () => {
+  const one = buildHomeNumbers({ learning: 1, introducedToday: 1, goodShare7Days: 1 });
   assert.equal(one[0].value, '1');
   assert.equal(one[0].label, 'слово вчу');
   assert.equal(one[1].label, 'нове сьогодні');

@@ -117,7 +117,6 @@ test('the Ukrainian texts of the spec are in the page exactly', () => {
     'Ще 10',
     'Сьогодні нових: ',
     'Залишилось на сьогодні: ',
-    'Усе повторено',
   ];
   // logic.js writes its apostrophes escaped (\'), the page text has the plain one.
   const pageText = `${html}${logicSource}`.replace(/\\'/g, "'");

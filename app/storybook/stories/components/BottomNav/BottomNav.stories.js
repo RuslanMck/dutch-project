@@ -9,6 +9,7 @@ export const Overview = {
   render: () => `
 <div class="story-static-nav">
   <nav id="bottom-nav" class="bottom-nav" aria-label="Розділи">
+    <span id="bottom-nav-pill" class="bottom-nav__pill" aria-hidden="true"></span>
       <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 10.5L12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5h4v5"/></svg><span>Головна</span></button>
       <button class="bottom-nav__item" type="button" data-tab="table" data-nav="dictionary"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/><path d="M9.5 12.5l2-5.5 2 5.5M10.2 10.8h2.6"/></svg><span>Словник</span></button>
       <button class="bottom-nav__hub" type="button" data-tab="learn" data-nav="learn" aria-current="page"><span class="bottom-nav__slot" aria-hidden="true"></span><span class="bottom-nav__disc"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1V19c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5V20"/></svg></span><span>Вчити</span></button>
@@ -23,6 +24,7 @@ export const OnHome = {
   render: () => `
 <div class="story-static-nav">
   <nav id="bottom-nav" class="bottom-nav" aria-label="Розділи">
+    <span id="bottom-nav-pill" class="bottom-nav__pill" aria-hidden="true"></span>
       <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home" aria-current="page"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 10.5L12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5h4v5"/></svg><span>Головна</span></button>
       <button class="bottom-nav__item" type="button" data-tab="table" data-nav="dictionary"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/><path d="M9.5 12.5l2-5.5 2 5.5M10.2 10.8h2.6"/></svg><span>Словник</span></button>
       <button class="bottom-nav__hub" type="button" data-tab="learn" data-nav="learn"><span class="bottom-nav__slot" aria-hidden="true"></span><span class="bottom-nav__disc"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1V19c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5V20"/></svg></span><span>Вчити</span></button>
@@ -37,6 +39,7 @@ export const OnDictionary = {
   render: () => `
 <div class="story-static-nav">
   <nav id="bottom-nav" class="bottom-nav" aria-label="Розділи">
+    <span id="bottom-nav-pill" class="bottom-nav__pill" aria-hidden="true"></span>
       <button class="bottom-nav__item" type="button" data-tab="home" data-nav="home"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 10.5L12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5h4v5"/></svg><span>Головна</span></button>
       <button class="bottom-nav__item" type="button" data-tab="table" data-nav="dictionary" aria-current="page"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/><path d="M9.5 12.5l2-5.5 2 5.5M10.2 10.8h2.6"/></svg><span>Словник</span></button>
       <button class="bottom-nav__hub" type="button" data-tab="learn" data-nav="learn"><span class="bottom-nav__slot" aria-hidden="true"></span><span class="bottom-nav__disc"><svg class="garden-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1V19c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5V20"/></svg></span><span>Вчити</span></button>

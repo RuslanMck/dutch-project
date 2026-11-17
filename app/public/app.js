@@ -35,11 +35,11 @@ import {
   formatExerciseTitle,
   formatLearnNewLine,
   formatLearnNewPill,
+  isLearnNewDone,
   formatLearnPhrasesLine,
   formatLearnReviewLine,
   formatLearnStrugglingLine,
   isExerciseTab,
-  LEARN_SET_SIZE,
   formatRoundNextLabel,
   buildRoundRepeatButton,
   buildFsrsDoneScreen,
@@ -211,10 +211,11 @@ const ui = {
     error: '', isAnswering: false,
   },
   tab: 'home',
-  // Вчити: the Важкі слова count, and the daily practices' counts ({ introducedToday, reviewOwed, phraseSetLeft }), null while unknown.
-  // Головна: the Важкі слова count, the daily counts, and the numbers read with the page: streak (days), the calendar
-  // days of two weeks, the vocabulary's learning and FSRS review counts. Each is null while unknown.
-  home: { strugglingCount: null, practiceCounts: null, streak: null, calendarDays: null, learning: null, fsrsReview: null },
+  // Вчити and Головна: the Важкі слова count, and the daily practices' counts ({ introducedToday, reviewOwed,
+  // phraseSetLeft, setSize, goodShare }), null while unknown. A failed read keeps the last known value.
+  // Головна also reads the streak (days), the calendar days of two weeks and the words still being learned (learning).
+  // Each is null while unknown.
+  home: { strugglingCount: null, practiceCounts: null, streak: null, calendarDays: null, learning: null },
   learnScrollY: 0,                   // where Вчити was scrolled when an exercise opened; ✕ goes back there
   // Medals (Досягнення tab): status loading | ready | failed; data is the last answer of GET /api/achievements.
   achievements: { status: 'loading', data: null },
@@ -458,6 +459,8 @@ function showTab(name) {
   const nextTab = TABS.includes(name) ? name : 'home';
   // Leaving Вчити remembers where it was scrolled: ✕ on an exercise comes back to that place.
   if (previousTab === 'learn' && nextTab !== 'learn') ui.learnScrollY = window.scrollY;
+  // An exercise entered from anywhere but Вчити (Головна's Далі card, a deck) has no Вчити scroll to return to: ✕ lands at the top.
+  if (isExerciseTab(nextTab) && previousTab !== 'learn' && !isExerciseTab(previousTab)) ui.learnScrollY = 0;
   ui.tab = nextTab;
   ui.armed = null;                   // switching tabs disarms the phrase delete
   try { localStorage.setItem('tab', ui.tab); } catch { /* storage unavailable */ }
@@ -503,17 +506,19 @@ function showTab(name) {
   if (ui.tab === 'stats') { loadStats(); loadCalendar(); }
   if (ui.tab === 'week') loadWeek();
   else stopWeekTimer();
-  if (['home', 'profile', 'achievements'].includes(ui.tab)) loadAchievements();
+  // The medals are read on Головна (unlock toasts, the next medal) and on Досягнення (the page itself).
+  if (['home', 'achievements'].includes(ui.tab)) loadAchievements();
   if (ui.tab === 'decks') loadDeckList();
   if (ui.tab === 'word-order') refreshWordOrderIfNeeded();
   if (ui.tab === 'rule-quiz') loadRuleQuizOverview();
   render();
 }
 
-function focusTabHeading() {
-  if (ui.tab === 'home') $('home-greeting').focus();
-  else if (isExerciseTab(ui.tab)) $('exercise-title').focus();
-  else $('page-title').focus();
+// options: { preventScroll } for a focus that must not move the page (✕ restores Вчити's scroll itself).
+function focusTabHeading(options) {
+  if (ui.tab === 'home') $('home-greeting').focus(options);
+  else if (isExerciseTab(ui.tab)) $('exercise-title').focus(options);
+  else $('page-title').focus(options);
 }
 
 // ---------- exercise screens (§5) ----------
@@ -528,8 +533,9 @@ function renderExerciseBar() {
 function closeExercise() {
   const scrollY = ui.learnScrollY;
   showTab('learn');
+  // The heading takes focus without a jump, then the page goes back to where Вчити was.
+  focusTabHeading({ preventScroll: true });
   window.scrollTo(0, scrollY);
-  focusTabHeading();
 }
 
 // ---------- Налаштування ----------
@@ -569,7 +575,7 @@ async function loadHomeStrugglingCount() {
     const listing = await api.getStrugglingWords();
     ui.home.strugglingCount = listing.count;
   } catch {
-    ui.home.strugglingCount = null;
+    // A failed read keeps the count on screen; it is read again the next time the page opens.
   }
   renderPracticeCounts();
 }
@@ -583,10 +589,11 @@ async function loadHomePracticeCounts() {
       introducedToday: stats.introduced_today,
       reviewOwed: stats.review_owed,
       phraseSetLeft: stats.phrases?.set_phrases_left,
+      setSize: stats.set_size,
       goodShare: stats.good_share_7_days,
     };
   } catch {
-    ui.home.practiceCounts = null;
+    // A failed read keeps the last known counts: a stale number beats a blank card.
   }
   renderPracticeCounts();
 }
@@ -609,15 +616,19 @@ function settledValue(result) {
   return result.status === 'fulfilled' ? result.value : null;
 }
 
-// The streak from the week's activity, the two weeks of the calendar, and the vocabulary counts of Статистика.
+// Головна's loader token: a reply to an older load does not overwrite a newer one (the pattern of loadAchievements).
+let homeOverviewRequest = 0;
+
+// The streak from the week's activity, the two weeks of the calendar, and the words being learned (Статистика).
 async function loadHomeOverview() {
+  const request = ++homeOverviewRequest;
   const [activity, calendar, stats] = await Promise.allSettled([api.getActivity('week'), api.getCalendar(14), api.getStats()]);
+  if (request !== homeOverviewRequest) return;
   const overview = settledValue(stats);
   ui.home.streak = settledValue(activity)?.streak?.current ?? null;
   ui.home.calendarDays = settledValue(calendar)?.days ?? null;
   ui.home.learning = overview?.words?.learning ?? null;
-  ui.home.fsrsReview = overview?.fsrs?.review ?? null;
-  renderHome();
+  if (ui.tab === 'home') renderHome();
 }
 
 // Головна: the greeting, the Далі card, the goal, the week, the numbers and the next medal. Unknown numbers show «—».
@@ -646,6 +657,7 @@ function renderHomeNext() {
     reviewOwed: counts?.reviewOwed,
     introducedToday: counts?.introducedToday,
     strugglingCount: ui.home.strugglingCount,
+    setSize: counts?.setSize,
   });
   $('home-subtitle').textContent = step.subtitle;
   $('home-next-title').textContent = step.main.title;
@@ -668,6 +680,10 @@ function handleHomeNextClick(event) {
   else if (id === 'new') openFsrsPractice('fsrs');
   else if (id === 'struggling') handleHomeStrugglingTile();
   else if (id === 'article') openArticlePractice();
+  else if (id === 'learn') {
+    showTab('learn');
+    focusTabHeading();
+  }
 }
 
 // The week strip: seven cells, Monday first, shaded by the answers of each day; the line about last week.
@@ -687,7 +703,6 @@ function renderHomeNumbers() {
   const counts = ui.home.practiceCounts;
   const numbers = buildHomeNumbers({
     learning: ui.home.learning,
-    fsrsReview: ui.home.fsrsReview,
     introducedToday: counts?.introducedToday,
     goodShare7Days: counts?.goodShare,
   });
@@ -727,8 +742,12 @@ function currentResumeView() {
 function resumeLearnPractice() {
   const view = currentResumeView();
   if (!view) return;
-  if (view.mode === 'custom') showTab('practice');
-  else openFsrsPractice(view.mode);
+  if (view.mode === 'custom') {
+    // The drill on screen reopens in its own mode, not the last daily mode.
+    ui.practice.mode = ui.custom.mode;
+    showTab('practice');
+    focusTabHeading();
+  } else openFsrsPractice(view.mode);
 }
 
 // Every number of Вчити: the cards and tiles. An unknown count shows «…», never «undefined».
@@ -742,13 +761,13 @@ function renderLearn() {
   const counts = ui.home.practiceCounts;
   const introduced = counts?.introducedToday ?? NaN;
   const owed = counts?.reviewOwed ?? NaN;
+  const setSize = counts?.setSize;
   // The words still new are read from the word list: it is loaded with the page.
   const newLeft = state.words.filter(word => word.status === 'new').length;
-  const newDone = Number.isFinite(introduced) && introduced >= LEARN_SET_SIZE;
-  $('learn-new-line').textContent = formatLearnNewLine(introduced, newLeft);
-  $('learn-new-fill').style.width = `${computeLearnNewPercent(introduced)}%`;
-  $('learn-new-pill').textContent = formatLearnNewPill(introduced);
-  $('learn-new-done').hidden = !newDone;
+  $('learn-new-line').textContent = formatLearnNewLine(introduced, newLeft, setSize);
+  $('learn-new-fill').style.width = `${computeLearnNewPercent(introduced, setSize)}%`;
+  $('learn-new-pill').textContent = formatLearnNewPill(introduced, setSize);
+  $('learn-new-done').hidden = !isLearnNewDone(introduced, setSize);
   $('learn-review-line').textContent = formatLearnReviewLine(owed);
   $('learn-review-done').hidden = owed !== 0;
   $('learn-struggling-line').textContent = formatLearnStrugglingLine(ui.home.strugglingCount);
@@ -761,7 +780,7 @@ function renderLearnDecks() {
   const all = el('button', '', 'learn-deck');
   all.type = 'button';
   all.dataset.learnAct = 'cards';
-  all.append(el('span', 'Усі слова', 'learn-deck__name'), el('span', formatWordTotal(state.words.length), 'muted learn-deck__line'));
+  all.append(el('span', 'Усі слова', 'learn-deck__name'), el('span', `Картки · ${formatWordTotal(state.words.length)}`, 'muted learn-deck__line'));
   const deckButtons = decks.list.map(deck => {
     const button = el('button', '', 'learn-deck');
     button.type = 'button';
@@ -781,8 +800,10 @@ function renderLearnDecks() {
 function handleLearnDecksClick(event) {
   const button = event.target.closest('button[data-learn-act], button[data-deck-id]');
   if (!button) return;
-  if (button.dataset.learnAct === 'cards') showTab('cards');
-  else if (button.dataset.learnAct === 'new-deck') {
+  if (button.dataset.learnAct === 'cards') {
+    showTab('cards');
+    focusTabHeading();
+  } else if (button.dataset.learnAct === 'new-deck') {
     showTab('decks');
     startNewDeck();
   } else {
@@ -791,9 +812,11 @@ function handleLearnDecksClick(event) {
   }
 }
 
+// Важкі слова from Вчити or Головна: «Назад» of the drill returns there.
 function handleHomeStrugglingTile() {
   showTab('practice');
-  handleStrugglingButtonClick();
+  focusTabHeading();
+  startStrugglingDrill('learn');
 }
 
 // ---------- Головна: ціль на день ----------
@@ -962,6 +985,7 @@ function openArticlePractice() {
   $('practice-input').value = '';
   pickArticleQuestion();
   showTab('practice');
+  focusTabHeading();
 }
 
 // Practice in one of the FSRS modes: Головна's Нові слова and Запам'ятовування tiles.
@@ -969,6 +993,7 @@ function openFsrsPractice(mode) {
   ui.practice.mode = mode;
   $('practice-input').value = '';
   showTab('practice');
+  focusTabHeading();
 }
 
 // ---------- Профіль: поточна глава (plan §4) ----------
@@ -2127,11 +2152,11 @@ function handleRoundNextClick() {
   refillFsrsQueue();
 }
 
-// «Завершити на сьогодні»: leaves the summary for Головна. The session stays; opening Практика later plans the next set.
+// «Завершити на сьогодні»: leaves the summary for Вчити. The session stays; opening Практика later plans the next set.
 function handleRoundFinishClick() {
   ui.fsrs.round = null;
   ui.fsrs.status = 'idle';
-  showTab('home');
+  showTab('learn');
 }
 
 function renderRoundSummary() {
@@ -2466,7 +2491,7 @@ function choosePracticeMode(mode) {
   ui.practice.mode = mode;
   if (mode === 'art') pickArticleQuestion();
   $('practice-input').value = '';
-  if (mode === 'struggling') startStrugglingDrill();
+  if (mode === 'struggling') startStrugglingDrill('practice');
   else ensureFsrsSession();
   renderPractice();
 }
@@ -3108,7 +3133,7 @@ function createCustomDrill(status) {
   };
 }
 
-// The return target: a name ('round-summary' | 'practice' | 'decks') or { name, onBack } where onBack goes back itself.
+// The return target: a name ('round-summary' | 'practice' | 'decks' | 'learn') or { name, onBack } where onBack goes back itself.
 function resolveReturnTo(returnTo) {
   if (typeof returnTo === 'string') return { name: returnTo, onBack: null };
   return { name: returnTo?.name ?? 'practice', onBack: returnTo?.onBack ?? null };
@@ -3127,18 +3152,20 @@ function isCustomPracticeMode() {
 }
 
 // Starts a custom drill with these practice words (id, uk, nl, article, …) and shows it on the Практика tab.
-// title: the name in the progress line. returnTo: where «Назад» goes at the end: 'round-summary' | 'practice' | 'decks',
-// or { name, onBack }. The 'decks' name shows the Колоди tab (it must be in TABS) unless onBack is given.
+// title: the name in the progress line. returnTo: where «Назад» goes at the end: 'round-summary' | 'practice' | 'decks'
+// | 'learn' (Вчити: the drill was started there or from Головна), or { name, onBack }. source: the drill log's name
+// when it is not the one findDrillSource gives (a deck drill from Вчити). The 'decks' name shows the Колоди tab
+// (it must be in TABS) unless onBack is given.
 // mode: the practice mode select value while it runs ('custom', or 'struggling' for the Важкі слова drill).
 // Callers check that the learner is still on the tab they started from before calling it.
-function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom', formDeck = null }) {
+function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom', formDeck = null, source = null }) {
   const drill = createCustomDrill(words.length ? 'ready' : 'empty');
   const resolvedReturnTo = resolveReturnTo(returnTo);
   Object.assign(drill, {
     mode,
     title,
     formDeck,
-    source: findDrillSource({ mode, returnTo: resolvedReturnTo }),
+    source: source ?? findDrillSource({ mode, returnTo: resolvedReturnTo }),
     words: [...words],
     returnTo: resolvedReturnTo,
     total: words.length,
@@ -3154,8 +3181,8 @@ function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom'
 
 // «Ще раз»: the same words in a new order.
 function restartCustomDrill() {
-  const { title, words, returnTo, mode, formDeck } = ui.custom;
-  startCustomDrill({ title, words, returnTo, mode, formDeck });
+  const { title, words, returnTo, mode, formDeck, source } = ui.custom;
+  startCustomDrill({ title, words, returnTo, mode, formDeck, source });
 }
 
 // «Назад»: back to where the drill started. The FSRS session keeps its state, so a round summary (round-done) or the
@@ -3170,6 +3197,11 @@ function leaveCustomDrill() {
   ui.practice.mode = fsrsModeForKind(ui.fsrs.kind);
   if (name === 'decks') {
     showTab('decks');
+    return;
+  }
+  if (name === 'learn') {
+    showTab('learn');
+    window.scrollTo(0, ui.learnScrollY);
     return;
   }
   showTab('practice');
@@ -3358,15 +3390,15 @@ function renderCustomEnd() {
   $('practice-drill-note').textContent = end.noteText;
 }
 
-// The FSRS summary's button: the mode select moves to the drill and the drill starts.
+// The FSRS summary's button: the mode select moves to the drill and the drill starts. «Назад» returns to Практика.
 function handleStrugglingButtonClick() {
   ui.practice.mode = 'struggling';
-  startStrugglingDrill();
+  startStrugglingDrill('practice');
 }
 
 // Reads the words whose latest graded answer was wrong or hard, then drills them as a custom drill titled «Важкі слова».
-// Nothing is posted: the schedule does not change.
-async function startStrugglingDrill() {
+// Nothing is posted: the schedule does not change. returnTo: 'learn' from Вчити or Головна, else 'practice'.
+async function startStrugglingDrill(returnTo = 'practice') {
   const loading = createCustomDrill('loading');
   loading.title = STRUGGLING_DRILL_TITLE;
   loading.mode = 'struggling';
@@ -3395,7 +3427,7 @@ async function startStrugglingDrill() {
     return;
   }
   // An empty list still starts with the struggling mode on screen, so the select names the drill.
-  startCustomDrill({ title: STRUGGLING_DRILL_TITLE, words: listing.words, returnTo: 'practice', mode: 'struggling' });
+  startCustomDrill({ title: STRUGGLING_DRILL_TITLE, words: listing.words, returnTo, mode: 'struggling' });
 }
 
 // The round summary's drill buttons (buildRoundDrillButtons): the rendering shows the counts and hides a button with
@@ -5197,7 +5229,9 @@ async function practiceDeck(deck) {
     // The learner went to another tab while the words loaded: the drill does not start, and the tab is not changed.
     if (ui.tab !== startTab) return;
     decks.view = 'list';
-    startCustomDrill({ title: `Колода: ${deck.name}`, words, returnTo: 'decks' });
+    const returnTo = startTab === 'learn' ? 'learn' : 'decks';
+    startCustomDrill({ title: `Колода: ${deck.name}`, words, returnTo, source: 'deck' });
+    focusTabHeading();
   } catch (error) {
     notice(error.message || 'Помилка');
   } finally {

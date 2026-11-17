@@ -21,6 +21,7 @@ import {
   formatResumeLeft,
   formatWaitingWords,
   isExerciseTab,
+  isLearnNewDone,
   NAVIGATION_SECTION_FOR_TAB,
   PRACTICE_MODE_TITLES,
   TAB_SUBTITLES,
@@ -58,13 +59,13 @@ test('formatWaitingWords agrees the noun and the verb with the count', () => {
   assert.equal(formatWaitingWords(5), '5 слів чекають');
   assert.equal(formatWaitingWords(11), '11 слів чекають');
   assert.equal(formatWaitingWords(21), '21 слово чекає');
-  assert.equal(formatWaitingWords(0), 'нових слів не лишилось');
+  assert.equal(formatWaitingWords(0), 'нових слів не залишилося');
 });
 
 test('the Нові слова card line: today out of the set, capped at 10; an unknown count is «…»', () => {
   assert.equal(formatLearnNewLine(3, 42), 'Сьогодні 3 з 10 · 42 слова чекають');
   assert.equal(formatLearnNewLine(12, 1), 'Сьогодні 10 з 10 · 1 слово чекає');
-  assert.equal(formatLearnNewLine(0, 0), 'Сьогодні 0 з 10 · нових слів не лишилось');
+  assert.equal(formatLearnNewLine(0, 0), 'Сьогодні 0 з 10 · нових слів не залишилося');
   assert.equal(formatLearnNewLine(NaN, 5), '…');
   assert.equal(formatLearnNewLine(2, undefined), '…');
 });
@@ -75,6 +76,19 @@ test('the Нові слова bar and pill: a full set reads «Ще 10», never 
   assert.equal(computeLearnNewPercent(NaN), 0);
   assert.equal(formatLearnNewPill(9), 'Почати');
   assert.equal(formatLearnNewPill(10), 'Ще 10');
+});
+
+test('the daily set size comes from the server (set_size); 10 is the fallback', () => {
+  assert.equal(formatLearnNewLine(3, 42, 12), 'Сьогодні 3 з 12 · 42 слова чекають');
+  assert.equal(formatLearnNewLine(12, 1, 12), 'Сьогодні 12 з 12 · 1 слово чекає');
+  assert.equal(formatLearnNewLine(3, 42, null), 'Сьогодні 3 з 10 · 42 слова чекають');
+  assert.equal(formatLearnNewLine(3, 42, 0), 'Сьогодні 3 з 10 · 42 слова чекають');
+  assert.equal(formatLearnNewPill(12, 12), 'Ще 12');
+  assert.equal(formatLearnNewPill(9, 12), 'Почати');
+  assert.equal(computeLearnNewPercent(6, 12), 50);
+  assert.equal(isLearnNewDone(10, 12), false);
+  assert.equal(isLearnNewDone(12, 12), true);
+  assert.equal(isLearnNewDone(NaN, 10), false);
 });
 
 test('the Запам\'ятовування card line: the words, the minutes, or «all repeated» when nothing is owed', () => {
@@ -175,7 +189,7 @@ test('Вчити: the resume strip, the daily cards, the word and sentence tiles
   assert.match(learn, /<button class="learn-tile" type="button" data-tab="word-order">/);
   assert.match(learn, /<button class="learn-tile" type="button" data-tab="rule-quiz">/);
   assert.match(learn, /<button class="learn-tile" type="button" data-tab="phrases">/);
-  assert.match(learn, /<button class="learn-section-link" type="button" data-tab="decks">Усі<\/button>/);
+  assert.match(learn, /<button class="learn-section-link" type="button" data-tab="decks" aria-label="Усі колоди">Усі<\/button>/);
   // The counts are drawn by app.js, so the markup holds no number of its own.
   assert.doesNotMatch(learn, /undefined/);
 });
@@ -206,7 +220,7 @@ test('the exercise bar: ✕ with its label, and the title that takes the focus',
   assert.match(html, /<button id="exercise-close" class="icon-button" type="button" aria-label="Закрити вправу">/);
   assert.match(html, /<h1 id="exercise-title" class="exercise-bar__title" tabindex="-1"><\/h1>/);
   assert.match(appSource, /\$\('exercise-close'\)\.addEventListener\('click', closeExercise\);/);
-  assert.match(appSource, /else if \(isExerciseTab\(ui\.tab\)\) \$\('exercise-title'\)\.focus\(\);/);
+  assert.match(appSource, /else if \(isExerciseTab\(ui\.tab\)\) \$\('exercise-title'\)\.focus\(options\);/);
   assert.match(appSource, /document\.body\.classList\.toggle\('is-exercise', isExerciseTab\(ui\.tab\)\);/);
   assert.match(css, /body\.is-exercise #top-header,\s*body\.is-exercise #bottom-nav \{ display: none; \}/);
   assert.match(css, /body\.is-exercise \.exercise-bar \{ display: flex; \}/);
@@ -215,8 +229,49 @@ test('the exercise bar: ✕ with its label, and the title that takes the focus',
 test('✕ goes back to Вчити at the scroll position it had: the position is kept when Вчити is left', () => {
   const close = appSource.slice(appSource.indexOf('function closeExercise() {'), appSource.indexOf('\n}\n', appSource.indexOf('function closeExercise() {')));
   assert.match(close, /const scrollY = ui\.learnScrollY;/);
-  assert.match(close, /showTab\('learn'\);\s*window\.scrollTo\(0, scrollY\);/);
+  assert.match(close, /focusTabHeading\(\{ preventScroll: true \}\);\s*window\.scrollTo\(0, scrollY\);/);
   assert.match(appSource, /if \(previousTab === 'learn' && nextTab !== 'learn'\) ui\.learnScrollY = window\.scrollY;/);
+});
+
+test('an exercise entered from elsewhere than Вчити resets the saved Вчити scroll, so ✕ lands at the top', () => {
+  assert.match(appSource, /if \(isExerciseTab\(nextTab\) && previousTab !== 'learn' && !isExerciseTab\(previousTab\)\) ui\.learnScrollY = 0;/);
+});
+
+// The body of one top-level function of app.js (from its header to the closing brace at column 0).
+function appFunction(header) {
+  const start = appSource.indexOf(header);
+  assert.ok(start >= 0, `${header} is in app.js`);
+  return appSource.slice(start, appSource.indexOf('\n}\n', start) + 3);
+}
+
+test('the resume strip reopens the drill in its own mode; the daily sets keep their mode', () => {
+  const resume = appFunction('function resumeLearnPractice() {');
+  assert.match(resume, /if \(view\.mode === 'custom'\) \{[\s\S]*?ui\.practice\.mode = ui\.custom\.mode;\s*showTab\('practice'\);/);
+  assert.match(resume, /else openFsrsPractice\(view\.mode\);/);
+});
+
+test('the exercises opened from a button move focus to their title after the switch', () => {
+  for (const header of ['function openFsrsPractice(mode) {', 'function openArticlePractice() {', 'function handleHomeStrugglingTile() {',
+    'function resumeLearnPractice() {', 'function handleHomeNextClick(event) {', 'function handleLearnDecksClick(event) {']) {
+    assert.match(appFunction(header), /focusTabHeading\(/, `${header} moves focus`);
+  }
+  assert.match(appFunction('async function practiceDeck(deck) {'), /source: 'deck' \}\);\s*focusTabHeading\(\);/);
+});
+
+test('a drill started from Вчити or Головна returns to Вчити; the Колоди page keeps its own return', () => {
+  assert.match(appFunction('function handleHomeStrugglingTile() {'), /startStrugglingDrill\('learn'\);/);
+  assert.match(appFunction('async function startStrugglingDrill(returnTo = \'practice\') {'), /returnTo, mode: 'struggling'/);
+  assert.match(appFunction('function handleStrugglingButtonClick() {'), /startStrugglingDrill\('practice'\);/);
+  assert.match(appFunction('async function practiceDeck(deck) {'), /const returnTo = startTab === 'learn' \? 'learn' : 'decks';\s*startCustomDrill\(\{[^\n]*source: 'deck' \}\)/);
+  assert.match(appFunction('function leaveCustomDrill() {'), /if \(name === 'learn'\) \{\s*showTab\('learn'\);/);
+  assert.match(appFunction('function handleRoundFinishClick() {'), /showTab\('learn'\);/);
+});
+
+test('the learn page wiring: the return to Вчити and the Головна loader keep the newest reply', () => {
+  assert.match(appFunction('async function loadHomeOverview() {'), /const request = \+\+homeOverviewRequest;/);
+  assert.match(appFunction('async function loadHomeOverview() {'), /if \(request !== homeOverviewRequest\) return;/);
+  assert.match(appFunction('async function loadHomeOverview() {'), /if \(ui\.tab === 'home'\) renderHome\(\);/);
+  assert.match(appSource, /\['home', 'achievements'\]\.includes\(ui\.tab\)\) loadAchievements\(\);/);
 });
 
 test('the practice page has no mode block; the mode select stays in the DOM, hidden, for app.js', () => {

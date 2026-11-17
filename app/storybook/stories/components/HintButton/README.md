@@ -1,12 +1,10 @@
-The «i» next to a label that reveals a `.hint` paragraph (`garden-sand` ground, `garden-ink` text, `small`).
-It is an `IconButton` in its compact size: `.icon-button.icon-button--compact` (32px target) with a `garden-icon--sm` (18px) info icon,
-so it doesn't make the label row much taller. Beside other icon buttons (the practice meta row) use the normal
-`.icon-button` with a 22px icon.
+The «i» button next to a line of practice that reveals a `.hint` paragraph (`garden-sand` ground, `garden-ink` text, `small`). In the app it is `#practice-progress-hint-button`, in the practice progress row: it explains what the remaining count means.
 
-- **Closed:** `garden-ink-soft`, no fill.
-- **Open** (`aria-expanded="true"`): `garden-ink` on a `garden-sand` square — the same "on" state as every icon button.
+It is a plain `IconButton` (`.icon-button`, 44px target) with a 22px `garden-icon` info icon, placed in the row of the practice's other icon buttons.
 
-Use it for any explanation longer than one line. The button toggles `aria-expanded` and the hint's `hidden`.
-It always has an `aria-label`; the SVG is `aria-hidden`.
+- **Closed** (`aria-expanded="false"`): `garden-ink-soft` icon, no fill; the hint is `hidden`.
+- **Open** (`aria-expanded="true"`): `garden-ink` on a `garden-sand` square, the same "on" state as every icon button; the hint shows under the row.
 
-Markup from `public/index.html`; styled by `storybook/styles/garden.css`.
+Use it for any explanation longer than one line. The button toggles `aria-expanded` and the hint's `hidden`. It always has an `aria-label`; the SVG is `aria-hidden`. The mode select and its explanation are gone: the mode is chosen on Вчити.
+
+Markup from `public/index.html` (`#practice-progress-hint-button`, `#practice-progress-hint`); styled by `storybook/styles/garden.css`.

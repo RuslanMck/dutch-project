@@ -1252,30 +1252,8 @@ export function formatExerciseTitle(tab, mode) {
   return TAB_TITLES[tab] ?? '';
 }
 
-// The home screen's numbers. words: the word list (status, due_at); now: milliseconds. The bar shows started words.
-export function buildHomeSummary({ words = [], phraseCount = 0, now }) {
-  const dueCount = words.filter(word => word.due_at != null && word.due_at <= now && word.status !== 'new').length;
-  const learningCount = words.filter(word => word.status === 'learning').length;
-  // Started = left the «new» status. (Статистика's «Слів вивчено» counts finished learning decks, a different measure.)
-  const startedCount = words.filter(word => word.status !== 'new').length;
-  const startedPercent = words.length ? Math.round((startedCount / words.length) * 100) : 0;
-  return {
-    line: `До повторення: ${dueCount} · вчу: ${learningCount}`,
-    startedPercent,
-    progressLabel: `Почато ${startedCount} з ${words.length} слів · ${startedPercent}%`,
-    cardsLine: formatWordTotal(words.length),
-    phrasesLine: `${phraseCount} ${pluralize(phraseCount, ['фраза', 'фрази', 'фраз'])}`,
-  };
-}
-
 export function formatWordTotal(count) {
   return `${count} ${pluralize(count, ['слово', 'слова', 'слів'])}`;
-}
-
-// The Важкі слова tile: null while the count is unknown (not read yet, or the read failed).
-export function formatStrugglingTileLine(count) {
-  if (count == null) return 'Тренування без оцінок';
-  return count ? formatWordTotal(count) : 'Немає важких слів';
 }
 
 // ---------- Вчити: the hub's cards and the resume strip ----------
@@ -1290,27 +1268,39 @@ export function estimateReviewMinutes(count) {
   return Math.max(1, Math.round((count * REVIEW_SECONDS_PER_WORD) / 60));
 }
 
+// The daily set's size: the server's set_size when it came, else the 10 of the plan.
+export function dailySetSize(setSize) {
+  return Number.isFinite(setSize) && setSize > 0 ? setSize : LEARN_SET_SIZE;
+}
+
 // «Сьогодні 3 з 10 · 42 слова чекають». Unknown counts (not read yet, or the read failed) give «…».
-export function formatLearnNewLine(introducedToday, newLeft) {
+export function formatLearnNewLine(introducedToday, newLeft, setSize = LEARN_SET_SIZE) {
   if (!Number.isFinite(introducedToday) || !Number.isFinite(newLeft)) return '…';
-  return `Сьогодні ${Math.min(introducedToday, LEARN_SET_SIZE)} з ${LEARN_SET_SIZE} · ${formatWaitingWords(newLeft)}`;
+  const size = dailySetSize(setSize);
+  return `Сьогодні ${Math.min(introducedToday, size)} з ${size} · ${formatWaitingWords(newLeft)}`;
 }
 
 // «42 слова чекають», «1 слово чекає», «5 слів чекають»; no new word left gives «нових слів не лишилось».
 export function formatWaitingWords(count) {
-  if (count <= 0) return 'нових слів не лишилось';
+  if (count <= 0) return 'нових слів не залишилося';
   return `${count} ${pluralize(count, ['слово', 'слова', 'слів'])} ${pluralize(count, ['чекає', 'чекають', 'чекають'])}`;
 }
 
 // The thin bar of the Нові слова card: today's words out of the set, never past full.
-export function computeLearnNewPercent(introducedToday) {
+export function computeLearnNewPercent(introducedToday, setSize = LEARN_SET_SIZE) {
   if (!Number.isFinite(introducedToday)) return 0;
-  return Math.min(100, Math.round((introducedToday / LEARN_SET_SIZE) * 100));
+  return Math.min(100, Math.round((introducedToday / dailySetSize(setSize)) * 100));
 }
 
-// The pill of the Нові слова card: «Ще 10» once today's set is full, «Почати» before.
-export function formatLearnNewPill(introducedToday) {
-  return Number.isFinite(introducedToday) && introducedToday >= LEARN_SET_SIZE ? 'Ще 10' : 'Почати';
+// The pill of the Нові слова card: «Ще N» once today's set is full (N = the set size), «Почати» before.
+export function formatLearnNewPill(introducedToday, setSize = LEARN_SET_SIZE) {
+  const size = dailySetSize(setSize);
+  return Number.isFinite(introducedToday) && introducedToday >= size ? `Ще ${size}` : 'Почати';
+}
+
+// True when today's daily set is full (the card shows «Зроблено»).
+export function isLearnNewDone(introducedToday, setSize = LEARN_SET_SIZE) {
+  return Number.isFinite(introducedToday) && introducedToday >= dailySetSize(setSize);
 }
 
 // «N слів на сьогодні · близько M хв», or «На сьогодні все повторено» when nothing is owed. Unknown gives «…».
@@ -1376,18 +1366,6 @@ export function practiceSnapshotKey(kind) {
 
 export function spareSnapshotKey(kind) {
   return `spare-${kind}`;
-}
-
-// The Нові слова home tile: today's new words. Null (not read yet) gives no line.
-export function formatNewWordsTileLine(count) {
-  if (!Number.isFinite(count)) return '';
-  return `Сьогодні: ${count} ${pluralize(count, ['нове', 'нові', 'нових'])}`;
-}
-
-// The Запам'ятовування home tile: the reviews still owed today. Null (not read yet) gives no line.
-export function formatReviewTileLine(count) {
-  if (!Number.isFinite(count)) return '';
-  return count ? `${count} на сьогодні` : 'Усе повторено';
 }
 
 // The line under the mode select. counts: { introducedToday, reviewOwed } of the batch on screen, or null when unknown.
@@ -1971,28 +1949,6 @@ export function buildCalendarGrid(days) {
 
 // ---------- achievements (docs/WEEK_GOAL_CALENDAR_ACHIEVEMENTS.md §5) ----------
 
-// How many medals the Profile card shows in its row.
-export const ACHIEVEMENT_RECENT_COUNT = 6;
-
-// «Отримано 12 з 87».
-export function summarizeAchievements(achievements = []) {
-  const total = achievements.length;
-  const unlocked = achievements.filter(achievement => achievement.unlocked).length;
-  return { unlocked, total, text: `Отримано ${unlocked} з ${total}` };
-}
-
-// The latest unlocked medals for the Profile row. The list has no unlock times, so the later ones of the catalog
-// come first (the server lists each group from its first to its last target).
-// The latest unlocked medals, newest first by unlocked_at (catalog order breaks ties and covers a missing time).
-export function pickRecentAchievements(achievements = [], limit = ACHIEVEMENT_RECENT_COUNT) {
-  return achievements
-    .map((achievement, index) => ({ achievement, index }))
-    .filter(({ achievement }) => achievement.unlocked)
-    .sort((left, right) => (right.achievement.unlocked_at ?? 0) - (left.achievement.unlocked_at ?? 0) || right.index - left.index)
-    .slice(0, limit)
-    .map(({ achievement }) => achievement);
-}
-
 // The achievements of each group, in the server's group order; groups without achievements are left out.
 export function groupAchievements(groups = [], achievements = []) {
   return groups
@@ -2128,29 +2084,43 @@ export const NEXT_STEP_SUBTITLES = Object.freeze({
   review: 'Почнімо з повторення',
   new: 'Час для нових слів',
   done: 'На сьогодні все зроблено',
+  open: 'Що вчимо сьогодні?',
 });
 
-// The Далі card. counts: { reviewOwed, introducedToday, strugglingCount }; null or undefined means unknown, and an
-// unknown count never makes a suggestion. The suggestions keep this order: Запам'ятовування (words owed), Нові слова
-// (the daily set not full), Важкі слова (words to drill), Артикль (always). The first is the main one, the next
-// one the small «або …» link.
-export function pickNextStep({ reviewOwed, introducedToday, strugglingCount } = {}) {
+// The Далі card. counts: { reviewOwed, introducedToday, strugglingCount, setSize }; null or undefined means unknown, and
+// an unknown count never makes a suggestion. The suggestions keep this order: Запам'ятовування (words owed), Нові слова
+// (the daily set not full: only when introducedToday is known), Важкі слова (words to drill), Артикль (always). The
+// first is the main one, the next one the small «або …» link. With both the owed and the introduced counts unknown
+// the card is neutral: «Вчити», «Обери вправу», no link.
+export function pickNextStep({ reviewOwed, introducedToday, strugglingCount, setSize = LEARN_SET_SIZE } = {}) {
+  const owedKnown = Number.isFinite(reviewOwed);
+  const introducedKnown = Number.isFinite(introducedToday);
+  if (!owedKnown && !introducedKnown) {
+    return {
+      subtitle: NEXT_STEP_SUBTITLES.open,
+      main: { id: 'learn', title: 'Вчити', line: 'Обери вправу' },
+      second: null,
+    };
+  }
+  const size = dailySetSize(setSize);
   const steps = [];
-  if (Number.isFinite(reviewOwed) && reviewOwed > 0) {
+  if (owedKnown && reviewOwed > 0) {
     steps.push({ id: 'review', title: "Запам'ятовування", line: formatLearnReviewLine(reviewOwed), hint: formatWordTotal(reviewOwed) });
   }
-  if (!Number.isFinite(introducedToday) || introducedToday < LEARN_SET_SIZE) {
-    const done = Number.isFinite(introducedToday) ? Math.min(introducedToday, LEARN_SET_SIZE) : '—';
-    steps.push({ id: 'new', title: 'Нові слова', line: `Сьогодні ${done} з ${LEARN_SET_SIZE}`, hint: `${done} з ${LEARN_SET_SIZE}` });
+  if (introducedKnown && introducedToday < size) {
+    const done = Math.min(introducedToday, size);
+    steps.push({ id: 'new', title: 'Нові слова', line: `Сьогодні ${done} з ${size}`, hint: `${done} з ${size}` });
   }
   if (Number.isFinite(strugglingCount) && strugglingCount > 0) {
     steps.push({ id: 'struggling', title: 'Важкі слова', line: `${formatWordTotal(strugglingCount)} для тренування`, hint: formatWordTotal(strugglingCount) });
   }
   steps.push({ id: 'article', title: 'Артикль', line: 'de чи het', hint: 'de чи het' });
   const [main, second = null] = steps;
+  // «All done» is said only when both counts are known to be finished; an unknown count is never called done.
+  const allDone = owedKnown && reviewOwed === 0 && introducedKnown && introducedToday >= size;
   const subtitle = main.id === 'review' ? NEXT_STEP_SUBTITLES.review
     : main.id === 'new' ? NEXT_STEP_SUBTITLES.new
-      : NEXT_STEP_SUBTITLES.done;
+      : allDone ? NEXT_STEP_SUBTITLES.done : NEXT_STEP_SUBTITLES.open;
   return {
     subtitle,
     main: { id: main.id, title: main.title, line: main.line },
@@ -2208,16 +2178,16 @@ function isoFromDayNumber(dayNumber) {
   return new Date(dayNumber * 86400000).toISOString().slice(0, 10);
 }
 
-// The three numbers of Головна: words in progress (learning + the FSRS review set), new words today, and the share
-// of right answers over 7 days. Unknown values show «—».
-export function buildHomeNumbers({ learning = null, fsrsReview = null, introducedToday = null, goodShare7Days = null } = {}) {
-  const inProgress = Number.isFinite(learning) ? learning + (Number.isFinite(fsrsReview) ? fsrsReview : 0) : null;
-  const shown = Number.isFinite(inProgress) ? inProgress : 0;
+// The three numbers of Головна: the words with status learning («слів учу»), new words today, and the share of right
+// answers over 7 days. Unknown values show «—».
+export function buildHomeNumbers({ learning = null, introducedToday = null, goodShare7Days = null } = {}) {
+  const inProgress = Number.isFinite(learning) ? learning : null;
+  const shown = inProgress ?? 0;
   const newToday = Number.isFinite(introducedToday) ? introducedToday : null;
   return [
     {
       key: 'learning',
-      value: Number.isFinite(inProgress) ? String(inProgress) : '—',
+      value: inProgress == null ? '—' : String(inProgress),
       // «у» after a consonant, «в» after a vowel: «слів учу», but «слово вчу», «слова вчу».
       label: /[аеєиіїоуюя]$/.test(pluralize(shown, WORD_COUNT_FORMS)) ? `${pluralize(shown, WORD_COUNT_FORMS)} вчу` : `${pluralize(shown, WORD_COUNT_FORMS)} учу`,
     },
