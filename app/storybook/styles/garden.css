@@ -44,6 +44,9 @@ body {
   max-width: 640px;
   margin: 0 auto;
   padding: 12px 16px 48px;
+  /* A page sliding in from the side must not widen the screen: a phone then shifts the fixed bottom menu while it
+     slides. clip (unlike hidden) keeps position: sticky working and does not clip the fixed menu. */
+  overflow-x: clip;
 }
 
 button, input, select {

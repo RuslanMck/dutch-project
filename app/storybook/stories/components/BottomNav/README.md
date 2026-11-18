@@ -4,6 +4,8 @@ The fixed bottom bar on every tab, five sections: Головна, Словник
 - `.bottom-nav__item` — a plain section: 24px line icon and a label in `garden-ink-soft`, `garden-ink` when current.
 - `.bottom-nav__hub` — Вчити: the same height as the items; the `.bottom-nav__disc` (60px, `garden-primary`, `garden-lift`, ringed in `garden-paper`) hangs above the bar.
 
+The bar stays put when the section changes: the new page slides in from the side, and `.app` clips that slide (`overflow-x: clip`), so the screen never grows wider and a phone never shifts the fixed bar.
+
 Accessibility: a `nav` labelled «Розділи»; every item is a button with its visible label, so no item needs an `aria-label`.
 
 Markup from `public/index.html`; styled by `storybook/styles/garden.css`.

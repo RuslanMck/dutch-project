@@ -315,3 +315,9 @@ test('the Вчити styles use garden tokens and the light fills of §0 for the
   const block = css.slice(css.indexOf('/* Вчити (§4)'));
   assert.doesNotMatch(block, /#[0-9a-fA-F]{3,6}\b|rgba?\(/);
 });
+
+test('a page sliding in never widens the screen: .app clips the side overflow, so the fixed bottom bar stays put', () => {
+  const appRule = css.match(/^\.app \{[^}]*\}/m)[0];
+  assert.match(appRule, /overflow-x: clip;/);
+  assert.match(css, /\.tab-enter \{ animation: motion-enter/);
+});
