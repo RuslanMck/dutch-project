@@ -1839,8 +1839,36 @@ input:focus, select:focus, textarea:focus { border-color: var(--garden-primary);
 .sheet__edit { margin: 14px 0 0; }
 .sheet__edit .sheet__actions { margin-top: 6px; }
 
-/* practice: progress of the set, and the round's celebration header */
-.practice-progress-bar { margin: 4px 0 8px; }
+/* practice: progress of the set (two layers: learned words, then the progress of the words in play), and the round's
+   celebration header */
+.set-progress { display: grid; gap: 6px; margin: 4px 0 8px; }
+.set-progress[hidden] { display: none; }
+.set-progress__bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--garden-tint);
+  overflow: hidden;
+}
+.set-progress__learned, .set-progress__learning { flex: none; transition: width .6s var(--motion-spring); }
+.set-progress__learned { background: var(--garden-forest); }
+.set-progress__learning, .set-progress__key--learning::before {
+  background: repeating-linear-gradient(135deg, var(--garden-primary) 0 5px,
+    color-mix(in srgb, var(--garden-primary) 55%, var(--garden-raised)) 5px 9px);
+}
+.set-progress__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--garden-ink-soft);
+}
+.set-progress__key { display: inline-flex; align-items: center; gap: 6px; }
+.set-progress__key::before { content: ""; width: 10px; height: 10px; border-radius: 3px; }
+.set-progress__key--learned::before { background: var(--garden-forest); }
+.set-progress__key--waiting::before { background: var(--garden-tint); box-shadow: inset 0 0 0 1px var(--garden-line); }
 
 .practice-round__title {
   margin: 0 0 4px;

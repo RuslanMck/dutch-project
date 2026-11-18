@@ -17,7 +17,9 @@ import {
   localIsoDate,
   pickNextAchievement,
   pickNextStep,
-  computeQueueProgressPercent,
+  countWordRounds,
+  buildSetProgress,
+  formatSetProgressLabel,
   buildWordDetailView,
   buildWordEditPatch,
   findNavigationSection,
@@ -2031,7 +2033,7 @@ async function loadFsrsBatch(sessionId, kind) {
     kind,
     direction: 'uk_nl',
     queue: [],
-    peakQueueLength: 0,
+    wordRounds: [],
     waiting: { uk_nl: [], nl_uk: [] },
     lastAnsweredId: null,
     answered: new Set(),
@@ -2085,7 +2087,6 @@ function startNextRound(holder) {
   const next = planNextRound(holder, holder.lastAnsweredId);
   if (!next) return null;
   Object.assign(holder, next);
-  holder.peakQueueLength = 0;        // each round fills its own progress bar
   return next.direction;
 }
 
@@ -2140,7 +2141,6 @@ async function showRoundSummaryOrRefill() {
   if (round?.is_complete && round.finished_in_session_id === sessionId) {
     session.round = round;
     session.status = 'round-done';
-    session.peakQueueLength = 0;
     renderPractice();
     return;
   }
@@ -2200,7 +2200,6 @@ async function refillFsrsQueue(continueMessage = '') {
   const loadToken = session.loadToken;
   session.current = null;
   session.status = 'loading';
-  session.peakQueueLength = 0;       // the next set fills its own progress bar
   renderPractice();
   // The last answer must be stored first: the set is planned from the store.
   await Promise.allSettled([...session.pendingGradePosts]);
@@ -2261,6 +2260,7 @@ function forgetDeletedWord(wordId) {
   const practice = ui.practice;
   const wasOnScreen = findCurrentPracticeWord()?.id === wordId || drill.current?.word.id === wordId;
   session.queue = session.queue.filter(word => word.id !== wordId);
+  session.wordRounds = session.wordRounds.filter(word => word.id !== wordId);
   for (const direction of ROUND_DIRECTIONS) {
     session.waiting[direction] = session.waiting[direction].filter(word => word.id !== wordId);
   }
@@ -2268,6 +2268,7 @@ function forgetDeletedWord(wordId) {
   // A restart («Ще раз») uses the words that are left; the end keeps counting the words the drill started with.
   drill.words = drill.words.filter(word => word.id !== wordId);
   drill.queue = drill.queue.filter(word => word.id !== wordId);
+  drill.wordRounds = drill.wordRounds.filter(word => word.id !== wordId);
   for (const direction of ROUND_DIRECTIONS) {
     drill.waiting[direction] = drill.waiting[direction].filter(word => word.id !== wordId);
   }
@@ -2892,15 +2893,24 @@ function renderFsrsPractice() {
   if (isRoundDone) renderRoundSummary();
 }
 
-// The bar above the question: how much of the set (or drill) is done. holder: ui.fsrs or the custom drill.
+// The two-layer bar above the question: the set's (or drill's) learned words, the progress of the words in play, and
+// the three counts under it. holder: ui.fsrs or the custom drill ({ wordRounds, direction, queue, waiting }).
 function renderPracticeProgressBar(holder, isReady) {
   const bar = $('practice-progress-bar');
   bar.hidden = !isReady;
   if (!isReady) return;
-  holder.peakQueueLength = Math.max(holder.peakQueueLength || 0, holder.queue.length);
-  const percent = computeQueueProgressPercent(holder.queue.length, holder.peakQueueLength);
-  bar.setAttribute('aria-valuenow', String(percent));
-  $('practice-progress-fill').style.width = `${percent}%`;
+  const progress = buildSetProgress(holder);
+  bar.setAttribute('aria-valuenow', String(progress.learnedPercent));
+  bar.setAttribute('aria-valuetext', formatSetProgressLabel(progress));
+  // A layer at 0 is hidden, so the gap between the layers shows only when both have a share.
+  for (const [layer, percent] of [['learned', progress.learnedPercent], ['learning', progress.learningPercent]]) {
+    const fill = $(`practice-progress-${layer}`);
+    fill.hidden = percent === 0;
+    fill.style.width = `${percent}%`;
+  }
+  $('practice-progress-learned-count').textContent = `Вивчено ${progress.learned}`;
+  $('practice-progress-learning-count').textContent = `Вчимо ${progress.learning}`;
+  $('practice-progress-waiting-count').textContent = `Чекають ${progress.waiting}`;
 }
 
 function renderPracticeSummary() {
@@ -2963,6 +2973,7 @@ function startFsrsSet({ words, isOfflineSet = false, setSize, setOpenedAt = Date
     answered: session.answered,
     order: orderWords,
   });
+  session.wordRounds = countWordRounds({ waiting: session.waiting });
 }
 
 async function fetchLiveBatch(sessionId, kind) {
@@ -3094,7 +3105,6 @@ function showLocalRoundSummary() {
     allWords: session.setWords,
   };
   session.status = 'round-done';
-  session.peakQueueLength = 0;
   renderPractice();
 }
 
@@ -3125,6 +3135,7 @@ function createCustomDrill(status) {
     direction: 'uk_nl',
     queue: [],
     waiting: { uk_nl: [], nl_uk: [] },
+    wordRounds: [],
     lastAnsweredId: null,
     answered: new Set(),
     firstTry: { uk_nl: 0, nl_uk: 0 },
@@ -3171,6 +3182,7 @@ function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom'
     total: words.length,
     ...planCustomDrill(words, orderWords),
   });
+  drill.wordRounds = countWordRounds({ queue: drill.queue, waiting: drill.waiting });
   ui.custom = drill;
   ui.practice.mode = mode;
   $('practice-input').value = '';

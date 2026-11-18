@@ -50,6 +50,7 @@ One folder per UI component of the app. Each holds `<Name>.stories.js` (the stor
 | `SectionTabs/` | Navigation group. Stories and guidelines. |
 | `Segmented/` | Forms group. Stories and guidelines. |
 | `SentenceSchema/` | Study group. Stories and guidelines. |
+| `SetProgress/` | Study group. Stories and guidelines. |
 | `Skeleton/` | Feedback group. Stories and guidelines. |
 | `Splash/` | Feedback group. Stories and guidelines. |
 | `StatTile/` | Data group. Stories and guidelines. |

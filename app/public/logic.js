@@ -1554,10 +1554,59 @@ export function buildNewWordBody(values) {
   return { body, priorityTag: choice?.tag ?? null };
 }
 
-// The practice progress bar: share of the set already done, from the words still queued and the most queued so far.
-export function computeQueueProgressPercent(queueLength, peakQueueLength) {
-  if (!peakQueueLength) return 0;
-  return Math.round(((peakQueueLength - queueLength) / peakQueueLength) * 100);
+// ---------- set progress: the two-layer bar above the practice question ----------
+
+// The words of a set and how many rounds each is asked in: one per list (the queue, each round's waiting list) that
+// holds it. Read once when the set (or drill) starts; buildSetProgress counts the rounds finished against it.
+export function countWordRounds({ queue = [], waiting = {} }) {
+  const rounds = new Map();
+  for (const list of [queue, ...ROUND_DIRECTIONS.map(direction => waiting[direction] ?? [])]) {
+    for (const id of new Set(list.map(word => word.id))) rounds.set(id, (rounds.get(id) ?? 0) + 1);
+  }
+  return Object.freeze([...rounds].map(([id, count]) => Object.freeze({ id, rounds: count })));
+}
+
+// The share of the current round a queued word has done: its right answers out of those its deck needs in this
+// direction (FSRS words); 0 without a deck (drills, a word not answered yet).
+function readRoundShare(word, direction) {
+  const position = word.deck?.[direction];
+  if (!position?.in_deck || !position.required_correct) return 0;
+  return Math.min(1, position.correct_count / position.required_correct);
+}
+
+// The two-layer bar of a set: learned words (no round left), words in progress (in the active window or with some
+// rounds or answers done) and waiting words (not started). learnedPercent is the learned words' share of the set;
+// learningPercent the progress made by the words in progress, so the two never pass 100 together. A deleted word
+// is left out of wordRounds by the caller.
+export function buildSetProgress({ wordRounds, direction, queue, waiting, windowSize = ACTIVE_WINDOW_SIZE }) {
+  const queued = new Map(queue.map(word => [word.id, word]));
+  const activeIds = new Set(queue.slice(0, windowSize).map(word => word.id));
+  const waitingIds = ROUND_DIRECTIONS.map(round => new Set((waiting[round] ?? []).map(word => word.id)));
+  let learned = 0;
+  let learning = 0;
+  let learningShare = 0;
+  for (const { id, rounds } of wordRounds) {
+    const roundsLeft = (queued.has(id) ? 1 : 0) + waitingIds.filter(ids => ids.has(id)).length;
+    if (!roundsLeft || !rounds) {
+      learned += 1;
+      continue;
+    }
+    const roundShare = queued.has(id) ? readRoundShare(queued.get(id), direction) : 0;
+    const share = (rounds - roundsLeft + roundShare) / rounds;
+    if (activeIds.has(id) || share > 0) {
+      learning += 1;
+      learningShare += share;
+    }
+  }
+  const total = wordRounds.length;
+  const learnedPercent = total ? Math.round((learned / total) * 100) : 0;
+  const learningPercent = total ? Math.min(100 - learnedPercent, Math.round((learningShare / total) * 100)) : 0;
+  return Object.freeze({ total, learned, learning, waiting: total - learned - learning, learnedPercent, learningPercent });
+}
+
+// The bar's text for screen readers: "Вивчено 3 з 10, вчимо 4, чекають 3".
+export function formatSetProgressLabel({ total, learned, learning, waiting }) {
+  return `Вивчено ${learned} з ${total}, вчимо ${learning}, чекають ${waiting}`;
 }
 
 // ---------- offline practice ----------

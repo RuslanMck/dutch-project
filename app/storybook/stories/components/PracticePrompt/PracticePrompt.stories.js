@@ -8,7 +8,10 @@ export default {
 export const Overview = {
   render: () => `
 <div class="col">
-<div class="progress-bar practice-progress-bar" role="progressbar" aria-label="Прогрес набору" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="progress-bar__fill" style="width:40%"></span></div>
+<div class="set-progress" role="progressbar" aria-label="Прогрес набору" aria-valuemin="0" aria-valuemax="100" aria-valuenow="30" aria-valuetext="Вивчено 3 з 10, вчимо 4, чекають 3">
+<div class="set-progress__bar"><span class="set-progress__learned" style="width:30%"></span><span class="set-progress__learning" style="width:14%"></span></div>
+<p class="set-progress__legend" aria-hidden="true"><span class="set-progress__key set-progress__key--learned">Вивчено 3</span><span class="set-progress__key set-progress__key--learning">Вчимо 4</span><span class="set-progress__key set-progress__key--waiting">Чекають 3</span></p>
+</div>
 <div class="practice-q">велосипед</div>
 <form class="row-form" onsubmit="return false"><input value="de fits" aria-label="Відповідь"><button class="primary" type="submit">Перевірити</button></form>
 <p class="msg bad">Неправильно: de fiets</p>

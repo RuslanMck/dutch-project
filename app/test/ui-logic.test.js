@@ -112,7 +112,9 @@ import {
   TAB_SUBTITLES,
   NAVIGATION_SECTION_FOR_TAB,
   buildWordDetailView,
-  computeQueueProgressPercent,
+  countWordRounds,
+  buildSetProgress,
+  formatSetProgressLabel,
   findNavigationSection,
   formatWordTotal,
 } from '../public/logic.js';
@@ -1410,10 +1412,10 @@ test('every tab has a title, a header subtitle and belongs to one bottom-bar ite
   assert.equal(findNavigationSection('unknown'), 'home');
 });
 
-test('a new set, a new round and a refill each start the practice progress bar from zero', () => {
-  assert.match(functionBody(appSource, 'async function loadFsrsBatch(sessionId, kind) {'), /peakQueueLength: 0/);
-  assert.match(functionBody(appSource, 'function startNextRound(holder) {'), /holder\.peakQueueLength = 0/);
-  assert.match(functionBody(appSource, "async function refillFsrsQueue(continueMessage = '') {"), /session\.peakQueueLength = 0/);
+test('every new set and drill counts its words\' rounds for the progress bar', () => {
+  assert.match(functionBody(appSource, 'function startFsrsSet({ words, isOfflineSet = false, setSize, setOpenedAt = Date.now() }) {'), /countWordRounds/);
+  assert.match(appSource, /drill\.wordRounds = countWordRounds/);
+  assert.doesNotMatch(appSource, /peakQueueLength/);
 });
 
 test('every tab is reachable: the bottom bar, the home tiles and the Профіль links name them all', () => {
@@ -1444,11 +1446,46 @@ test('buildWordDetailView lists status, next review, errors and the optional cha
   assert.equal(view.details[2][1], '2');
 });
 
-test('computeQueueProgressPercent is the share of the set done', () => {
-  assert.equal(computeQueueProgressPercent(10, 10), 0);
-  assert.equal(computeQueueProgressPercent(4, 10), 60);
-  assert.equal(computeQueueProgressPercent(0, 10), 100);
-  assert.equal(computeQueueProgressPercent(3, 0), 0);
+const progressWord = (id, deck) => ({ id, deck });
+
+test('countWordRounds counts each word once per list it waits in', () => {
+  const a = progressWord(1), b = progressWord(2), c = progressWord(3);
+  assert.deepEqual(countWordRounds({ queue: [], waiting: { uk_nl: [a, b], nl_uk: [a, b, c] } }),
+    [{ id: 1, rounds: 2 }, { id: 2, rounds: 2 }, { id: 3, rounds: 1 }]);
+  assert.deepEqual(countWordRounds({ queue: [a], waiting: { uk_nl: [], nl_uk: [a] } }), [{ id: 1, rounds: 2 }]);
+});
+
+test('buildSetProgress splits a fresh set into the active window and waiting words', () => {
+  const words = Array.from({ length: 10 }, (_, index) => progressWord(index + 1));
+  const wordRounds = countWordRounds({ queue: [], waiting: { uk_nl: words, nl_uk: words } });
+  const progress = buildSetProgress({ wordRounds, direction: 'uk_nl', queue: words, waiting: { uk_nl: [], nl_uk: words } });
+  assert.deepEqual(progress, { total: 10, learned: 0, learning: 5, waiting: 5, learnedPercent: 0, learningPercent: 0 });
+});
+
+test('buildSetProgress counts finished rounds and deck answers, and a learned word in full', () => {
+  const words = [1, 2, 3, 4].map(id => progressWord(id));
+  const wordRounds = countWordRounds({ queue: [], waiting: { uk_nl: words, nl_uk: words } });
+  // Round 2: word 1 learned, word 2 has 1 of 2 right answers in nl_uk, words 3 and 4 still queued without answers.
+  const queue = [progressWord(2, { nl_uk: { in_deck: true, required_correct: 2, correct_count: 1 } }), words[2], words[3]];
+  const progress = buildSetProgress({ wordRounds, direction: 'nl_uk', queue, waiting: { uk_nl: [], nl_uk: [] } });
+  assert.equal(progress.learned, 1);
+  assert.equal(progress.learning, 3);
+  assert.equal(progress.waiting, 0);
+  assert.equal(progress.learnedPercent, 25);
+  // Word 2: (1 + 0.5) / 2; words 3 and 4: 1 / 2 each → 1.75 of 4 words.
+  assert.equal(progress.learningPercent, 44);
+});
+
+test('buildSetProgress never lets the layers pass 100 and copes with an empty set', () => {
+  const progress = buildSetProgress({ wordRounds: [], direction: 'uk_nl', queue: [], waiting: {} });
+  assert.deepEqual(progress, { total: 0, learned: 0, learning: 0, waiting: 0, learnedPercent: 0, learningPercent: 0 });
+  const one = progressWord(1, { uk_nl: { in_deck: true, required_correct: 2, correct_count: 1 } });
+  const half = buildSetProgress({ wordRounds: [{ id: 1, rounds: 1 }], direction: 'uk_nl', queue: [one], waiting: {} });
+  assert.equal(half.learnedPercent + half.learningPercent, 50);
+});
+
+test('formatSetProgressLabel names the three counts', () => {
+  assert.equal(formatSetProgressLabel({ total: 10, learned: 3, learning: 4, waiting: 3 }), 'Вивчено 3 з 10, вчимо 4, чекають 3');
 });
 
 test('gradeTranslationAnswer accepts a plain hyphen for the dash in the stored word', () => {

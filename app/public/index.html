@@ -495,8 +495,15 @@
         <option value="custom" hidden disabled>Тренування</option>
       </select>
       <p id="practice-kind-line" class="muted practice-kind-line" hidden></p>
-      <div id="practice-progress-bar" class="progress-bar practice-progress-bar" role="progressbar" aria-label="Прогрес набору"
-        aria-valuemin="0" aria-valuemax="100" hidden><span id="practice-progress-fill" class="progress-bar__fill"></span></div>
+      <div id="practice-progress-bar" class="set-progress" role="progressbar" aria-label="Прогрес набору"
+        aria-valuemin="0" aria-valuemax="100" hidden>
+        <div class="set-progress__bar"><span id="practice-progress-learned" class="set-progress__learned" hidden></span><span
+          id="practice-progress-learning" class="set-progress__learning" hidden></span></div>
+        <p class="set-progress__legend" aria-hidden="true"><span id="practice-progress-learned-count"
+          class="set-progress__key set-progress__key--learned"></span><span id="practice-progress-learning-count"
+          class="set-progress__key set-progress__key--learning"></span><span id="practice-progress-waiting-count"
+          class="set-progress__key set-progress__key--waiting"></span></p>
+      </div>
       <div id="practice-q" class="practice-q" aria-live="polite"></div>
       <section id="practice-board" class="article-board" aria-label="Артикль" hidden>
         <div id="article-chip" class="article-chip" tabindex="0" aria-keyshortcuts="ArrowLeft ArrowRight"
