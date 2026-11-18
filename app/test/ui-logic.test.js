@@ -1446,6 +1446,13 @@ test('buildWordDetailView lists status, next review, errors and the optional cha
   assert.equal(view.details[2][1], '2');
 });
 
+test('the counts under the practice mode are read again after each stored answer', () => {
+  assert.match(functionBody(appSource, 'async function postFsrsGrade(current, answer) {'), /refreshFsrsCounts\(\)/);
+  const refresh = functionBody(appSource, 'async function refreshFsrsCounts() {');
+  assert.match(refresh, /api\.getPracticeStats\(\)/);
+  assert.match(refresh, /session\.loadToken !== loadToken/);
+});
+
 const progressWord = (id, deck) => ({ id, deck });
 
 test('countWordRounds counts each word once per list it waits in', () => {

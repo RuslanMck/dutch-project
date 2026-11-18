@@ -2446,6 +2446,7 @@ async function postFsrsGrade(current, answer) {
     current.schedule = schedule;
     word.deck = schedule.deck;
     if (session.current === current) renderPractice();
+    refreshFsrsCounts();
   } catch (error) {
     // A new batch replaces the answered set and the tally, so only the batch that posted is rolled back.
     if (!current.repeat && session.answered === answered) {
@@ -2457,6 +2458,23 @@ async function postFsrsGrade(current, answer) {
     }
     notice(error.message || 'Помилка');
   }
+}
+
+// The line under the mode («Сьогодні нових», «Залишилось на сьогодні») follows each stored answer: the counts are read
+// again from the server, which alone knows them. A read that a newer batch or another mode overtakes changes nothing;
+// a failed read keeps the last counts.
+async function refreshFsrsCounts() {
+  const session = ui.fsrs;
+  const loadToken = session.loadToken;
+  let stats;
+  try {
+    stats = await api.getPracticeStats();
+  } catch {
+    return;
+  }
+  if (session.loadToken !== loadToken) return;
+  session.counts = { introducedToday: stats.introduced_today, reviewOwed: stats.review_owed };
+  if (isFsrsMode(ui.practice.mode)) renderPractice();
 }
 
 // "Далі": a word still in the round's deck comes back later among the active words (advanceWindowedQueue); a word
