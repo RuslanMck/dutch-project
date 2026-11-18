@@ -1,5 +1,6 @@
 // REST + live-update client. Same-origin cookie auth; a 401 sends the page to /login.
-// A network failure throws an Error with offline: true and status: 0 (message «Немає зв'язку»).
+// A network failure (or an answer post that outlasts its time limit) throws an Error with offline: true and status: 0
+// (message «Немає зв'язку»).
 
 // The message of every error that means "the network is down" (a fetch failure, or the service worker's 503).
 export const OFFLINE_MESSAGE = "Немає зв'язку";
@@ -45,13 +46,21 @@ async function readResponse(res, { rejectOfflineCache = false } = {}) {
   return data;
 }
 
-// A fetch that rejects means the network is down.
-async function fetchOrThrowOffline(url, init) {
+// How long an answer post may take before it counts as offline (a weak signal: the phone reports online, but the request
+// hangs). The answer then goes to the outbox; its client_answer_id makes a post that arrives late harmless.
+export const ANSWER_POST_TIMEOUT_MS = 6000;
+
+// A fetch that rejects, or that outlasts timeoutMs (when given), means the network is down.
+async function fetchOrThrowOffline(url, init, timeoutMs) {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
-    return await fetch(url, init);
+    return await fetch(url, controller ? { ...init, signal: controller.signal } : init);
   } catch {
     isNetworkDownNow = true;
     throw createOfflineError();
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -65,8 +74,9 @@ function buildInit(method, body) {
   return init;
 }
 
-async function request(method, url, body, options) {
-  const res = await fetchOrThrowOffline(url, buildInit(method, body));
+// options: rejectOfflineCache (readResponse) and timeoutMs (fetchOrThrowOffline).
+async function request(method, url, body, options = {}) {
+  const res = await fetchOrThrowOffline(url, buildInit(method, body), options.timeoutMs);
   if (res.status === 401) {
     location.href = '/login';
     throw new Error('Потрібен вхід');
@@ -76,7 +86,7 @@ async function request(method, url, body, options) {
 
 // For the outbox: a POST whose 401 does not leave the page; it throws an Error with status 401 instead.
 export async function postWithoutRedirect(url, body) {
-  const res = await fetchOrThrowOffline(url, buildInit('POST', body));
+  const res = await fetchOrThrowOffline(url, buildInit('POST', body), ANSWER_POST_TIMEOUT_MS);
   if (res.status === 401) {
     const err = new Error('Потрібен вхід');
     err.status = 401;
@@ -129,7 +139,8 @@ export const getSpareWords = (sessionId, kind = 'new') =>
   request('GET', `/api/practice/spare-words?session_id=${enc(sessionId)}&kind=${enc(kind)}`, undefined, { rejectOfflineCache: true });
 export const getAppVersion = () => request('GET', '/api/version');
 // body: word_id, grade, answer, session_id, direction, and optionally client_answer_id, answered_at (queued answers only), set_word_ids and set_opened_at (offline sets only).
-export const gradePracticeWord = body => request('POST', '/api/practice/grades', body);
+export const gradePracticeWord = body =>
+  request('POST', '/api/practice/grades', body, { timeoutMs: ANSWER_POST_TIMEOUT_MS });
 export const getPracticeStats = () => request('GET', '/api/practice/stats');
 export const getPhraseBatch = sessionId => request('GET', `/api/practice/phrases/batch?session_id=${enc(sessionId)}`);
 export const gradePracticePhrase = body => request('POST', '/api/practice/phrases/grades', body);
@@ -140,7 +151,8 @@ export const getDrillWords = ids => (ids.length
   : Promise.resolve({ words: [] }));
 // One checked answer of a custom drill, logged for the statistics only (the schedule never reads it). The body may carry
 // client_answer_id (a retried post is counted once) and, for a queued answer, answered_at (the time of the answer).
-export const postDrillAnswer = body => request('POST', '/api/practice/drill-answers', body);
+export const postDrillAnswer = body =>
+  request('POST', '/api/practice/drill-answers', body, { timeoutMs: ANSWER_POST_TIMEOUT_MS });
 export const getRoundSummary = (kind = 'new') =>
   request('GET', `/api/practice/round-summary?kind=${enc(kind)}`, undefined, { rejectOfflineCache: true });
 export const getStats = () => request('GET', '/api/stats');

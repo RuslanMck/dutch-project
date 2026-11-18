@@ -146,6 +146,10 @@ the answer's time.
 - Every grade and drill answer gets `client_answer_id` (`createSessionId`) so a retried post is never counted twice.
   `answered_at` (the time of the answer on the phone) is sent **only with answers that go through the outbox**; a direct
   online post omits it and the server uses its own time. Grades are built by `buildGradePostBody` (logic.js).
+- A weak signal (the phone reports online, but nothing comes back) counts as offline: the grade and drill posts and the
+  outbox posts give up after `ANSWER_POST_TIMEOUT_MS` (6 s, `api.js`) with the offline error, so the answer is queued and
+  «Далі» never waits for the server. A cut-off post that still reaches the server is harmless: its `client_answer_id`
+  returns the stored receipt when the outbox sends it again. Other requests have no limit (generation can be slow).
 
 ### 3.4 Practice offline (`app.js`, pure helpers in `logic.js`)
 
