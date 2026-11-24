@@ -160,13 +160,17 @@ the answer's time.
 - **Snapshot**: after a batch loads and after every answer, save `{ sessionId, calendarDate, words (the batch words with
   directions_left), answeredKeys, tally, introducedCount, offlineSet: bool, setOpenedAt }` under `practice`. When `getPracticeBatch`
   fails offline, a snapshot of the same calendar date and session restores the set (words whose both directions are
-  answered are left out); otherwise the practice shows «Немає зв'язку. Практика продовжиться, щойно з'явиться інтернет».
-- **Spare words**: after each batch loads online, fetch `getSpareWords(sessionId)` and save them under `spare`.
+  answered are left out); otherwise a set is built from the spare words, as for the offline next set below.
+- **Spare words**: after each batch loads online, and for both kinds in the warm-up (§3.6, every online start), fetch
+  `getSpareWords(sessionId, kind)` and save them under `spare-<kind>` with the calendar date. They stay usable for
+  `SPARE_WORDS_MAX_AGE_DAYS` (3) days (`readUsableSpareWords`), so a practice opens offline even when no set was opened
+  that day. A fresh Запам'ятовування whose spare words saved today are empty shows «На сьогодні все повторено».
 - **Offline next set**: «Наступний набір» while offline (or the batch request failing offline) builds a set with
   `buildOfflineSet({ stillLearning, spare, setSize })` (logic.js): first the words of the finished set that are still
   learning (graded again or hard in this set), then spare words not already in it, up to `setSize`; it is practised like a
   normal set and every grade (queued or direct) carries `set_word_ids` = its ids and `set_opened_at` (ms, when the phone
-  started the set; kept in the snapshot). An ordinary online set never sends them. No spare words saved → the message above.
+  started the set; kept in the snapshot). An ordinary online set never sends them. No usable spare words → «Немає
+  зв'язку. Практика продовжиться, щойно з'явиться інтернет».
 - The round summary works offline from local data (the server summary is fetched only when online; offline it shows the
   local tally). The drill buttons stay.
 

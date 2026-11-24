@@ -31,6 +31,7 @@ import {
   fsrsModeForKind,
   practiceSnapshotKey,
   spareSnapshotKey,
+  readUsableSpareWords,
   formatPracticeKindLine,
   buildResumeView,
   computeLearnNewPercent,
@@ -2067,10 +2068,11 @@ async function loadFsrsBatch(sessionId, kind) {
   } catch (error) {
     if (session.loadToken !== loadToken) return;
     if (error.offline) {
-      // The set kept on the phone continues; without one the practice waits for the connection.
+      // The set kept on the phone continues; without one a set is built from the spare words kept on the phone, and
+      // without those the practice waits for the connection (startOfflineNextSet).
       const restored = await restoreFsrsFromSnapshot(kind);
       if (session.loadToken !== loadToken) return;
-      if (!restored) session.status = 'offline';
+      if (!restored) await startOfflineNextSet();
     } else if (error.status === 409) {
       session.status = 'unconfigured';
     } else {
@@ -3073,6 +3075,9 @@ async function restoreFsrsFromSnapshot(kind) {
   return true;
 }
 
+// Offline: a set from the words still being learned and the spare words kept on the phone (readUsableSpareWords). With
+// no words, the practice waits for the connection; but a fresh Запам'ятовування whose spare words, saved today, are
+// empty has nothing owed today, so it shows that instead.
 async function startOfflineNextSet(continueMessage = '') {
   const session = ui.fsrs;
   const sessionId = session.sessionId;
@@ -3081,14 +3086,16 @@ async function startOfflineNextSet(continueMessage = '') {
   let spareSnapshot = null;
   try { spareSnapshot = await offlineStore.loadSnapshot(spareSnapshotKey(kind)); } catch { /* none */ }
   if (!isSameFsrsSession(sessionId, kind, loadToken)) return false;
-  const spare = spareSnapshot?.calendarDate === formatTodayInAmsterdam() ? spareSnapshot.words : [];
+  const spare = readUsableSpareWords({ snapshot: spareSnapshot, calendarDate: formatTodayInAmsterdam() });
   const words = buildOfflineSet({
     stillLearning: session.setWords.filter(word => session.hardWordIds.has(word.id)),
     spare,
     setSize: session.setSize,
   });
   if (!words.length) {
-    session.status = 'offline';
+    const isNothingOwedToday = kind === 'review' && !session.setWords.length
+      && spareSnapshot?.calendarDate === formatTodayInAmsterdam();
+    session.status = isNothingOwedToday ? 'done' : 'offline';
     renderPractice();
     return false;
   }
@@ -5008,8 +5015,8 @@ function renderOfflineBanner() {
   $('offline-banner-login').hidden = !view.showLoginLink;
 }
 
-// In the background, reads the lists the tabs use so the service worker keeps them for reading offline. At most once
-// every 10 minutes; errors are ignored.
+// In the background, reads the lists the tabs use so the service worker keeps them for reading offline, and keeps the
+// spare words of both practices on the phone. At most once every 10 minutes; errors are ignored.
 async function warmUpOfflineData() {
   if (isDeviceOffline() || Date.now() - lastWarmUpAt < WARM_UP_MIN_GAP_MS) return;
   lastWarmUpAt = Date.now();
@@ -5019,6 +5026,9 @@ async function warmUpOfflineData() {
     api.listWords(), api.listTopics(), api.listRules(), api.listPatterns(), api.listPhrases(), api.listTexts(),
     api.getDeckWordCatalog(), api.getPracticeStats(), api.getStats(), api.getActivity(ui.stats.period),
   ].map(quietly));
+  // The next words of both practices, so either one can start offline even when no set was opened today.
+  const sessionId = readSessionId();
+  await Promise.all(['new', 'review'].map(kind => loadSpareWords(sessionId, kind)));
   const deckList = await quietly(api.listDecks());
   for (const deck of deckList || []) {
     const detail = await quietly(api.getDeck(deck.id));

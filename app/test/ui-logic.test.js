@@ -6,6 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildOfflineSet,
+  readUsableSpareWords,
+  SPARE_WORDS_MAX_AGE_DAYS,
   buildSetWordIds,
   buildGradePostBody,
   restorePracticeSnapshot,
@@ -1797,4 +1799,23 @@ test('buildRoundRepeatButton: a drill of every word of the set, in the set order
 test('formatRoundNextLabel: Нові слова asks for 10 new words, Запам\'ятовування for the next 10', () => {
   assert.equal(formatRoundNextLabel('new'), 'Ще 10 нових');
   assert.equal(formatRoundNextLabel('review'), 'Ще 10');
+});
+
+test('readUsableSpareWords: spare words from today up to SPARE_WORDS_MAX_AGE_DAYS days back start an offline set', () => {
+  const words = [{ id: 'a' }];
+  const at = calendarDate => readUsableSpareWords({ snapshot: { words, calendarDate: '2026-11-21' }, calendarDate });
+  assert.equal(SPARE_WORDS_MAX_AGE_DAYS, 3);
+  assert.deepEqual(at('2026-11-21'), words);
+  assert.deepEqual(at('2026-11-24'), words);
+  assert.deepEqual(at('2026-11-25'), []);
+  assert.deepEqual(at('2026-11-20'), []);   // saved on a later day: the clock moved back
+  assert.deepEqual(readUsableSpareWords({ snapshot: null, calendarDate: '2026-11-21' }), []);
+  assert.deepEqual(readUsableSpareWords({ snapshot: { words, calendarDate: 'x' }, calendarDate: '2026-11-21' }), []);
+});
+
+test('offline start: no set kept on the phone → a set from the spare words; the warm-up keeps both kinds', () => {
+  const app = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(app, /if \(!restored\) await startOfflineNextSet\(\);/);
+  assert.match(app, /const spare = readUsableSpareWords\(\{ snapshot: spareSnapshot, calendarDate: formatTodayInAmsterdam\(\) \}\);/);
+  assert.match(app, /\['new', 'review'\]\.map\(kind => loadSpareWords\(sessionId, kind\)\)/);
 });

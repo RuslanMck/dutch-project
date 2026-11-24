@@ -1368,6 +1368,18 @@ export function spareSnapshotKey(kind) {
   return `spare-${kind}`;
 }
 
+// How many days the phone's spare words may still start an offline set. A word due then is still due (a little late), and
+// the server takes answers up to 7 days old. The app refreshes them on every online start, so they are rarely this old.
+export const SPARE_WORDS_MAX_AGE_DAYS = 3;
+
+// The words of a stored spare snapshot that may still start an offline set: saved today or up to SPARE_WORDS_MAX_AGE_DAYS
+// days before (calendar dates, YYYY-MM-DD); [] for none, an older one, or one from a later day (the phone's clock moved).
+export function readUsableSpareWords({ snapshot, calendarDate }) {
+  if (!snapshot || !Array.isArray(snapshot.words) || typeof snapshot.calendarDate !== 'string') return [];
+  const ageInDays = (Date.parse(calendarDate) - Date.parse(snapshot.calendarDate)) / 86_400_000;
+  return ageInDays >= 0 && ageInDays <= SPARE_WORDS_MAX_AGE_DAYS ? snapshot.words : [];
+}
+
 // The line under the mode select. counts: { introducedToday, reviewOwed } of the batch on screen, or null when unknown.
 // Нові слова shows today's new words, Запам'ятовування the reviews still to do.
 export function formatPracticeKindLine(kind, counts) {
