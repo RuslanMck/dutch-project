@@ -60,6 +60,10 @@ import {
   shuffle,
   formatStrugglingDrillButton,
   buildCustomDrillEnd,
+  DECK_SET_SIZE,
+  formatDeckSetNextButton,
+  formatDeckSetTitle,
+  planDeckSets,
   buildRoundDrillButtons,
   formatCustomDrillProgress,
   planCustomDrill,
@@ -448,6 +452,35 @@ test('advanceDrillQueue: returns a new array and leaves the queue it was given u
 
 test('formatStrugglingDrillButton: the button text carries the word count', () => {
   assert.equal(formatStrugglingDrillButton(3), 'Потренувати важкі слова (3)');
+});
+
+test('planDeckSets: sets of ten, hard first (most mistakes first), then medium, new and easy in deck order', () => {
+  assert.equal(DECK_SET_SIZE, 10);
+  const word = (id, difficulty, mistakeCount = 0) => ({ id, difficulty, mistake_count: mistakeCount });
+  const deckWords = [
+    word(1, null), word(2, 'easy'), word(3, 'hard', 3), word(4, 'medium', 1), word(5, null),
+    word(6, 'hard', 5), word(7, 'medium', 2), word(8, 'easy'),
+  ];
+  assert.deepEqual(planDeckSets(deckWords, 3).map(set => set.map(entry => entry.id)), [[6, 3, 7], [4, 1, 5], [2, 8]]);
+  const chapter = Array.from({ length: 54 }, (_, index) => word(index + 1, null));
+  const sets = planDeckSets(chapter);
+  assert.deepEqual(sets.map(set => set.length), [10, 10, 10, 10, 10, 4]);
+  assert.deepEqual(sets[0].map(entry => entry.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'new words keep the deck order');
+  assert.deepEqual(planDeckSets([]), []);
+  assert.equal(deckWords[0].difficulty, null, 'the words are not changed');
+});
+
+test('deck set titles and the next-set button', () => {
+  assert.equal(formatDeckSetTitle({ name: 'Глава 8', index: 1, count: 6 }), 'Колода: Глава 8 · набір 2 з 6');
+  assert.equal(formatDeckSetTitle({ name: 'Глава 8', index: 0, count: 1 }), 'Колода: Глава 8');
+  assert.equal(formatDeckSetNextButton({ nextIndex: 5, count: 6, nextSize: 4 }), 'Наступні 4 · набір 6 з 6');
+});
+
+test('a deck is practised in sets: practiceDeck plans them, the end offers the next set, «Ще раз» keeps it', () => {
+  assert.match(appSource, /planDeckSets\(deckWords\.filter/);
+  assert.match(appSource, /startDeckSet\(\{ name: deck\.name, sets, index: 0 \}/);
+  assert.match(appSource, /\$\('practice-drill-next-button'\)\.addEventListener\('click', startNextDeckSet\)/);
+  assert.match(appSource, /function restartCustomDrill\(\) \{[^}]*deckSets \} = ui\.custom;\s*startCustomDrill\(\{[^}]*deckSets \}\)/);
 });
 
 test('buildCustomDrillEnd: first-check count per direction out of all words, and the schedule note', () => {

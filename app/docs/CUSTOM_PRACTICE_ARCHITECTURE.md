@@ -100,8 +100,9 @@ answer_count, last_practiced_on }] }`, all words, sorted by `nl`.
 
 `drill_answers (id, word_id → words ON DELETE CASCADE, direction, is_correct, answer, source, answered_at)`, source
 `round | deck | struggling | custom`. `POST /api/practice/drill-answers` `{ word_id, direction, is_correct, answer?,
-source }` → 201 `{ id }` (404 for an unknown word). The schedule, the decks, the round summary and the catalog never
-read it; no change event is published. The statistics activity counts drill answers (kind `drill`, right = good) in
+source }` → 201 `{ id }` (404 for an unknown word). The schedule and the round summary never read it; no change event
+is published. The word catalog (§2.3) counts drill answers with the daily answers (a wrong drill answer is a mistake),
+so a word drilled in a deck moves between «нове», «важко», «середньо» and «легко». The statistics activity counts drill answers (kind `drill`, right = good) in
 answers, mistakes, accuracy, time, days practised, the chart (`drill_answers` per bucket) and the streak, with
 `totals.drill_answers` shown as the «Тренування» tile; the hardest words stay real practice only.
 
@@ -122,7 +123,11 @@ Drawer link «Колоди» (`data-tab="decks"`) after «Практика». Th
    name) shown inline.
 
 «Змінити» opens the picker with the deck's words checked and the confirmation prefilled. «Практикувати» switches to
-the «Практика» tab and starts the custom drill with title «Колода: <name>»; «Назад» at the end returns to «Колоди».
+the «Практика» tab and practises the deck in sets of ten (`planDeckSets`): hard words first (most mistakes first), then
+medium, new and easy ones, in the deck's order otherwise. Each set is a custom drill titled «Колода: <name> · набір 2 з
+6» (a deck of one set keeps «Колода: <name>»). The end of a set offers «Наступні 10 · набір 3 з 6» as the main action,
+«Ще раз» (the same set) and «Назад», which returns to «Колоди». The sets are planned once when the deck starts; the next
+start orders them again by the new difficulties. The picker also has a «Глава» select (chapters from the words' sections).
 
 Large lists: render rows efficiently (build once, filter by toggling `hidden`, or render only matching rows); 600+
 words must stay smooth on a phone. Works at 360px, light and dark. textContent only.

@@ -344,6 +344,36 @@ export function buildCustomDrillEnd({ firstTry, total }) {
   };
 }
 
+// ---------- deck sets: a deck practised ten words at a time ----------
+
+export const DECK_SET_SIZE = 10;
+const DECK_SET_BUCKET_ORDER = Object.freeze({ hard: 0, medium: 1, new: 2, easy: 3 });
+
+// A deck's words (catalog rows with difficulty and mistake_count) in sets of setSize: hard words first, then medium,
+// new and easy ones. Inside hard and medium the most mistakes come first; otherwise the deck's own order stays. The
+// last set holds what is left. The words are not changed.
+export function planDeckSets(words, setSize = DECK_SET_SIZE) {
+  const ordered = words
+    .map((word, index) => ({ word, index, bucket: DECK_SET_BUCKET_ORDER[catalogBucket(word)] }))
+    .sort((first, second) => first.bucket - second.bucket
+      || (first.bucket <= DECK_SET_BUCKET_ORDER.medium ? (second.word.mistake_count ?? 0) - (first.word.mistake_count ?? 0) : 0)
+      || first.index - second.index)
+    .map(entry => entry.word);
+  const sets = [];
+  for (let start = 0; start < ordered.length; start += setSize) sets.push(ordered.slice(start, start + setSize));
+  return sets;
+}
+
+// The drill title of one set: "Колода: Глава 8 · набір 2 з 6"; a deck of one set keeps its plain title.
+export function formatDeckSetTitle({ name, index, count }) {
+  return count > 1 ? `Колода: ${name} · набір ${index + 1} з ${count}` : `Колода: ${name}`;
+}
+
+// The end button of a set that has another after it: "Наступні 10 · набір 2 з 6".
+export function formatDeckSetNextButton({ nextIndex, count, nextSize }) {
+  return `Наступні ${nextSize} · набір ${nextIndex + 1} з ${count}`;
+}
+
 // ---------- form decks (ready-made decks of word forms, e.g. the personal pronouns) ----------
 // A form deck pairs two forms of the same word (subject and object form). It is drilled as a custom drill: round 1
 // shows the first form and wants the second, round 2 the other way round. The drill keeps its direction keys

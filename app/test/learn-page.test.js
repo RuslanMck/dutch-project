@@ -262,7 +262,7 @@ test('a drill started from Вчити or Головна returns to Вчити; t
   assert.match(appFunction('function handleHomeStrugglingTile() {'), /startStrugglingDrill\('learn'\);/);
   assert.match(appFunction('async function startStrugglingDrill(returnTo = \'practice\') {'), /returnTo, mode: 'struggling'/);
   assert.match(appFunction('function handleStrugglingButtonClick() {'), /startStrugglingDrill\('practice'\);/);
-  assert.match(appFunction('async function practiceDeck(deck) {'), /const returnTo = startTab === 'learn' \? 'learn' : 'decks';\s*startCustomDrill\(\{[^\n]*source: 'deck' \}\)/);
+  assert.match(appFunction('async function practiceDeck(deck) {'), /const returnTo = startTab === 'learn' \? 'learn' : 'decks';[\s\S]*?startDeckSet\([^\n]*\{ returnTo, source: 'deck' \}\)/);
   assert.match(appFunction('function leaveCustomDrill() {'), /if \(name === 'learn'\) \{\s*showTab\('learn'\);/);
   assert.match(appFunction('function handleRoundFinishClick() {'), /showTab\('learn'\);/);
 });

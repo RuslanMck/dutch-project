@@ -16,3 +16,16 @@ export const Overview = {
 </section>
 `,
 };
+
+// The end of one set of a deck practised in sets: «Наступні 10» is the main action, «Ще раз» repeats the set.
+export const DeckSetEnd = {
+  render: () => `
+<section class="practice-summary" aria-label="Підсумок тренування">
+<p class="practice-summary__text" role="status">Готово! Правильно з першого разу: UA → NL 7 з 10 · NL → UA 8 з 10.</p>
+<p class="muted">Тренування — розклад слів не змінюється.</p>
+<button class="primary practice-summary__struggling-button" type="button">Наступні 10 · набір 2 з 6</button>
+<button class="practice-summary__struggling-button" type="button">Ще раз</button>
+<button class="practice-summary__extra-button" type="button">Назад</button>
+</section>
+`,
+};

@@ -1,26 +1,37 @@
 // SQL for custom decks and their words, and the word catalog with its answer totals. No business rules. The totals
-// count the counting answers in deck_answers (superseded_at NULL): answer_count is every answer ever, in both
-// directions; mistake_count is the mistakes (a grade other than good, the same as the round summary) among the word's
-// last DIFFICULTY_ANSWER_WINDOW counting answers, so a long-practised word is judged by its recent answers.
+// count every answer of a word: the counting answers of the daily practice in deck_answers (superseded_at NULL) and the
+// checked answers of the drills in drill_answers (decks, round-summary drills, Важкі слова), so a word drilled in a deck
+// moves between the difficulties too; the schedule still reads deck_answers only. answer_count is every answer ever,
+// in both directions; mistake_count is the mistakes (a grade other than good, or a wrong drill answer, the same as the
+// round summary) among the word's last DIFFICULTY_ANSWER_WINDOW answers, so a long-practised word is judged by its
+// recent answers.
 const DIFFICULTY_ANSWER_WINDOW = 10;
+const ALL_ANSWERS_SQL = `
+  SELECT deck_answers.word_id, deck_answers.answered_at, deck_answers.id AS answer_id, 0 AS log_order,
+    CASE WHEN deck_answers.grade <> 'good' THEN 1 ELSE 0 END AS is_mistake
+  FROM deck_answers
+  WHERE deck_answers.superseded_at IS NULL
+  UNION ALL
+  SELECT drill_answers.word_id, drill_answers.answered_at, drill_answers.id AS answer_id, 1 AS log_order,
+    1 - drill_answers.is_correct AS is_mistake
+  FROM drill_answers
+`;
 const CATALOG_FROM_SQL = `
   FROM words
   LEFT JOIN (
-    SELECT deck_answers.word_id, COUNT(*) AS answer_count, MAX(deck_answers.answered_at) AS last_answered_at
-    FROM deck_answers
-    WHERE deck_answers.superseded_at IS NULL
-    GROUP BY deck_answers.word_id
+    SELECT all_answers.word_id, COUNT(*) AS answer_count, MAX(all_answers.answered_at) AS last_answered_at
+    FROM (${ALL_ANSWERS_SQL}) AS all_answers
+    GROUP BY all_answers.word_id
   ) AS answer_totals ON answer_totals.word_id = words.id
   LEFT JOIN (
-    SELECT newest_answers.word_id,
-      SUM(CASE WHEN newest_answers.grade <> 'good' THEN 1 ELSE 0 END) AS mistake_count
+    SELECT newest_answers.word_id, SUM(newest_answers.is_mistake) AS mistake_count
     FROM (
-      SELECT deck_answers.word_id, deck_answers.grade,
+      SELECT all_answers.word_id, all_answers.is_mistake,
         ROW_NUMBER() OVER (
-          PARTITION BY deck_answers.word_id ORDER BY deck_answers.answered_at DESC, deck_answers.id DESC
+          PARTITION BY all_answers.word_id
+          ORDER BY all_answers.answered_at DESC, all_answers.log_order DESC, all_answers.answer_id DESC
         ) AS newest_rank
-      FROM deck_answers
-      WHERE deck_answers.superseded_at IS NULL
+      FROM (${ALL_ANSWERS_SQL}) AS all_answers
     ) AS newest_answers
     WHERE newest_answers.newest_rank <= ${DIFFICULTY_ANSWER_WINDOW}
     GROUP BY newest_answers.word_id

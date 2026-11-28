@@ -122,6 +122,9 @@ import {
   gradeFormAnswer,
   revealFormAnswer,
   planCustomDrill,
+  planDeckSets,
+  formatDeckSetNextButton,
+  formatDeckSetTitle,
   checkAnswer,
   esc,
   formatDutchWithArticle,
@@ -3167,6 +3170,7 @@ function createCustomDrill(status) {
     firstTry: { uk_nl: 0, nl_uk: 0 },
     current: null,
     feedback: null,
+    deckSets: null,                  // a deck practised in sets: { name, sets (arrays of words), index }, see practiceDeck
   };
 }
 
@@ -3195,7 +3199,10 @@ function isCustomPracticeMode() {
 // (it must be in TABS) unless onBack is given.
 // mode: the practice mode select value while it runs ('custom', or 'struggling' for the Важкі слова drill).
 // Callers check that the learner is still on the tab they started from before calling it.
-function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom', formDeck = null, source = null }) {
+// deckSets: { name, sets, index } when the drill is one set of a deck (practiceDeck); the end offers the next set.
+function startCustomDrill({
+  title, words, returnTo = 'practice', mode = 'custom', formDeck = null, source = null, deckSets = null,
+}) {
   const drill = createCustomDrill(words.length ? 'ready' : 'empty');
   const resolvedReturnTo = resolveReturnTo(returnTo);
   Object.assign(drill, {
@@ -3206,6 +3213,7 @@ function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom'
     words: [...words],
     returnTo: resolvedReturnTo,
     total: words.length,
+    deckSets,
     ...planCustomDrill(words, orderWords),
   });
   drill.wordRounds = countWordRounds({ queue: drill.queue, waiting: drill.waiting });
@@ -3219,8 +3227,29 @@ function startCustomDrill({ title, words, returnTo = 'practice', mode = 'custom'
 
 // «Ще раз»: the same words in a new order.
 function restartCustomDrill() {
-  const { title, words, returnTo, mode, formDeck, source } = ui.custom;
-  startCustomDrill({ title, words, returnTo, mode, formDeck, source });
+  const { title, words, returnTo, mode, formDeck, source, deckSets } = ui.custom;
+  startCustomDrill({ title, words, returnTo, mode, formDeck, source, deckSets });
+}
+
+// The set after this one of a deck practised in sets, or null at the last set and for any other drill.
+function findNextDeckSet(drill) {
+  const deckSets = drill.deckSets;
+  if (!deckSets || deckSets.index + 1 >= deckSets.sets.length) return null;
+  return { ...deckSets, index: deckSets.index + 1 };
+}
+
+// Starts one set of a deck: its words, titled with the set's number.
+function startDeckSet(deckSets, { returnTo, source }) {
+  const title = formatDeckSetTitle({ name: deckSets.name, index: deckSets.index, count: deckSets.sets.length });
+  startCustomDrill({ title, words: deckSets.sets[deckSets.index], returnTo, source, deckSets });
+}
+
+// «Наступні 10»: the next set of the deck, back where this one returns to.
+function startNextDeckSet() {
+  const next = findNextDeckSet(ui.custom);
+  if (!next) return;
+  startDeckSet(next, { returnTo: ui.custom.returnTo, source: ui.custom.source });
+  focusPracticeAnswer();
 }
 
 // «Назад»: back to where the drill started. The FSRS session keeps its state, so a round summary (round-done) or the
@@ -3426,6 +3455,16 @@ function renderCustomEnd() {
     : buildCustomDrillEnd({ firstTry: drill.firstTry, total: drill.total });
   $('practice-drill-result').textContent = end.resultText;
   $('practice-drill-note').textContent = end.noteText;
+  // A deck in sets: the next set is the main action, «Ще раз» repeats this one.
+  const next = findNextDeckSet(drill);
+  const nextButton = $('practice-drill-next-button');
+  nextButton.hidden = !next;
+  if (next) {
+    nextButton.textContent = formatDeckSetNextButton({
+      nextIndex: next.index, count: next.sets.length, nextSize: next.sets[next.index].length,
+    });
+  }
+  $('practice-drill-again-button').classList.toggle('primary', !next);
 }
 
 // The FSRS summary's button: the mode select moves to the drill and the drill starts. «Назад» returns to Практика.
@@ -4790,6 +4829,7 @@ function bindEvents() {
     else handleOverrideClick();
   });
   $('practice-struggling-button').addEventListener('click', handleStrugglingButtonClick);
+  $('practice-drill-next-button').addEventListener('click', startNextDeckSet);
   $('practice-drill-again-button').addEventListener('click', restartCustomDrill);
   $('practice-drill-back-button').addEventListener('click', leaveCustomDrill);
   $('practice-edit-button').addEventListener('click', () => {
@@ -5271,7 +5311,11 @@ async function practiceDeck(deck) {
     if (ui.tab !== startTab) return;
     decks.view = 'list';
     const returnTo = startTab === 'learn' ? 'learn' : 'decks';
-    startCustomDrill({ title: `Колода: ${deck.name}`, words, returnTo, source: 'deck' });
+    // Sets of ten, hard words first; the catalog difficulty counts the deck drills too, so the order follows them.
+    const drillWordById = new Map(words.map(word => [word.id, word]));
+    const sets = planDeckSets(deckWords.filter(word => drillWordById.has(word.id)))
+      .map(set => set.map(word => drillWordById.get(word.id)));
+    startDeckSet({ name: deck.name, sets, index: 0 }, { returnTo, source: 'deck' });
     focusTabHeading();
   } catch (error) {
     notice(error.message || 'Помилка');

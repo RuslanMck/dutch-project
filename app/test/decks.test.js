@@ -1,7 +1,7 @@
 // Custom decks against an in-memory database and a fake clock: create, read, update and delete, the name and word
 // rules, a deleted word leaving its decks, the word catalog (difficulty, last practice day), the custom drill's words
 // (order, unknown ids, read only), the drill answers log (statistics only), and the REST and MCP adapters. Answers are written straight into deck_answers, the
-// table the round summary and the catalog count.
+// table the round summary and the catalog count (the catalog counts drill answers too).
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { after, before, test } from 'node:test';
@@ -250,6 +250,30 @@ test('drill words: the order of the ids, repeats once, unknown ids skipped, and 
   assert.equal(words[0].uk, 'de kat (переклад)');
   assert.equal(countRows(context, 'review_logs'), reviewLogsBefore);
   assert.equal(countRows(context, 'deck_answers'), answersBefore);
+});
+
+test('the catalog counts drill answers too: a drilled word moves from new to hard, then back to easy', () => {
+  const drillClock = createFakeClock('2026-11-01T09:00:00+01:00');
+  const drillContext = createTestContext({ clock: drillClock });
+  const [wordId] = createWords(drillContext, ['de trein']);
+  const findWord = () => drillContext.deckService.listWordCatalog().words.find(word => word.id === wordId);
+  assert.equal(findWord().difficulty, null);
+  const step = milliseconds => drillClock.moveTo(new Date(drillClock.now() + milliseconds).toISOString());
+  const drill = isCorrect => {
+    step(60_000);
+    drillContext.practiceService.recordDrillAnswer({ wordId, direction: 'uk_nl', isCorrect, answer: '', source: 'deck' });
+  };
+  for (const isCorrect of [false, false, false, true]) drill(isCorrect);
+  assert.deepEqual([findWord().difficulty, findWord().mistake_count, findWord().answer_count], ['hard', 3, 4]);
+  assert.equal(findWord().last_practiced_on, '2026-11-01');
+  // A daily-practice answer counts with them, newest last.
+  insertDeckAnswer(drillContext, { wordId, grade: 'good', answeredAt: drillClock.now() + 60_000 });
+  step(120_000);
+  // Seven more right answers leave one of the three mistakes in the last ten: medium; one more: easy.
+  for (let count = 0; count < 7; count += 1) drill(true);
+  assert.deepEqual([findWord().difficulty, findWord().mistake_count, findWord().answer_count], ['medium', 1, 12]);
+  drill(true);
+  assert.equal(findWord().difficulty, 'easy');
 });
 
 test('deck words in the catalog and deck match the catalog fields', () => {
