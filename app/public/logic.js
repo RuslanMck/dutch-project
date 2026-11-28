@@ -1114,13 +1114,36 @@ function catalogBucket(word) {
   return word.difficulty ?? 'new';
 }
 
-// The picker's filter: the chosen bucket (all | hard | medium | easy | new | selected) and the search text, matched
-// against the article, the Dutch word and the Ukrainian translation. selectedIds: a Set or an array of ids.
-// Returns the matching words in their given order; the words are not changed.
-export function filterCatalog({ words, query = '', filter = 'all', selectedIds = [] }) {
+// The chapter of a catalog word's section, as the server reads it: the integer before the first dot ('8.2' → 8,
+// '8' → 8); null for a word with no section or a section that is not a chapter ('Д1').
+export function parseCatalogChapter(section) {
+  const match = /^(\d+)(?:\.|$)/.exec(String(section ?? '').trim());
+  return match ? Number(match[1]) : null;
+}
+
+// The picker's chapter choices for these words: the chapters they have, lowest first, then 'none' when some words
+// have no chapter. Each choice is the select's value as text.
+export function listCatalogChapters(words) {
+  const chapters = new Set(words.map(word => parseCatalogChapter(word.section)));
+  const numbers = [...chapters].filter(chapter => chapter !== null).sort((a, b) => a - b).map(String);
+  return chapters.has(null) && numbers.length ? [...numbers, 'none'] : numbers;
+}
+
+// Whether a word belongs to the chosen chapter: 'all', a chapter number as text, or 'none' (words with no chapter).
+function isInCatalogChapter(word, chapter) {
+  if (chapter === 'all') return true;
+  const wordChapter = parseCatalogChapter(word.section);
+  return chapter === 'none' ? wordChapter === null : wordChapter === Number(chapter);
+}
+
+// The picker's filter: the chosen bucket (all | hard | medium | easy | new | selected), the chapter (see
+// isInCatalogChapter) and the search text, matched against the article, the Dutch word and the Ukrainian translation.
+// selectedIds: a Set or an array of ids. Returns the matching words in their given order; the words are not changed.
+export function filterCatalog({ words, query = '', filter = 'all', chapter = 'all', selectedIds = [] }) {
   const selected = selectedIds instanceof Set ? selectedIds : new Set(selectedIds);
   const needle = foldSearchText(query);
   return words.filter(word => {
+    if (!isInCatalogChapter(word, chapter)) return false;
     if (filter === 'selected') {
       if (!selected.has(word.id)) return false;
     } else if (filter !== 'all' && catalogBucket(word) !== filter) {

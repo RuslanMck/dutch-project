@@ -134,6 +134,7 @@ import {
   revealTranslationAnswer,
   clearSelected,
   filterCatalog,
+  listCatalogChapters,
   formatDeckWordCount,
   formatDeckWordLabel,
   formatDifficultyLabel,
@@ -5105,7 +5106,7 @@ const DECK_MAX_WORDS = 1000;
 const decks = {
   view: 'list', status: 'idle', list: [], editingId: null,
   catalog: null, catalogStatus: 'idle',
-  selected: new Set(), query: '', filter: 'all', sort: 'alpha',
+  selected: new Set(), query: '', filter: 'all', chapter: 'all', sort: 'alpha',
   draft: { name: '', description: '' }, busy: false,
 };
 
@@ -5279,10 +5280,12 @@ async function practiceDeck(deck) {
   }
 }
 
-// A new deck's picker starts fresh: nothing selected, the filter «Усі», an empty search and the default sort.
+// A new deck's picker starts fresh: nothing selected, the filter «Усі», every chapter, an empty search and the default
+// sort.
 function resetPickerChoice() {
   decks.query = '';
   decks.filter = 'all';
+  decks.chapter = 'all';
   decks.sort = 'alpha';
 }
 
@@ -5338,6 +5341,7 @@ function openPicker() {
   decks.view = 'picker';
   $('decks-search').value = decks.query;
   $('decks-sort').value = decks.sort;
+  $('decks-chapter').value = decks.chapter;
   renderDecks();
   applyPicker();   // the rows of the last load, if any, show the current selection while the catalog reloads
   loadCatalog();
@@ -5415,6 +5419,21 @@ function buildCatalog(words) {
     if (!rows.has(id)) row.li.remove();
   }
   decks.catalog = { words, rows, visibleIds: new Set(), order: [], sortedBy: null };
+  renderChapterOptions(words);
+}
+
+// «Глава»: every chapter the words have, then «без глави». A chosen chapter that no word has any more falls back to
+// «усі глави».
+function renderChapterOptions(words) {
+  const chapters = listCatalogChapters(words);
+  const select = $('decks-chapter');
+  const options = [new Option('усі глави', 'all')];
+  for (const chapter of chapters) {
+    options.push(new Option(chapter === 'none' ? 'без глави' : `глава ${chapter}`, chapter));
+  }
+  select.replaceChildren(...options);
+  if (decks.chapter !== 'all' && !chapters.includes(decks.chapter)) decks.chapter = 'all';
+  select.value = decks.chapter;
 }
 
 // Puts the rows in the given order. Only a row out of place moves, so the others keep their focus and scroll.
@@ -5441,7 +5460,7 @@ function applyPicker() {
     return;
   }
   const visible = filterCatalog({
-    words: catalog.words, query: decks.query, filter: decks.filter, selectedIds: decks.selected,
+    words: catalog.words, query: decks.query, filter: decks.filter, chapter: decks.chapter, selectedIds: decks.selected,
   });
   const visibleIds = new Set(visible.map(word => word.id));
   catalog.visibleIds = visibleIds;
@@ -5604,6 +5623,10 @@ function bindDeckEvents() {
     const button = event.target.closest('button[data-filter]');
     if (!button) return;
     decks.filter = button.dataset.filter;
+    applyPicker();
+  });
+  $('decks-chapter').addEventListener('change', event => {
+    decks.chapter = event.target.value;
     applyPicker();
   });
   $('decks-sort').addEventListener('change', event => {

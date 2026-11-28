@@ -102,6 +102,8 @@ import {
   clearSelected,
   filterCatalog,
   foldSearchText,
+  listCatalogChapters,
+  parseCatalogChapter,
   formatDeckWordCount,
   formatDeckWordLabel,
   formatDifficultyLabel,
@@ -1239,6 +1241,44 @@ test('filterCatalog returns new arrays and does not change the words', () => {
   const result = filterCatalog({ words: catalogWords, query: 'a' });
   assert.notEqual(result, catalogWords);
   assert.equal(JSON.stringify(catalogWords), copy);
+});
+
+test('parseCatalogChapter reads the chapter as the server does: the integer before the first dot', () => {
+  assert.equal(parseCatalogChapter('8'), 8);
+  assert.equal(parseCatalogChapter('8.2'), 8);
+  assert.equal(parseCatalogChapter(' 12 '), 12);
+  assert.equal(parseCatalogChapter('Д1'), null);
+  assert.equal(parseCatalogChapter('8a'), null);
+  assert.equal(parseCatalogChapter(null), null);
+});
+
+const chapterWords = [
+  { id: 1, nl: 'fiets', uk: 'велосипед', section: '8', difficulty: 'hard' },
+  { id: 2, nl: 'boek', uk: 'книга', section: '7', difficulty: null },
+  { id: 3, nl: 'trein', uk: 'потяг', section: '8.1', difficulty: null },
+  { id: 4, nl: 'huis', uk: 'дім', section: null, difficulty: 'easy' },
+  { id: 5, nl: 'tafel', uk: 'стіл', section: '10', difficulty: null },
+];
+
+test('listCatalogChapters: the chapters the words have, lowest first, then none when some words have no chapter', () => {
+  assert.deepEqual(listCatalogChapters(chapterWords), ['7', '8', '10', 'none']);
+  assert.deepEqual(listCatalogChapters(chapterWords.filter(word => word.section)), ['7', '8', '10']);
+  assert.deepEqual(listCatalogChapters([{ id: 1, section: null }]), [], 'no chapter at all: nothing to choose');
+});
+
+test('filterCatalog: the chapter combines with the bucket and the search', () => {
+  assert.deepEqual(ids(filterCatalog({ words: chapterWords, chapter: '8' })), [1, 3]);
+  assert.deepEqual(ids(filterCatalog({ words: chapterWords, chapter: '8', filter: 'new' })), [3]);
+  assert.deepEqual(ids(filterCatalog({ words: chapterWords, chapter: '8', query: 'велос' })), [1]);
+  assert.deepEqual(ids(filterCatalog({ words: chapterWords, chapter: 'none' })), [4]);
+  assert.deepEqual(ids(filterCatalog({ words: chapterWords, chapter: 'all' })), [1, 2, 3, 4, 5]);
+  assert.deepEqual(ids(filterCatalog({ words: chapterWords, chapter: '1' })), [], 'chapter 1 is not chapter 10');
+});
+
+test('the decks picker passes the chosen chapter to filterCatalog and resets it for a new deck', () => {
+  assert.match(appSource, /filterCatalog\(\{[^}]*chapter: decks\.chapter/);
+  assert.match(appSource, /function resetPickerChoice\(\) \{[^}]*decks\.chapter = 'all'/);
+  assert.match(appSource, /\$\('decks-chapter'\)\.addEventListener\('change'/);
 });
 
 test('sortCatalog: alpha by the Dutch word (accent and case free), hardest first with new words last, stale first', () => {

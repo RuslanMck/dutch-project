@@ -71,7 +71,8 @@ export const LongText = {
   }),
 };
 
-// The picker that comes before the form: the title, the search, the filter chips, the sort and the bar with the count.
+// The picker that comes before the form: the title, the search, the filter chips, the chapter (here глава 8), the sort
+// and the bar with the count.
 export const Picker = {
   render: () => `
 <div class="deck-picker" style="max-width:520px">
@@ -87,6 +88,16 @@ export const Picker = {
     <button type="button" data-filter="selected" aria-pressed="false">Обрані</button>
   </div>
   <div class="deck-picker__tools">
+    <label class="field">
+      <span>Глава</span>
+      <select aria-label="Глава підручника">
+        <option value="all">усі глави</option>
+        <option value="6">глава 6</option>
+        <option value="7">глава 7</option>
+        <option value="8" selected>глава 8</option>
+        <option value="none">без глави</option>
+      </select>
+    </label>
     <label class="field">
       <span>Порядок</span>
       <select aria-label="Порядок слів">
